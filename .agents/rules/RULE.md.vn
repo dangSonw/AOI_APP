@@ -1,0 +1,110 @@
+---
+name: rule-vn
+description: Phiên bản tiếng Việt của các quy tắc dự án
+metadata:
+  origin: Sown
+---
+
+# Quy tắc chuẩn hóa dự án AOI_APP
+
+## 1. Mục tiêu
+Tài liệu này định nghĩa các quy tắc chuẩn để thống nhất cấu trúc thư mục, đặt tên file, đặt tên biến, commit message, thiết kế API, bảo mật, testing và ngôn ngữ sử dụng trong toàn bộ dự án.
+
+## 2. Nguyên tắc chung
+- Ưu tiên code rõ ràng, dễ tìm, dễ mở rộng và dễ bảo trì.
+- Mỗi module nên có một trách nhiệm chính duy nhất.
+- Trước khi tạo file mới, hãy kiểm tra xem module tương tự đã tồn tại chưa.
+- Không đặt file ở thư mục gốc nếu đã có thư mục chức năng phù hợp.
+- Giữ sự thống nhất giữa backend, frontend, core, database và data.
+
+## 3. Quy tắc đặt tên thư mục
+- Chỉ dùng chữ thường.
+- Dùng kebab-case cho tên thư mục.
+- Ví dụ: `user-management`, `ai-pipeline`, `image-processing`.
+- Tên thư mục phải mô tả chức năng rõ ràng.
+- Tránh các tên chung như `temp`, `new`, `abc`, `final`, `misc`.
+- Dùng cấu trúc nhất quán cho thư mục chức năng như `feature/`, `domain/`, `service/`, `types/`, `tests/`.
+
+## 4. Quy tắc đặt tên file
+- File Python: dùng `snake_case.py`.
+- File TypeScript/JavaScript: dùng `kebab-case.ts` hoặc `kebab-case.tsx`.
+- Component React: dùng `PascalCase.tsx`.
+- File test: dùng hậu tố như `.test.ts`, `.test.py`, `.spec.ts`.
+- Tránh tên gây hiểu nhầm hoặc trùng với module khác.
+
+## 5. Quy tắc đặt tên biến, hàm và class
+- Python:
+  - biến và hàm: `snake_case`
+  - class: `PascalCase`
+  - hằng số: `UPPER_SNAKE_CASE`
+- TypeScript/JavaScript:
+  - biến và hàm: `camelCase`
+  - component, class, interface: `PascalCase`
+  - hằng số: `UPPER_SNAKE_CASE`
+- Tên boolean nên bắt đầu bằng `is`, `has`, `can` hoặc `should`.
+- Tên hàm phải mô tả hành vi, ví dụ: `load_user_profile`, `calculate_defect_score`.
+
+## 6. Phân quyền thư mục chức năng
+- `backend/`: API, authentication, schema, service, middleware, websocket.
+- `frontend/src/`: `components/`, `pages/`, `hooks/`, `services/`, `store/`, `types/`, `utils/`, `styles/`.
+- `core/`: business logic, thuật toán, calibration, vision, matching, measurement, pipeline.
+- `data/`: cache, images, models, projects, reports, temp.
+- `database/`: schema, migration, seed, backup.
+- `tests/`: chia theo tầng `backend`, `frontend`, `integration`, `performance`.
+
+## 7. Quy tắc phân tầng
+- Frontend chỉ chịu trách nhiệm hiển thị giao diện và gọi service hoặc API.
+- Backend xử lý request, response, validation, authentication và luồng nghiệp vụ cơ bản.
+- Core chứa logic nghiệp vụ chung, thuật toán và xử lý dữ liệu.
+- Database chỉ chứa schema, migration và định nghĩa cấu trúc dữ liệu.
+- Không đặt logic nghiệp vụ trực tiếp trong component hoặc route.
+
+## 8. Quy tắc commit message
+- Dùng commit message rõ ràng và thống nhất bằng tiếng Anh.
+- Ưu tiên phong cách Conventional Commits:
+  - `feat: add user profile endpoint`
+  - `fix: correct defect score calculation`
+  - `refactor: simplify image preprocessing flow`
+  - `test: add unit tests for calibration service`
+  - `docs: update API documentation`
+  - `chore: update dependencies`
+- Subject nên ngắn gọn và ở dạng mệnh lệnh.
+- Có thể thêm scope nếu cần, ví dụ: `feat(api): add user authentication`.
+- Tránh các message mơ hồ như `update`, `fix stuff`, `misc changes`.
+
+## 9. Quy tắc API
+- Dùng tên endpoint theo kiểu resource-based, RESTful.
+- Ưu tiên danh từ số nhiều cho collection, ví dụ: `/users`, `/projects`, `/defects`.
+- Giữ tên endpoint nhất quán và dễ dự đoán.
+- Dùng schema request/response rõ ràng và thống nhất.
+- Trả về mã HTTP phù hợp và thông báo lỗi có ý nghĩa.
+- Validate toàn bộ dữ liệu đầu vào ở server.
+- Khi có breaking change, nên version API.
+
+## 10. Quy tắc bảo mật
+- Không hardcode secrets, token, password hoặc private key.
+- Dùng environment variable hoặc hệ thống cấu hình an toàn.
+- Validate và sanitize tất cả dữ liệu đầu vào từ người dùng và hệ thống bên ngoài.
+- Áp dụng authentication và authorization cho tài nguyên được bảo vệ.
+- Không lộ thông tin nhạy cảm trong log, response hoặc message lỗi.
+- Tuân thủ nguyên tắc least privilege cho service và token.
+
+## 11. Quy tắc test
+- Khi thay đổi hành vi, phải cập nhật hoặc thêm test.
+- Ưu tiên test-first khi implement hoặc fix feature.
+- Viết unit test cho logic riêng và integration test cho luồng đa module.
+- Test phải dễ đọc, deterministic và độc lập.
+- Không bỏ qua test cho các luồng quan trọng như authentication, xử lý dữ liệu hoặc contract API.
+- Dùng tên test mô tả đúng hành vi mong đợi.
+
+## 12. Quy tắc ngôn ngữ
+- Tất cả code, tên file, biến, hàm, class, comment, log, text trên giao diện, key trong API payload và tên test phải dùng tiếng Anh.
+- Tiếng Việt chỉ nên dùng khi trả lời câu hỏi hoặc trao đổi với người dùng trong chat.
+- Không trộn tiếng Việt vào code, log, UI text, commit message hoặc tài liệu nằm trong codebase.
+
+## 13. Quy tắc bổ sung
+- Tên phải có ý nghĩa và không dùng viết tắt không rõ ràng.
+- Nếu nhiều file cùng mô tả một khái niệm, dùng prefix hoặc suffix thống nhất như `user-service`, `auth-middleware`, `defect-report`.
+- Không hardcode giá trị lặp lại; nên dùng constant, enum hoặc configuration.
+- Comment chỉ nên giải thích vì sao, không lặp lại điều đã rõ trong code.
+- Khi sửa module hiện có, giữ phong cách đặt tên và cấu trúc đã dùng trong module đó.
