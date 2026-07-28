@@ -1,0 +1,79 @@
+# Thư mục Scripts Hệ thống AOI
+
+Thư mục này chứa các kịch bản tự động để thiết lập, xây dựng, kiểm thử, triển khai và đóng gói ứng dụng Hệ thống AOI.
+
+## Yêu cầu trước khi chạy
+
+Các kịch bản được thiết kế để chạy trong môi trường tương thích POSIX (Linux, macOS hoặc Windows Subsystem for Linux - WSL).
+Đảm bảo bạn đã cài đặt các công cụ sau trên hệ thống của mình:
+- **Conda** (Miniconda hoặc Anaconda)
+- **NodeJS** và **npm**
+- **CMake** (tùy chọn, cần thiết để biên dịch các module C++ native)
+
+## Danh mục Kịch bản
+
+Tất cả các kịch bản được viết bằng đường dẫn tương đối, cho phép chúng hoạt động chính xác bất kể kho lưu trữ được nhân bản ở đâu.
+
+### 1. Thiết lập Cài đặt (`scripts/install/setup.sh`)
+Thiết lập môi trường phát triển bằng cách kiểm tra các phụ thuộc hệ thống, tạo một môi trường Python trong Conda có tên là `aoi-app`, cài đặt các thư viện backend, chạy `npm install` ở frontend và tạo các thư mục lưu trữ dữ liệu cần thiết trong `data/`.
+
+**Cách dùng:**
+```bash
+bash scripts/install/setup.sh
+```
+
+### 2. Chạy môi trường Phát triển (`scripts/run_dev.sh`)
+Khởi chạy đồng thời cả máy chủ phát triển FastAPI backend và Vite frontend. Nhấn `Ctrl+C` sẽ dọn dẹp và dừng cả hai tiến trình.
+
+**Cách dùng:**
+```bash
+bash scripts/run_dev.sh
+```
+- API Backend sẽ chạy tại: [http://127.0.0.1:8000](http://127.0.0.1:8000) (tự động tải lại khi thay đổi code)
+- Server phát triển frontend sẽ bắt đầu (kiểm tra đầu ra terminal để biết cổng hoạt động của Vite)
+
+### 3. Biên dịch Dự án (`scripts/build/build.sh`)
+Biên dịch các tài nguyên sẵn sàng cho production của frontend (được đưa vào `frontend/dist`) và biên dịch thư viện C++ native core (nếu đã cài đặt CMake) trong `core/native/build`.
+
+**Cách dùng:**
+```bash
+bash scripts/build/build.sh
+```
+
+### 4. Công cụ chạy Kiểm thử (`scripts/test/test.sh`)
+Chạy các bài kiểm thử một cách tuần tự cho các phân tầng khác nhau:
+- Các kiểm thử Backend trong `tests/backend/` bằng `pytest`.
+- Các kiểm thử logic Core trong `tests/core/` bằng `pytest`.
+- Các kiểm thử tích hợp (Integration) trong `tests/integration/` bằng `pytest`.
+- Các kiểm thử và kiểm tra kiểu dữ liệu (Type checking) frontend trong `frontend/`.
+
+**Cách dùng:**
+```bash
+bash scripts/test/test.sh
+```
+
+### 5. Kiểm tra khả năng Triển khai (`scripts/deploy/deploy.sh`)
+Xác minh xem các tài nguyên phiên bản production đã được biên dịch thành công chưa và cung cấp hướng dẫn chạy máy chủ trong môi trường production đằng sau một máy chủ proxy ngược (reverse proxy).
+
+**Cách dùng:**
+```bash
+bash scripts/deploy/deploy.sh
+```
+
+### 6. Đóng gói Bản phát hành (`scripts/release/release.sh`)
+Chạy một bản build sạch và đóng gói các tài nguyên production (dist, backend, core, database, docs, scripts) vào một tệp nén `.tar.gz` nằm trong thư mục `release/`. Các thư mục phục vụ phát triển (như `.venv` hoặc `__pycache__`) sẽ được loại trừ khỏi tệp lưu trữ.
+
+**Cách dùng:**
+```bash
+bash scripts/release/release.sh
+```
+
+---
+
+## Các Quy tắc Quan trọng khi Viết Script
+1. **Luôn sử dụng Đường dẫn Tương đối**: Tuyệt đối không hardcode đường dẫn tuyệt đối (ví dụ: `/home/user/...` hoặc `C:\Users\...`). Xác định thư mục bằng cách sử dụng các tham chiếu tương đối động (ví dụ: `$(dirname "${BASH_SOURCE[0]}")`).
+2. **Quản lý Phụ thuộc An toàn**: Làm cho các script hoạt động độc lập và an toàn. Nếu một script phụ thuộc vào trạng thái khác (như `setup.sh`), nó nên tự kiểm tra trạng thái đó trước hoặc đưa ra cảnh báo cho người dùng.
+3. **Quyền Thực thi**: Đảm bảo tất cả các kịch bản đều có quyền thực thi:
+   ```bash
+   chmod +x scripts/run_dev.sh scripts/install/setup.sh scripts/build/build.sh scripts/test/test.sh scripts/deploy/deploy.sh scripts/release/release.sh
+   ```

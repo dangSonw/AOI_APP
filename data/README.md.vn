@@ -1,0 +1,16 @@
+# Tài liệu Thư mục Dữ liệu Hệ thống AOI
+
+## Mục đích
+Mục này chứa tất cả dữ liệu phi cấu trúc, hình ảnh kiểm tra, mô hình AI, các tệp hiệu chuẩn và logs được tạo ra hoặc sử dụng bởi hệ thống AOI.
+
+## Các thư mục chính
+- `images/`: Lưu trữ ảnh camera chụp phục vụ kiểm tra lỗi.
+- `models/`: Lưu trữ các tệp trọng số mô hình trí tuệ nhân tạo (AI/Deep Learning).
+- `calibration/`: Lưu trữ các tham số hiệu chuẩn camera.
+- `logs/`: Lưu trữ nhật ký hoạt động chi tiết của hệ thống.
+- `reports/`: Lưu trữ báo cáo kết quả kiểm tra.
+- `cache/`, `temp/`: Thư mục lưu trữ bộ đệm và tệp tạm thời.
+
+## Nguyên tắc quản lý
+- Không commit các tệp hình ảnh lớn hoặc mô hình AI trực tiếp lên git.
+- Sử dụng các đường dẫn tương đối từ `core` và `backend` để lưu/đọc dữ liệu.

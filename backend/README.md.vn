@@ -1,0 +1,11 @@
+# Tài liệu Backend Hệ thống AOI
+
+## Mục đích
+Mục này chứa mã nguồn và tài liệu cho API Backend của hệ thống AOI, được xây dựng bằng FastAPI.
+
+## Các tệp thuộc về đây
+- API endpoints, dịch vụ xác thực, schemas định nghĩa dữ liệu, middleware và các kết nối cơ sở dữ liệu.
+- Các module xử lý kết nối WebSocket cho giao tiếp thời gian thực.
+
+## Mối quan hệ phụ thuộc
+Tương tác với `database` để truy xuất/lưu trữ dữ liệu, và giao tiếp với `core` để gọi các thuật toán và logic xử lý nghiệp vụ hình ảnh.

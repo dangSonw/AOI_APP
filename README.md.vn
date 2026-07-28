@@ -1,0 +1,16 @@
+# README.md.vn
+
+## Mục đích
+Điểm bắt đầu cấp cao nhất cho kho lưu trữ hệ thống AOI và tài liệu dự án.
+
+## Các tệp thuộc về đây
+Tổng quan về kho lưu trữ, tóm tắt kiến trúc, ghi chú thiết lập và tài liệu dành cho toàn bộ nhóm.
+
+## Các tệp không nên đặt ở đây
+Logic nghiệp vụ, chi tiết triển khai cụ thể, dữ liệu được tạo ra trong quá trình chạy (runtime), hoặc các thông tin bảo mật (secrets).
+
+## Nội dung ví dụ trong tương lai
+Sơ đồ kiến trúc gốc, hướng dẫn làm quen (onboarding), danh sách kiểm tra môi trường chạy và ghi chú phát hành (release notes).
+
+## Mối quan hệ phụ thuộc
+Phụ thuộc vào tất cả các thư mục chính để viết tài liệu và điều phối giữa frontend, backend, core, database và operations.

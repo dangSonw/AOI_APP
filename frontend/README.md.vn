@@ -1,0 +1,11 @@
+# Tài liệu Giao diện Người dùng (Frontend) Hệ thống AOI
+
+## Mục đích
+Mục này chứa mã nguồn cho ứng dụng giao diện web (UI) phục vụ vận hành và cấu hình hệ thống AOI, được xây dựng bằng Vite, React và TypeScript.
+
+## Các tệp thuộc về đây
+- Các component UI, trang màn hình (pages), hooks dùng chung và phong cách thiết kế (Tailwind CSS).
+- Các định nghĩa kiểu dữ liệu TypeScript (types) và dịch vụ API kết nối đến Backend.
+
+## Mối quan hệ phụ thuộc
+Gọi các API endpoints được cung cấp bởi `backend` để lấy trạng thái, cấu hình và gửi các tập lệnh kiểm tra chất lượng sản phẩm.

@@ -1,0 +1,17 @@
+# Tài liệu Thư mục Kiểm thử Hệ thống AOI
+
+## Mục đích
+Mục này chứa toàn bộ bộ kiểm thử (test suite) của hệ thống AOI, bao gồm kiểm thử đơn vị (unit tests), kiểm thử tích hợp (integration tests) và kiểm thử hiệu năng (performance tests).
+
+## Các thư mục chính
+- `backend/`: Các bài kiểm thử đơn vị cho API FastAPI backend.
+- `core/`: Các bài kiểm thử đơn vị cho thuật toán xử lý ảnh và đo đạc.
+- `frontend/`: Kiểm thử các thành phần UI và logic ứng dụng giao diện.
+- `integration/`: Kiểm thử tích hợp đa luồng giữa backend, core và cơ sở dữ liệu.
+- `performance/`: Các bài đo lường hiệu năng xử lý ảnh của thuật toán và độ trễ API.
+
+## Cách chạy kiểm thử
+Sử dụng công cụ chạy kiểm thử được cung cấp sẵn thông qua script:
+```bash
+bash scripts/test/test.sh
+```
