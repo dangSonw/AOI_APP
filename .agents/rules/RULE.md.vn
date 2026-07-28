@@ -101,6 +101,7 @@ Tài liệu này định nghĩa các quy tắc chuẩn để thống nhất cấ
 - Tất cả code, tên file, biến, hàm, class, comment, log, text trên giao diện, key trong API payload và tên test phải dùng tiếng Anh.
 - Tiếng Việt chỉ nên dùng khi trả lời câu hỏi hoặc trao đổi với người dùng trong chat.
 - Không trộn tiếng Việt vào code, log, UI text, commit message hoặc tài liệu nằm trong codebase.
+- Mỗi file markdown (`.md`) được tạo mới hoặc chỉnh sửa trong kho lưu trữ bắt buộc phải có một file dịch `.md.vn` tương ứng được viết bằng tiếng Việt (ví dụ: `README.md` và `README.md.vn`).
 
 ## 13. Quy tắc bổ sung
 - Tên phải có ý nghĩa và không dùng viết tắt không rõ ràng.
@@ -121,3 +122,7 @@ Tài liệu này định nghĩa các quy tắc chuẩn để thống nhất cấ
 - Biến: `defectCount`, `isLoading`, `MAX_IMAGE_SIZE`
 - Commit: `feat(api): add user authentication`
 - Đường dẫn tương đối (Python): `Path(__file__).parent.parent / "data" / "images"` thay vì `/home/sonev/graduation_project/main/AOI_APP/data/images`
+
+## 16. Quy tắc ghi nhớ kinh nghiệm AI (Experience & Memory)
+- Khi phát hiện hoặc sửa chữa một lỗi (bug), khi gặp các cấu hình đặc biệt, hoặc khi có các lưu ý kỹ thuật quan trọng, AI phải ghi lại trải nghiệm này.
+- Lưu trữ các lưu ý này dưới dạng file `memory.md` (tiếng Anh) và `memory.md.vn` (tiếng Việt) trong thư mục `.agents/experience/` để tích lũy kiến thức vận hành cho các agent sau này.

@@ -1,0 +1,17 @@
+# Nhật ký Kinh nghiệm AI: Thiết lập Conda và Quy tắc Đường dẫn
+
+## 1. Bối cảnh
+Trong quá trình thiết lập ban đầu dự án Hệ thống AOI, môi trường ảo Python tiêu chuẩn (`venv`) được tạo trong phân vùng WSL đã gây ra lỗi chỉ mục (index) của Git Client trên Windows khi chạy lệnh `git add .` do xung đột liên kết động (symlink) tương thích. Ngoài ra, nhà phát triển yêu cầu sử dụng Anaconda/Miniconda để quản lý môi trường nhằm đảm bảo tính tương thích đồng thời giữa Windows và Ubuntu.
+
+## 2. Các vấn đề gặp phải & Giải pháp
+- **Lỗi Chỉ mục Git:** Nạp và commit các thư mục môi trường ảo hoặc môi trường tuyệt đối gây ra lỗi thiếu tệp trên hệ điều hành máy chủ.
+  * *Giải pháp:* Loại bỏ tất cả các đường dẫn tạm thời `.venv/` và `.conda/` trong file `.gitignore`.
+- **Đường dẫn tuyệt đối trong tệp Build:** Thư mục include mục tiêu được cấu hình bằng đường dẫn tuyệt đối `/include` trong `core/native/CMakeLists.txt`.
+  * *Giải pháp:* Thay thế bằng `${CMAKE_CURRENT_SOURCE_DIR}/include`.
+- **Không tương thích môi trường phát triển:** Môi trường ảo `venv` của Python có sự khác biệt về symlink giữa Windows và WSL.
+  * *Giải pháp:* Tái cấu trúc các kịch bản cài đặt, build, test và run để chuyển sang sử dụng môi trường Conda với tên gọi thống nhất là `aoi-app` thông qua lệnh `conda run -n aoi-app`.
+
+## 3. Các luật chính được bổ sung
+- **Quy tắc Đường dẫn Tương đối:** Nghiêm cấm sử dụng đường dẫn tuyệt đối (ví dụ: `/home/...`, `C:\...`) để duy trì khả năng di động của dự án.
+- **Quy tắc Bản dịch Tiếng Việt đi kèm:** Mỗi tệp tài liệu dạng markdown (`.md`) được tạo mới hoặc cập nhật bắt buộc phải có một bản dịch `.md.vn` tương ứng bằng tiếng Việt.
+- **Nhật ký Kinh nghiệm của AI:** Các lỗi lớn, lưu ý kỹ thuật hoặc kinh nghiệm vận hành phải được ghi chép lại trong thư mục `.agents/experience/` dưới tên tệp `memory.md` và `memory.md.vn`.

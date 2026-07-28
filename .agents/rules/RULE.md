@@ -101,6 +101,7 @@ This document defines the standard rules for folder structure, file names, varia
 - All code, file names, variables, functions, classes, comments, logs, UI text, API payload keys, and test names must be written in English.
 - Vietnamese should be used only for chat replies and conversational communication with humans.
 - Do not mix Vietnamese into code, logs, UI strings, commit messages, or documentation that is part of the codebase.
+- Every markdown file (`.md`) created or modified in the repository must have a corresponding `.md.vn` translation file written in Vietnamese (e.g. `README.md` and `README.md.vn`).
 
 ## 13. Additional rules
 - Names must be meaningful and should not use unclear abbreviations.
@@ -121,3 +122,7 @@ This document defines the standard rules for folder structure, file names, varia
 - Variable: `defectCount`, `isLoading`, `MAX_IMAGE_SIZE`
 - Commit: `feat(api): add user authentication`
 - Relative Path (Python): `Path(__file__).parent.parent / "data" / "images"` instead of `/home/sonev/graduation_project/main/AOI_APP/data/images`
+
+## 16. AI Experience and Memory rules
+- When resolving a bug, encountering unique configurations, or identifying critical technical notes, the AI agent must record this knowledge.
+- Save these notes as `memory.md` (in English) and `memory.md.vn` (in Vietnamese) inside the `.agents/experience/` directory to preserve operational knowledge for future agents.
