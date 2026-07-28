@@ -109,9 +109,15 @@ This document defines the standard rules for folder structure, file names, varia
 - Comments should explain why something exists, not repeat what the code already clearly shows.
 - When editing an existing module, preserve the naming style and structure already used there.
 
-## 14. Examples
+## 14. Path rules
+- Always use relative paths when referring to files, directories, or assets within the project.
+- Absolutely avoid absolute paths (e.g. `/home/...` or `C:\...` or `\\wsl.localhost\...`) to ensure the project remains portable and runs smoothly when transferred to other machines.
+- Use path utility libraries (like Python's `pathlib` or Node's `path`) with relative references to resolve local project assets dynamically.
+
+## 15. Examples
 - Folder: `user-management/`
 - Python file: `user_service.py`
 - TypeScript component: `user-profile-card.tsx`
 - Variable: `defectCount`, `isLoading`, `MAX_IMAGE_SIZE`
 - Commit: `feat(api): add user authentication`
+- Relative Path (Python): `Path(__file__).parent.parent / "data" / "images"` instead of `/home/sonev/graduation_project/main/AOI_APP/data/images`

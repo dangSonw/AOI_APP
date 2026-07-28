@@ -1,6 +1,31 @@
-﻿node_modules/
+﻿# Node / Frontend
+node_modules/
 dist/
 .vite/
 .env
 .env.*
 .DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env/
+env/
+ENV/
+backend/.venv/
+.conda/
+conda-bld/
+
+# Native C++ build directories
+core/native/build/
+
+# Local data cache/logs (keep directory structure but ignore contents if needed)
+data/cache/*
+data/logs/*
+data/temp/*
+!data/cache/.gitkeep
+!data/logs/.gitkeep
+!data/temp/.gitkeep

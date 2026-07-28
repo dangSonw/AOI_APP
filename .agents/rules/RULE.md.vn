@@ -108,3 +108,16 @@ Tài liệu này định nghĩa các quy tắc chuẩn để thống nhất cấ
 - Không hardcode giá trị lặp lại; nên dùng constant, enum hoặc configuration.
 - Comment chỉ nên giải thích vì sao, không lặp lại điều đã rõ trong code.
 - Khi sửa module hiện có, giữ phong cách đặt tên và cấu trúc đã dùng trong module đó.
+
+## 14. Quy tắc đường dẫn
+- Luôn sử dụng đường dẫn tương đối (relative path) khi tham chiếu đến file, thư mục hoặc tài nguyên trong dự án.
+- Tuyệt đối tránh sử dụng đường dẫn tuyệt đối (absolute path, ví dụ: bắt đầu với `/home/...`, `C:\...` hoặc `\\wsl.localhost\...`) để đảm bảo dự án có thể di động và chạy trơn tru khi chuyển sang máy khác.
+- Sử dụng các thư viện tiện ích đường dẫn (như `pathlib` của Python hoặc `path` của Node) với tham chiếu tương đối để phân giải tài nguyên dự án cục bộ một cách linh hoạt.
+
+## 15. Ví dụ
+- Thư mục: `user-management/`
+- File Python: `user_service.py`
+- Component TypeScript: `user-profile-card.tsx`
+- Biến: `defectCount`, `isLoading`, `MAX_IMAGE_SIZE`
+- Commit: `feat(api): add user authentication`
+- Đường dẫn tương đối (Python): `Path(__file__).parent.parent / "data" / "images"` thay vì `/home/sonev/graduation_project/main/AOI_APP/data/images`

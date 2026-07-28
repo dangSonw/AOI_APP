@@ -2,4 +2,4 @@
 project(aoi_core LANGUAGES CXX)
 
 add_library(aoi_core INTERFACE)
-target_include_directories(aoi_core INTERFACE /include)
+target_include_directories(aoi_core INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
