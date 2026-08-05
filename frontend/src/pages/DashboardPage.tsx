@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import type { PhysicalInputState, PhysicalOutputState } from '../types/physical-io';
 import type { InspectionStatus } from '../types/workspace';
 import { StatusBadge } from '../components/StatusBadge';
+import type { Workflow } from '../types/workflow';
 
 interface DashboardPageProps {
   inputs: PhysicalInputState | null;
@@ -9,6 +11,9 @@ interface DashboardPageProps {
   error: string;
   isRunning: boolean;
   onOutputToggle: (signalName: string, currentValue: boolean) => void;
+  workflow: Workflow | null;
+  workflowError: string;
+  onConfigureWorkflow: () => void;
 }
 
 const METRICS = [
@@ -19,16 +24,8 @@ const METRICS = [
   { label: 'Defects', value: '12', unit: 'flagged', delta: '0.96%' },
 ];
 
-const PIPELINE_STEPS: Array<{ label: string; runtime: string; status: InspectionStatus }> = [
-  { label: 'Camera', runtime: '12 ms', status: 'success' },
-  { label: 'Measure', runtime: '3 ms', status: 'success' },
-  { label: 'Depth', runtime: '18 ms', status: 'success' },
-  { label: 'PatchCore', runtime: '21 ms', status: 'running' },
-  { label: 'YOLO', runtime: '16 ms', status: 'idle' },
-  { label: 'Decision', runtime: '8 ms', status: 'idle' },
-];
-
-export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, onOutputToggle }: DashboardPageProps) {
+export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, onOutputToggle, workflow, workflowError, onConfigureWorkflow }: DashboardPageProps) {
+  const [isFlowCollapsed, setIsFlowCollapsed] = useState(false);
   const lineStatus: InspectionStatus = isRunning ? 'running' : inputs ? (inputs.machine.emergencyStop ? 'error' : 'success') : 'warning';
   const lineStatusLabel = isRunning ? 'Inspection running' : inputs ? (inputs.machine.emergencyStop ? 'Emergency stop' : 'Line ready') : 'Awaiting I/O';
   const systemStatuses = [
@@ -39,6 +36,10 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, on
     { label: 'Model', status: 'success' },
     { label: 'Recipe', status: 'success' },
   ] as const;
+  const workflowNodes = new Map(workflow?.nodes.map((node) => [node.id, node]) ?? []);
+  const orderedWorkflowNodes = workflow?.executionOrder
+    .map((nodeId) => workflowNodes.get(nodeId))
+    .filter((node) => node !== undefined) ?? [];
 
   return (
     <div className="dashboard-layout" aria-busy={isLoading}>
@@ -122,21 +123,37 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, on
         </section>
       </div>
 
-      <aside className="pipeline-panel" aria-label="Inspection flow">
-        <div className="panel-heading"><span>Inspection flow</span><span>v2.14</span></div>
+      <aside className={`pipeline-panel ${isFlowCollapsed ? 'pipeline-panel--collapsed' : ''}`} aria-label="Inspection flow">
+        <div className="panel-heading">
+          <span>Inspection flow</span>
+          <span className="pipeline-panel__actions">
+            <button className="icon-button" type="button" aria-label="Configure inspection workflow" onClick={onConfigureWorkflow}>⚙</button>
+            <button
+              className="icon-button"
+              type="button"
+              aria-label={isFlowCollapsed ? 'Expand inspection flow' : 'Collapse inspection flow'}
+              aria-expanded={!isFlowCollapsed}
+              onClick={() => setIsFlowCollapsed((current) => !current)}
+            >
+              {isFlowCollapsed ? '‹' : '›'}
+            </button>
+          </span>
+        </div>
+        {workflowError && <p className="pipeline-panel__error" role="status">{workflowError}</p>}
+        {!workflowError && orderedWorkflowNodes.length === 0 && <p className="pipeline-panel__error">No configured workflow steps.</p>}
         <ol className="pipeline-list">
-          {PIPELINE_STEPS.map((step, index) => (
-            <li className={`pipeline-step pipeline-step--${step.status}`} key={step.label}>
+          {orderedWorkflowNodes.map((step, index) => (
+            <li className="pipeline-step pipeline-step--configuration" key={step.id}>
               <span className="pipeline-step__index">{String(index + 1).padStart(2, '0')}</span>
-              <span><strong>{step.label}</strong><small>{step.status}</small></span>
-              <time>{step.runtime}</time>
+              <span><strong>{step.displayName}</strong><small>Configuration only</small></span>
+              <code>{step.algorithmId}</code>
             </li>
           ))}
         </ol>
         <section className="pipeline-summary">
-          <span className="overline">Last decision</span>
-          <strong>PASS</strong>
-          <span>PCB-24-08192 · 98.7% confidence</span>
+          <span className="overline">Saved recipe graph</span>
+          <strong>R{workflow?.revision ?? '—'}</strong>
+          <span>{workflow ? `${workflow.nodes.length} nodes · Schema v${workflow.version}` : 'Workflow unavailable'}</span>
         </section>
       </aside>
     </div>
