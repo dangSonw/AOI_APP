@@ -1,0 +1,442 @@
+# Thiết kế Trình biên tập Workflow
+
+**Ngày:** 2026-08-05
+
+**Trạng thái:** Đã duyệt
+
+**Bản tiếng Anh đi kèm:** `2026-08-05-workflow-editor-design.md`
+
+## 1. Mục đích
+
+AOI Studio cần một inspection workflow có thể chỉnh sửa nhưng không được tuyên bố sai rằng runtime xử lý ảnh hoặc phát hiện bất thường đã được cài đặt. Milestone này bổ sung:
+
+- panel Inspection flow có thể thu gọn trên dashboard;
+- thao tác cài đặt mở workspace Workflow editor riêng;
+- trình biên tập đồ thị có hướng không chu trình với cổng dữ liệu có kiểu, canvas tự do và danh sách thứ tự thực thi riêng;
+- catalog thuật toán do `core/` sở hữu;
+- REST endpoint có xác thực để cung cấp catalog và lưu workflow của recipe bằng JSON nguyên tử có kiểm tra revision.
+
+Milestone này chỉ phục vụ cấu hình. Nó không cài OpenCV, PyTorch, Anomalib, model weight, dữ liệu huấn luyện hoặc implementation inference.
+
+## 2. Phạm vi đã duyệt
+
+### 2.1 Inspection flow trên dashboard
+
+- Panel mặc định mở và có thể thu gọn/mở rộng giống Project explorer.
+- Nút cài đặt mở workspace Workflow editor riêng.
+- Khi thu gọn trong workspace rộng, panel trở thành action rail hẹp và trả lại chiều rộng cho dashboard.
+- Ở workspace hẹp, panel vẫn nằm trong normal document flow và thu thành header gọn thay vì gây tràn ngang document.
+- Control thu gọn và cài đặt có accessible name, keyboard focus nhìn thấy được và chiều cao truy cập tối thiểu.
+- Panel đọc active workflow đã lưu thay vì danh sách bước hard-code ở frontend.
+- Vì thực thi runtime nằm ngoài milestone, node đã cấu hình dùng trạng thái rõ ràng `Configuration only`. Trạng thái production mô phỏng hiện tại không được làm người dùng hiểu rằng implementation thuật toán đã sẵn sàng.
+
+### 2.2 Workflow editor riêng
+
+- Editor là workspace view hạng nhất `workflow-editor`.
+- Có thể mở từ nút cài đặt Inspection flow và mục Workflow trong Project explorer.
+- Header có Back to workspace, thông tin recipe, revision, trạng thái validation/dirty, Auto order và Save changes.
+- Editor có bốn vùng phối hợp:
+  1. catalog thuật toán có tìm kiếm và phân nhóm;
+  2. node graph canvas;
+  3. inspector của node đang chọn;
+  4. danh sách thứ tự thực thi.
+- `@xyflow/react` cung cấp định vị node, handle, edge, zoom, pan, fit view, control và minimap trên desktop.
+- React Flow chỉ là lớp tương tác. Dữ liệu workflow được lưu dùng schema do AOI sở hữu và không đưa type nội bộ của React Flow ra API.
+
+### 2.3 Chỉnh sửa graph
+
+- Người dùng có thể kéo item trong catalog vào canvas hoặc dùng nút Add.
+- Người dùng có thể di chuyển node tự do trên canvas. Tọa độ canvas là metadata trình bày và không quyết định thứ tự thực thi.
+- Người dùng có thể kéo edge từ output handle tới input handle.
+- Connection chỉ được chấp nhận khi:
+  - source node và target node đều tồn tại;
+  - source port và target port đều tồn tại;
+  - source là output và target là input;
+  - hai port có cùng kiểu dữ liệu chuẩn;
+  - input không phải variadic chưa có connection khác;
+  - edge không trùng và không tự nối node;
+  - việc thêm edge không tạo cycle.
+- Người dùng có thể chọn và xóa edge. Xóa edge để target port quay về trạng thái chưa kết nối.
+- Người dùng có thể xóa node. Nếu có edge phụ thuộc, UI chỉ rõ connection bị ảnh hưởng và yêu cầu xác nhận trước khi xóa node cùng các edge đó.
+- Chọn node sẽ mở inspector. Người dùng có thể sửa display name, tham số thuật toán và display label của port.
+- Kiểu port chuẩn và required port của thuật toán do catalog sở hữu nên không thể đổi hoặc xóa trong editor.
+- Chỉ catalog port đánh dấu `variadic` mới được tạo hoặc xóa port instance bổ sung. Decision fusion dùng score input variadic.
+- Mỗi thao tác bằng con trỏ đều có cách thay thế bằng bàn phím/form:
+  - nút Add thay cho kéo catalog;
+  - combobox source-output thay cho kéo edge;
+  - nút Move up và Move down thay cho kéo thứ tự thực thi;
+  - nút Delete connection và Delete node rõ ràng.
+
+### 2.4 Thứ tự thực thi
+
+- Thứ tự thực thi được lưu riêng với vị trí canvas.
+- Danh sách hỗ trợ kéo để sắp xếp và nút Move up/Move down.
+- Draft order có thể tạm thời không hợp lệ trong khi chỉnh sửa.
+- Save bị vô hiệu hóa tới khi mọi source dependency đứng trước consumer.
+- Auto order áp dụng stable topological sort. Khi nhiều node độc lập, thứ tự tương đối hiện tại của chúng được giữ nguyên.
+- Graph cycle bị chặn ngay khi đề xuất edge và tiếp tục bị core validation từ chối khi lưu.
+
+### 2.5 Lưu trữ và concurrency
+
+- Active recipe slug của milestone là `rev-c-mainboard`.
+- Workflow được lưu dưới `data/projects/<recipe-slug>/workflow.json` bằng cách phân giải đường dẫn tương đối với project.
+- Ghi dữ liệu qua file tạm cùng thư mục, flush và `fsync`, sau đó thay thế nguyên tử.
+- Workflow có `revision` là số nguyên không âm.
+- Update thành công yêu cầu revision gửi lên bằng revision đang lưu, tăng revision một đơn vị và trả workflow mới.
+- Update cũ trả HTTP `409 Conflict` với thông báo có ý nghĩa. Frontend giữ draft chưa lưu và cho phép reload; không bao giờ âm thầm ghi đè dữ liệu server mới hơn.
+- Khi chưa có file workflow, hệ thống tạo default workflow trong bộ nhớ và lưu nó ở lần update thành công đầu tiên.
+- Dữ liệu workflow không hợp lệ hoặc không đọc được trả HTTP `503 Service Unavailable` mà không lộ đường dẫn filesystem.
+
+## 3. Kiến trúc và quyền sở hữu
+
+```text
+frontend/src/
+  pages + components      UI state, tương tác React Flow, form
+  services                API call có xác thực
+  types                    contract API camelCase
+          |
+          | JSON qua REST có xác thực
+          v
+backend/app/
+  api                     request/response/auth/status code
+  schemas                 validation transport bằng Pydantic
+  services                adapter lưu workflow nguyên tử
+          |
+          | import catalog và graph rule
+          v
+core/
+  algorithms              catalog thuật toán và typed port
+  pipeline                domain model, validation, stable topological sort
+          |
+          v
+data/projects/<slug>/workflow.json
+```
+
+### 3.1 `core/`
+
+`core/` là nguồn sự thật cho metadata thuật toán và tính đúng đắn của pipeline. Nó không được import FastAPI, React, module database hoặc repository adapter phụ thuộc filesystem.
+
+Trách nhiệm của core:
+
+- định nghĩa standard data type, port definition, parameter definition, algorithm definition, node, connection và workflow;
+- trả immutable algorithm catalog;
+- kiểm tra cấu trúc workflow, typed connection, tham số, cycle, required input và execution order;
+- tạo stable topological order;
+- cung cấp default workflow.
+
+### 3.2 Backend
+
+Trách nhiệm của backend:
+
+- xác thực mọi workflow endpoint;
+- ánh xạ core domain object thành API schema camelCase;
+- kiểm tra recipe slug bằng `^[a-z0-9]+(?:-[a-z0-9]+)*$` và từ chối giá trị giống path traversal;
+- đọc và ghi nguyên tử JSON workflow của recipe;
+- thực thi optimistic revision concurrency;
+- chuyển core validation failure thành HTTP `422 Unprocessable Entity` và stale revision thành HTTP `409 Conflict`.
+
+### 3.3 Frontend
+
+Trách nhiệm của frontend:
+
+- render catalog và workflow nhận từ API;
+- quản lý local draft chưa lưu;
+- phản hồi tương tác sớm bằng API data type chung và frontend graph helper;
+- gửi toàn bộ workflow cho backend validation;
+- không tự định nghĩa business algorithm catalog độc lập;
+- không tuyên bố runtime thuật toán đã cài chỉ vì catalog có thuật toán đó.
+
+## 4. Domain model
+
+### 4.1 Kiểu dữ liệu port chuẩn
+
+Tập kiểu đóng ban đầu:
+
+| Kiểu | Ý nghĩa |
+|---|---|
+| `image` | Một tensor hoặc matrix ảnh 2D |
+| `image-set` | Tập ảnh có thứ tự hoặc được nhóm |
+| `mask` | Mask không gian nhị phân hoặc có nhãn |
+| `roi-set` | Tập region of interest có tên |
+| `keypoints` | Feature point và descriptor |
+| `contours` | Tập contour vector |
+| `features` | Tensor feature học được hoặc thủ công |
+| `detections` | Instance linh kiện/vật thể |
+| `anomaly-map` | Bản đồ anomaly score theo không gian |
+| `score` | Scalar hoặc tập score có tên |
+| `transform` | Geometric transform hoặc calibration mapping |
+| `decision` | Bằng chứng/kết quả `PASS`, `REVIEW` hoặc `FAIL` |
+
+Connection yêu cầu hai kiểu giống hệt nhau trong milestone này. Không hỗ trợ chuyển kiểu ngầm định.
+
+### 4.2 Algorithm definition
+
+Mỗi catalog entry gồm:
+
+- `id` kebab-case ổn định;
+- `name` tiếng Anh và `description` ngắn gọn hướng tới operator;
+- `category` và nhóm tài liệu;
+- `availability: "configuration-only"`;
+- input/output port template có thứ tự;
+- typed parameter definition có default value, giới hạn/lựa chọn và required flag;
+- reference label tùy chọn cho họ thuật toán nguồn được mô tả trong `docs/algorithm/README.md/algo.md`.
+
+### 4.3 Workflow node
+
+Mỗi node gồm:
+
+- UUID `id` duy nhất;
+- `algorithmId` trong catalog;
+- `displayName` chỉnh sửa được;
+- tọa độ canvas hữu hạn `position: { x, y }`;
+- giá trị tham số;
+- port instance chứa stable ID, catalog template key, standard type, display label chỉnh sửa được, required state và variadic-instance metadata.
+
+### 4.4 Connection
+
+Mỗi connection gồm:
+
+- UUID `id` duy nhất;
+- `sourceNodeId` và `sourcePortId`;
+- `targetNodeId` và `targetPortId`.
+
+### 4.5 Workflow
+
+Mỗi workflow gồm:
+
+- `recipeSlug`, `recipeName`, `version` và `revision`;
+- `updatedAt` theo UTC ISO 8601;
+- `nodes`;
+- `connections`;
+- `executionOrder` chứa mỗi node ID chính xác một lần.
+
+## 5. Catalog thuật toán
+
+Catalog là metadata cấu hình, không phải đăng ký runtime. Entry ban đầu được nhóm như sau.
+
+### 5.1 Thành phần acquisition và pipeline
+
+- Image input
+- Camera capture
+- ROI extraction
+- Global/local stream split
+- Score normalization
+- Connected-component evidence filter
+- Decision fusion
+- Decision output
+
+### 5.2 Tool cấu hình được OpenCV hỗ trợ
+
+- Color conversion
+- Resize
+- Normalize
+- CLAHE
+- Gaussian blur
+- Median blur
+- Bilateral filter
+- Global threshold
+- Otsu threshold
+- Adaptive threshold
+- Erode
+- Dilate
+- Morphology operation
+- Canny edges
+- Sobel gradient
+- Scharr gradient
+- Laplacian
+- Find contours
+- Connected components
+- Hough lines
+- Hough circles
+- Feature detection and matching
+- Camera undistortion
+- Homography registration
+- ECC registration
+
+### 5.3 Nhóm A — So sánh golden/reference
+
+- Absolute difference
+- Median–MAD robust difference
+- SSIM
+- Normalized cross-correlation
+- Edge difference
+- Gradient difference
+- Binary XOR
+- Template matching
+- Per-pixel Mahalanobis distance
+- Golden score fusion
+
+### 5.4 Nhóm B — Phân bố feature
+
+- SPADE
+- PaDiM
+- PatchCore
+- AnomalyDINO
+
+### 5.5 Nhóm C — Student–teacher và distillation
+
+- STFPM
+- RD4AD
+- EfficientAD
+
+### 5.6 Nhóm E — Normalizing flow
+
+- DifferNet
+- FastFlow
+- CFLOW-AD
+
+### 5.7 Nhóm F — Kiểm tra linh kiện và logic
+
+- Golden component matching
+- ComAD
+- Component relation graph
+- UniAD
+- Polarity and orientation inspection
+
+Catalog có thể mở rộng bằng core definition mới. Entry mới phải có đầy đủ typed port, ràng buộc tham số, availability, test và mô tả operator bằng tiếng Anh.
+
+## 6. Default workflow
+
+Graph mặc định `Rev C · Mainboard` minh họa branch và merge hợp lệ mà không ngụ ý runtime execution:
+
+```text
+Image input
+  -> ECC registration
+      -> Median–MAD robust difference --score--\
+      -> PatchCore --------------------score--- Decision fusion -> Decision output
+      -> Golden component matching ----score--/
+```
+
+Thứ tự thực thi mặc định đi theo dependency hiển thị. Mọi node có nhãn `Configuration only`.
+
+## 7. REST API
+
+Mọi endpoint yêu cầu bearer authentication dependency hiện có.
+
+### `GET /api/algorithms`
+
+Trả catalog dưới dạng mảng có thứ tự. Response: `200 OK`.
+
+### `GET /api/recipes/{recipeSlug}/workflow`
+
+Trả workflow đã lưu hoặc default workflow khi chưa có file. Response:
+
+- `200 OK`;
+- `422 Unprocessable Entity` khi recipe slug không hợp lệ;
+- `503 Service Unavailable` khi persisted data không hợp lệ/không đọc được.
+
+### `PUT /api/recipes/{recipeSlug}/workflow`
+
+Nhận toàn bộ workflow draft. Response:
+
+- `200 OK` với revision đã tăng;
+- `409 Conflict` khi revision cũ;
+- `422 Unprocessable Entity` với graph validation issue có cấu trúc;
+- `503 Service Unavailable` khi lưu thất bại.
+
+Validation issue chứa `code` ổn định, `message` tiếng Anh và `nodeId`, `portId` hoặc `connectionId` tùy chọn. Code ban đầu gồm `unknown-algorithm`, `unknown-node`, `unknown-port`, `duplicate-id`, `duplicate-connection`, `self-loop`, `type-mismatch`, `input-already-connected`, `missing-required-input`, `invalid-parameter`, `cycle`, `execution-order-mismatch` và `dependency-order`.
+
+## 8. Tương tác và state frontend
+
+- `WorkspacePage` sở hữu active view và tải workflow data cho dashboard/editor consumer.
+- Khi vào editor, catalog và workflow được fetch song song.
+- Editor giữ `savedWorkflow` và `draftWorkflow`; dirty state được suy ra bằng cách so sánh giá trị AOI schema có thể serialize.
+- Save bị vô hiệu hóa trong lúc loading, saving, không có thay đổi hoặc draft không hợp lệ.
+- Khi lưu thành công, cả saved state và draft state dùng workflow revision mới trả về.
+- Rời editor khi có thay đổi chưa lưu yêu cầu xác nhận trong app trước khi đổi workspace view.
+- API failure và validation failure nằm trong normal document flow và được thông báo qua `aria-live`.
+- Catalog search so khớp name, description, category và algorithm ID không phân biệt hoa thường.
+- Catalog item hiển thị `Configuration only` bằng text, không chỉ bằng màu.
+- Nút cài đặt dashboard có nhãn ổn định `Configure inspection workflow`.
+
+## 9. Thiết kế hình ảnh và responsive
+
+### 9.1 Token và nhận diện
+
+Editor mở rộng nhận diện AOI Studio công nghiệp sáng hiện có:
+
+- Ink `#0B1F33` cho primary text;
+- Blueprint `#1769E0` cho node được chọn và primary action;
+- Signal green `#149B68` cho valid state đi kèm text/icon;
+- Warning amber `#B66A00` cho draft và validation warning đi kèm text/icon;
+- Panel `#FFFFFF` cho application surface;
+- Grid `#EEF3F8` cho cấu trúc technical canvas.
+
+Tiếp tục dùng typography hiện có. Utility label dùng chữ hoa có tracking; data và execution index dùng Space Grotesk. Điểm hình ảnh đặc trưng là execution spine nối free-position graph với deterministic execution-order rail.
+
+### 9.2 Hành vi layout
+
+- Container rộng: catalog, canvas và inspector tạo ba cột; execution order trải rộng phía dưới.
+- Container trung bình: catalog thành rail ngang; canvas và inspector tạo hai cột; execution order vẫn ở dưới.
+- Container hẹp: catalog, canvas giới hạn, inspector và execution order xếp chồng trong normal flow.
+- React Flow canvas là technical region có giới hạn. Định vị node nội bộ được miễn quy tắc tọa độ application layout; application component bao quanh vẫn dùng normal flow Grid/Flex.
+- Minimap chỉ xuất hiện khi canvas có đủ không gian.
+- Document không được có tràn ngang ngoài ý muốn ở viewport 390, 768, 1280 hoặc 1920 pixel.
+- Reduced-motion preference vô hiệu hóa transition không thiết yếu.
+
+## 10. Xử lý lỗi
+
+- Catalog trống: giải thích không có algorithm definition và cung cấp thao tác retry.
+- Workflow trống: mời người dùng thêm Image input từ catalog.
+- Draft không hợp lệ: liệt kê graph issue có thể hành động và liên kết với node/port khi có thể.
+- Revision cũ: giữ draft và cung cấp Reload server version; không tự merge.
+- Lưu thất bại: giữ draft và đưa Save changes về trạng thái cho phép retry.
+- Thuật toán không xác định trong persisted data: backend từ chối workflow là persisted data không hợp lệ thay vì tự bỏ node.
+
+## 11. Test và xác minh
+
+### Core test
+
+- catalog ID và port template key là duy nhất;
+- mọi entry là `configuration-only` và có typed metadata đầy đủ;
+- branched graph hợp lệ vượt qua validation;
+- type mismatch, thiếu required input, duplicate, self-loop và cycle thất bại với code ổn định;
+- stable topological sort giữ thứ tự tương đối khi có thể;
+- execution order phải chứa mỗi node đúng một lần và đặt dependency trước.
+
+### Backend test
+
+- workflow JSON round-trip và được ghi nguyên tử;
+- stale revision bị từ chối;
+- recipe slug traversal bị từ chối;
+- protected endpoint từ chối anonymous request;
+- contract catalog và default workflow dùng camelCase;
+- graph không hợp lệ trả response `422` có cấu trúc.
+
+### Frontend test
+
+- graph helper từ chối connection sai kiểu và cycle;
+- thêm catalog definition tạo node với default từ catalog;
+- reorder và Auto order cập nhật execution order xác định;
+- lọc catalog không phân biệt hoa thường trên mọi field dự kiến;
+- dirty state và điều kiện cho phép lưu phản ánh validation và revision.
+
+### Xác minh trình duyệt thủ công
+
+- mở/thu panel dashboard và điều hướng bằng nút cài đặt;
+- kéo catalog vào canvas, di chuyển node, tạo/xóa edge, zoom/pan/fit view;
+- kéo thứ tự thực thi và dùng phương án bàn phím thay thế;
+- chỉnh parameter và port label trong node inspector;
+- lưu thành công, validation failure, stale-revision handling và xác nhận khi rời trang có thay đổi chưa lưu;
+- không tràn ngang ngoài ý muốn ở 390, 768, 1280 và 1920 pixel, gồm viewport thấp 390x600;
+- keyboard focus nhìn thấy được và reduced-motion behavior.
+
+Lệnh xác minh của dự án tiếp tục là:
+
+```bash
+bash scripts/test/test.sh
+bash scripts/build/build.sh
+```
+
+## 12. Ngoài phạm vi rõ ràng
+
+- Chạy image processing hoặc model inference.
+- Cài hoặc import OpenCV, PyTorch, Anomalib, CUDA, model repository hoặc model weight.
+- Huấn luyện, quản lý dataset, hiệu chỉnh threshold, benchmark hoặc runtime telemetry trực tiếp.
+- Collaborative editing nhiều người, tự merge conflict, lịch sử version workflow hoặc lưu database.
+- Thực thi graph đã cấu hình từ control Run hoặc Single step.
+- Python/script/plugin do người dùng tự viết hoặc parameter expression không giới hạn.
+
+## 13. Phát triển tương lai
+
+Khi runtime thuật toán được triển khai, catalog availability có thể phát triển từ `configuration-only` thành runtime capability record rõ ràng do core cung cấp. Công việc runtime phải định nghĩa riêng installation, nguồn gốc model artifact, preprocessing contract, yêu cầu phần cứng, execution isolation, telemetry và validation end-to-end trên dữ liệu PCB. Workflow schema và typed port do AOI sở hữu được thiết kế độc lập với React Flow để việc thêm runtime execution hoặc thay editor library trong tương lai không bắt buộc thay persisted recipe.
