@@ -121,7 +121,7 @@ bash scripts/test/test.sh
 bash scripts/build/build.sh
 ```
 
-The latest complete test run passed three backend unit tests, two integration tests, five frontend tests, and TypeScript checking.
+The latest complete test run passed 15 backend tests, 14 core tests, 12 integration tests, 11 frontend tests, and TypeScript checking.
 
 Direct frontend commands are also available:
 
@@ -154,8 +154,21 @@ The current JSON interface is a simulation boundary. A future hardware adapter c
 | `GET` | `/api/io/inputs` | Read simulated inputs | Bearer token |
 | `GET` | `/api/io/outputs` | Read simulated outputs | Bearer token |
 | `PUT` | `/api/io/outputs` | Atomically update outputs | Bearer token |
+| `GET` | `/api/algorithms` | Read the configuration-only algorithm catalog | Bearer token |
+| `GET` | `/api/recipes/{recipeSlug}/workflow` | Read a persisted or default recipe workflow | Bearer token |
+| `PUT` | `/api/recipes/{recipeSlug}/workflow` | Validate and atomically save a complete workflow | Bearer token |
 
 Password-reset email delivery is intentionally not implemented in this milestone. The endpoint returns the same safe message whether an account exists or not.
+
+## Workflow editor and storage
+
+- The Workflow editor is available from the Dashboard Inspection flow settings action and the Project explorer Workflow item.
+- `core/algorithms` owns the ordered configuration catalog, typed ports, parameter definitions, and `configuration-only` availability metadata.
+- `core/pipeline` owns workflow validation and stable topological ordering. Connections require exact type equality, and cycles, self-loops, duplicate connections, missing required inputs, and invalid execution order are rejected.
+- Recipe workflows are AOI-owned camelCase JSON documents stored under `data/projects/<recipe-slug>/workflow.json`. React Flow presentation objects are never persisted.
+- Successful saves require the submitted revision to match storage, increment the revision once, and use a sibling temporary file, flush, `fsync`, and atomic replacement. A stale save returns HTTP `409` without overwriting the newer file.
+- The current catalog and editor are configuration metadata only. They do not install or run OpenCV, PyTorch, Anomalib, model weights, training, or inference.
+- Local recipe workflow files are runtime data and are ignored by Git; `data/projects/.gitkeep` preserves the directory structure.
 
 ## Figma and CodeGraph workflow
 

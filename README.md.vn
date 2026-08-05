@@ -121,7 +121,7 @@ bash scripts/test/test.sh
 bash scripts/build/build.sh
 ```
 
-Lần chạy test đầy đủ mới nhất đã vượt qua ba backend unit test, hai integration test, năm frontend test và bước kiểm tra TypeScript.
+Lần chạy test đầy đủ mới nhất đã vượt qua 15 backend test, 14 core test, 12 integration test, 11 frontend test và bước kiểm tra TypeScript.
 
 Các lệnh frontend trực tiếp:
 
@@ -154,8 +154,21 @@ Giao diện JSON hiện tại là ranh giới mô phỏng. Adapter phần cứng
 | `GET` | `/api/io/inputs` | Đọc input mô phỏng | Bearer token |
 | `GET` | `/api/io/outputs` | Đọc output mô phỏng | Bearer token |
 | `PUT` | `/api/io/outputs` | Cập nhật output nguyên tử | Bearer token |
+| `GET` | `/api/algorithms` | Đọc catalog thuật toán chỉ phục vụ cấu hình | Bearer token |
+| `GET` | `/api/recipes/{recipeSlug}/workflow` | Đọc workflow đã lưu hoặc workflow mặc định của recipe | Bearer token |
+| `PUT` | `/api/recipes/{recipeSlug}/workflow` | Validate và lưu nguyên tử toàn bộ workflow | Bearer token |
 
 Gửi email đặt lại mật khẩu chưa được triển khai trong mốc này. Endpoint luôn trả cùng một thông báo an toàn dù tài khoản có tồn tại hay không.
+
+## Workflow editor và lưu trữ
+
+- Có thể mở Workflow editor từ thao tác cài đặt Inspection flow trên Dashboard và mục Workflow trong Project explorer.
+- `core/algorithms` sở hữu catalog cấu hình có thứ tự, typed port, parameter definition và metadata availability `configuration-only`.
+- `core/pipeline` sở hữu workflow validation và stable topological ordering. Connection yêu cầu type bằng tuyệt đối; cycle, self-loop, duplicate connection, thiếu required input và execution order không hợp lệ đều bị từ chối.
+- Workflow của recipe là tài liệu JSON camelCase do AOI sở hữu, được lưu dưới `data/projects/<recipe-slug>/workflow.json`. Object trình bày nội bộ của React Flow không bao giờ được lưu.
+- Lần lưu thành công yêu cầu revision gửi lên khớp storage, tăng revision đúng một lần và dùng file tạm cùng thư mục, flush, `fsync` cùng atomic replacement. Lần lưu stale trả HTTP `409` mà không ghi đè file mới hơn.
+- Catalog và editor hiện tại chỉ là metadata cấu hình. Chúng không cài hoặc chạy OpenCV, PyTorch, Anomalib, model weight, training hay inference.
+- File workflow recipe local là dữ liệu runtime và bị Git bỏ qua; `data/projects/.gitkeep` giữ cấu trúc thư mục.
 
 ## Quy trình Figma và CodeGraph
 

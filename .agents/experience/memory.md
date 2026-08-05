@@ -98,4 +98,15 @@ codegraph sync .
 codegraph status .
 ```
 
-The current baseline is three backend unit tests, two authentication/I/O integration tests, five frontend validation/filtering tests, a successful TypeScript production build, and zero npm audit findings.
+The current baseline is 15 backend tests, 14 core tests, 12 integration tests, 11 frontend tests, a successful TypeScript production build, and zero npm audit findings.
+
+## 12. Workflow Editor Contracts and Diagnostics
+
+- **Configuration-only boundary:** Catalog presence means a method can be configured, not that OpenCV, PyTorch, Anomalib, model weights, training, or inference is installed. UI nodes and dashboard steps must display `Configuration only` explicitly.
+- **Core ownership:** `core/algorithms` owns catalog metadata, typed port templates, and parameter constraints. `core/pipeline` owns graph validation and stable topological ordering. The frontend may provide immediate feedback but the backend must validate the complete submitted graph through core before persistence.
+- **Persistence contract:** Store AOI-owned camelCase documents under `data/projects/<recipe-slug>/workflow.json`. Writes use a sibling temporary file, flush, `fsync`, and atomic replacement. A save requires an exact revision match, increments once on success, and returns HTTP `409` for stale drafts without overwriting storage.
+- **Runtime data ownership:** Recipe workflow files under `data/projects/` are local runtime data and remain ignored by Git. Keep only `data/projects/.gitkeep` in source control.
+- **Monorepo backend imports:** The development launcher starts Uvicorn from `backend/`, so its process must receive a `PYTHONPATH` containing both the repository root and `backend/`. Otherwise backend imports succeed in repository-root tests but runtime startup fails when workflow routes import sibling `core` modules.
+- **React Flow presentation state:** Apply every React Flow node change to local presentation nodes so measured dimensions remain initialized. Synchronize AOI node values into that presentation state while preserving `measured`, and call `useUpdateNodeInternals` after AOI nodes or ports change so existing edge paths remain visible.
+- **Atomic node deletion:** React Flow can emit dependent edge removals before a node removal callback. Intercept node deletion with `onBeforeDelete`, delegate the node-and-edge confirmation to the AOI draft owner, and cancel React Flow's default batch so rejecting confirmation leaves both nodes and edges unchanged.
+- **Browser verification:** The editor and Dashboard Inspection flow passed document-overflow checks at 390, 768, 1280, and 1920 pixel layout widths, including 390x600. Catalog drag/drop, typed edge acceptance/rejection, free node movement, zoom/fit, edge deletion, atomic node confirmation, execution drag reorder, keyboard alternatives, inspector parameters and variadic ports, successful saves, stale `409` recovery, focus visibility, and reduced motion were exercised in an authenticated browser.
