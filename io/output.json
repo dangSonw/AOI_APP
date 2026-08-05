@@ -1,0 +1,11 @@
+{
+  "revision": 1,
+  "updatedAt": "2026-08-04T00:00:00Z",
+  "signals": {
+    "towerLightGreen": true,
+    "towerLightAmber": false,
+    "towerLightRed": false,
+    "rejectGate": false,
+    "cameraTrigger": false
+  }
+}

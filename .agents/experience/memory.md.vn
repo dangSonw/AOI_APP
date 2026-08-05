@@ -1,4 +1,4 @@
-# Nhật ký Kinh nghiệm AI: Thiết lập Conda và Quy tắc Đường dẫn
+# Nhật ký Kinh nghiệm Phát triển AI cho AOI Studio
 
 ## 1. Bối cảnh
 Trong quá trình thiết lập ban đầu dự án Hệ thống AOI, môi trường ảo Python tiêu chuẩn (`venv`) được tạo trong phân vùng WSL đã gây ra lỗi chỉ mục (index) của Git Client trên Windows khi chạy lệnh `git add .` do xung đột liên kết động (symlink) tương thích. Ngoài ra, nhà phát triển yêu cầu sử dụng Anaconda/Miniconda để quản lý môi trường nhằm đảm bảo tính tương thích đồng thời giữa Windows và Ubuntu.
@@ -15,3 +15,87 @@ Trong quá trình thiết lập ban đầu dự án Hệ thống AOI, môi trư�
 - **Quy tắc Đường dẫn Tương đối:** Nghiêm cấm sử dụng đường dẫn tuyệt đối (ví dụ: `/home/...`, `C:\...`) để duy trì khả năng di động của dự án.
 - **Quy tắc Bản dịch Tiếng Việt đi kèm:** Mỗi tệp tài liệu dạng markdown (`.md`) được tạo mới hoặc cập nhật bắt buộc phải có một bản dịch `.md.vn` tương ứng bằng tiếng Việt.
 - **Nhật ký Kinh nghiệm của AI:** Các lỗi lớn, lưu ý kỹ thuật hoặc kinh nghiệm vận hành phải được ghi chép lại trong thư mục `.agents/experience/` dưới tên tệp `memory.md` và `memory.md.vn`.
+
+## 4. Ghi chú Mốc Xác thực trên Ubuntu WSL
+
+- **Khóa SQLite của CodeGraph:** Chạy CodeGraph bản Windows với repository qua đường dẫn UNC của WSL liên tục trả về `database is locked`, kể cả sau khi xóa cache. Hãy cài và chạy CodeGraph bằng Node Linux bên trong Ubuntu, sau đó lập chỉ mục đường dẫn repository Linux.
+- **Điều khoản kênh Conda:** Miniconda 26 yêu cầu chấp nhận Terms of Service rõ ràng cho các kênh Anaconda mặc định khi setup không tương tác. Dự án tạo `aoi-app` với `--override-channels --channel conda-forge` để automation không tự chấp nhận điều khoản pháp lý thay nhà phát triển.
+- **Rò rỉ executable Conda:** Executable `pip` độc lập được phân giải qua `conda run` có thể dùng nhầm interpreter của Conda base; điều này khiến Python 3.14 từ chối các wheel đã pin cho môi trường Python 3.12 của dự án. Gọi công cụ Python bằng `conda run -n aoi-app python -m pip`, `python -m pytest` hoặc `python -m uvicorn`. Setup xác minh Python 3.12 và cài `pip` bên trong đúng môi trường đích.
+- **Vite phân tích JSON:** Các tệp JSON frontend ban đầu có UTF-8 BOM. TypeScript và npm chấp nhận nhưng bước tìm cấu hình PostCSS của Vite bị lỗi. Giữ `package.json` và `tsconfig.json` ở UTF-8 không BOM.
+- **Email nội bộ:** `EmailStr` của Pydantic từ chối domain dự trữ `.local` mà tài khoản seed trên Figma sử dụng. Xác thực dùng validator cấu trúc work-email có giới hạn độ dài để hỗ trợ domain nội bộ công nghiệp nhưng vẫn từ chối địa chỉ sai định dạng.
+- **Output vật lý:** Ghi `io/output.json` qua tệp tạm rồi thay thế nguyên tử. Không bao giờ ghi trạng thái mô phỏng phần cứng trực tiếp từ React.
+
+## 5. Ghi chú PowerShell và Layout Responsive
+
+- **Sai runtime Bash:** Chạy `bash scripts/run_dev.sh` từ PowerShell tại working directory UNC của WSL có thể gọi Git Bash/Cygwin. Cách này chọn npm và Conda Windows, gây lỗi interpreter `/cygdrive` và không truy cập được môi trường Conda Linux. Hãy dùng PowerShell WSL launcher hoặc vào Ubuntu trước bằng `wsl.exe -d Ubuntu`.
+- **Khởi động fail-fast:** `run_dev.sh` phải dùng xử lý lỗi shell nghiêm ngặt. Nếu setup tự động thất bại, script phải dừng trước khi khởi động bất kỳ server nào.
+- **Dọn dẹp tiến trình phát triển:** Chỉ kill PID wrapper `conda run` và `npm` có thể để Uvicorn reload worker hoặc tiến trình con Vite tiếp tục giữ cổng sau `Ctrl+C` hay khi đóng terminal. Khởi động mỗi dịch vụ trong process group riêng, bắt `EXIT`, `SIGINT`, `SIGTERM`, `SIGHUP` và dùng `bash scripts/run_dev.sh stop` để dừng stack còn lại từ phiên trước. Quá trình tìm tiến trình để dừng phải xác minh cả command và working directory của repository nhằm tránh ảnh hưởng project khác.
+- **Đường dẫn provider PowerShell:** `Resolve-Path(...).Path` có thể chứa tiền tố provider `Microsoft.PowerShell.Core\\FileSystem::` cho vị trí UNC của WSL. Dùng `Get-Item(...).FullName` trước khi chuyển UNC path thành Linux path.
+- **Triển khai Figma responsive:** Tọa độ Figma không phải tọa độ CSS. Đặt component ứng dụng trong normal flow bằng Grid/Flexbox, giữ validation message trong flow và xác minh horizontal overflow trên viewport mobile, tablet và desktop.
+
+## 6. Môi trường Local đã Xác minh
+
+- **Hệ điều hành:** Ubuntu 24.04 LTS trong WSL với `systemd` được bật.
+- **JavaScript toolchain:** Node.js Linux 20.20.2 và npm 10.8.2. Vite 8 yêu cầu Node.js 20 trở lên.
+- **Python toolchain:** Miniconda 26.5.3 với môi trường Python 3.12 `aoi-app`.
+- **Cơ sở dữ liệu:** PostgreSQL 16 chạy dưới dạng system service và lắng nghe cục bộ tại cổng `5432`.
+- **Code intelligence:** CodeGraph 1.5.0 phải phân giải đến executable Linux trước mọi executable Windows được kế thừa qua WSL interop. Chỉ mục mới nhất đã đồng bộ gồm 31 tệp mã nguồn, 232 node và 467 edge.
+- **Security audit frontend:** Bộ công cụ Vite và Vitest đã đồng bộ báo cáo không có npm vulnerability tại mốc này.
+
+## 7. Runbook Phát triển
+
+- **Điểm vào PowerShell:** Tại thư mục repository, chạy `powershell -ExecutionPolicy Bypass -File .\scripts\run-dev-wsl.ps1`. Launcher tự suy ra WSL distribution và đường dẫn Linux của repository từ vị trí của chính nó.
+- **Điểm vào Ubuntu:** Vào Ubuntu bằng `wsl.exe -d Ubuntu`, chuyển đến repository rồi chạy `bash scripts/run_dev.sh`.
+- **Lệnh không hỗ trợ:** Không chạy trực tiếp `bash scripts/run_dev.sh` trong PowerShell. Runtime guard chủ động thoát với mã `1` khi phát hiện Git Bash hoặc Cygwin.
+- **Guard công cụ Linux:** Script ứng dụng từ chối executable Node.js, npm hoặc Conda được phân giải từ `/mnt` và đặt bản Miniconda Linux trong thư mục người dùng trước các đường dẫn Windows kế thừa.
+- **Cổng xác định:** FastAPI dùng `8000`, Vite dùng `5173` với strict-port mode và PostgreSQL dùng `5432`. Startup phải dừng với thông báo rõ khi cổng ứng dụng đã bị chiếm; Vite không được tự chuyển cổng.
+- **Stack đang hoạt động bình thường:** Nếu cả hai cổng ứng dụng đã bị chiếm và health check backend AOI cùng request frontend đều thành công, `run_dev.sh` thông báo AOI Studio đang chạy rồi thoát thành công mà không tạo tiến trình trùng lặp. Listener không đầy đủ hoặc không thuộc ứng dụng vẫn là lỗi và được hiển thị để chẩn đoán.
+- **Ranh giới UI và API:** Mở ứng dụng tại `http://127.0.0.1:5173/`. Cổng `8000` chỉ phục vụ API; dùng `/health` để kiểm tra trạng thái sẵn sàng và `/docs` để xem OpenAPI. Root của backend hiện trả `404` vì redirect root và phản hồi favicon theo kế hoạch vẫn chưa được triển khai.
+- **Thời điểm startup:** Uvicorn có reload có thể thông báo listener trước khi Windows localhost forwarding sẵn sàng ngay lập tức. Xác nhận startup từ log Uvicorn hoặc thử lại health request sau một khoảng chờ ngắn.
+- **Dừng ứng dụng:** `Ctrl+C` phải kết thúc cả hai application server. PostgreSQL tiếp tục hoạt động dưới dạng system service.
+
+## 8. Cấu hình, Cơ sở dữ liệu và I/O Vật lý
+
+- **Cấu hình local:** `.env` không được Git theo dõi, được sinh với credential local ngẫu nhiên và phải giữ permission `600`. `.env.example` chỉ chứa placeholder.
+- **Secret:** Không bao giờ in, ghi vào tài liệu hoặc commit giá trị `POSTGRES_PASSWORD`, `JWT_SECRET_KEY` hay `SEED_ADMIN_PASSWORD`.
+- **Thiết lập PostgreSQL:** `scripts/install/setup-postgresql.sh` có thể chạy lặp an toàn và tạo hoặc cập nhật application role, database cùng schema `users`.
+- **Operator seed:** Email operator local là `operator@aoi.local`; mật khẩu chỉ được đọc từ tệp môi trường không được Git theo dõi. Backend startup chỉ tạo tài khoản khi chưa tồn tại. Quá trình này không cập nhật mật khẩu hoặc hồ sơ của user đã có trong database, vì vậy chỉ thay đổi `SEED_ADMIN_PASSWORD` sẽ không luân chuyển mật khẩu của tài khoản hiện tại.
+- **Quyền sở hữu input:** `io/input.json` biểu diễn trạng thái thiết bị bên ngoài và web application chỉ được đọc.
+- **Quyền sở hữu output:** `io/output.json` biểu diễn tín hiệu điều khiển của ứng dụng. Backend phải tăng `revision`, đặt timestamp UTC và dùng atomic replacement khi ghi.
+
+## 9. Chẩn đoán Đăng nhập và Trạng thái Dịch vụ
+
+- Frontend đọc `VITE_API_BASE_URL` từ `.env` tại repository thông qua `envDir` cấp repository của Vite; khi không được đặt, frontend gọi `http://127.0.0.1:8000`.
+- Thông báo `The AOI service is unavailable. Check the backend connection.` chỉ được tạo khi trình duyệt không thể hoàn tất `fetch`. Thông báo này cho biết backend không truy cập được, có lỗi mạng hoặc có vấn đề CORS/cấu hình, không phải credential bị từ chối.
+- Credential không hợp lệ đã đến được FastAPI và trả HTTP `401` với `The email or password is incorrect.` Tài khoản không active trả HTTP `403`.
+- Hãy chẩn đoán availability trước khi thay đổi credential: khởi động cả hai dịch vụ bằng launcher được hỗ trợ, gọi `http://127.0.0.1:8000/health` và xác nhận phản hồi JSON có `status` là `ok`.
+- Trong sự cố đăng nhập đã xác minh, PostgreSQL hoạt động bình thường, operator seed tồn tại và đang active, đồng thời mật khẩu seed được cấu hình khớp với hash đã lưu. Khởi động dịch vụ FastAPI còn thiếu đã khôi phục request đăng nhập từ frontend; không cần thay đổi source hay database.
+- CORS cho phép `FRONTEND_ORIGIN` đã cấu hình, mặc định là `http://127.0.0.1:5173`. Chỉ trong development, bổ sung alias loopback cùng scheme và cùng port giữa `127.0.0.1` với `localhost`; trình duyệt coi đây là hai origin khác nhau và nếu không có alias sẽ báo `Failed to fetch`. Không dùng wildcard hoặc mở rộng alias này ra ngoài development.
+
+## 10. Baseline Xác minh Responsive
+
+- Không định vị component ứng dụng bằng `position: absolute`, `position: fixed` hoặc tọa độ `top`, `right`, `bottom`, `left` hardcode.
+- Xác minh giao diện đã thay đổi tại độ rộng `390`, `768`, `1280` và `1920` pixel. Authentication cùng các workspace Dashboard, Settings, Camera Manager và Database đã vượt qua cả bốn độ rộng mà không có horizontal overflow ngoài ý muốn ở cấp document.
+- Bao gồm viewport thấp như `390x600`. Nội dung phải cuộn dọc khi cần thay vì bị cắt hoặc thu nhỏ dưới kích thước control đảm bảo accessibility.
+- Validation message phải đẩy các control phía sau bằng normal document flow. Xác minh lỗi email không chồng lên password control và lỗi password không chồng lên form options.
+- Giữ phân cấp, tỷ lệ, màu sắc, typography và chủ đích khoảng cách của Figma bằng Grid, Flexbox, `clamp()`, `min()`, `max()` và kích thước phụ thuộc nội dung thay vì tọa độ canvas.
+- **Các frame workspace đã kết nối:** File Figma Bridge live `AOI`, trang `AOI Studio`, có các frame sản phẩm đã triển khai gồm Dashboard `36:849`, Settings `36:1176`, Camera Manager `36:1569` và Database `36:1632`, ngoài frame authentication `41:991`. Đọc metadata và screenshot live từ bridge trước khi triển khai; specification 19 màn hình rộng hơn là roadmap, không phải bằng chứng rằng mọi frame đều đã tồn tại trên canvas.
+- **Hành vi shell công nghiệp:** Dùng chung top bar, inspection toolbar, project explorer, workspace responsive và bottom dock. Chuyển explorer thành bộ chọn view cuộn ngang trên tablet/mobile và xếp context panel theo normal flow ở viewport hẹp hơn.
+- **Baseline giao diện công nghiệp sáng:** Chrome sản phẩm, card, form, bảng và navigation dùng nền trung tính sáng với chữ tối. Bề mặt tối chỉ dành cho vùng trực quan hóa quang học, camera, heatmap hoặc depth có giới hạn khi chúng giúp tăng tương phản dữ liệu. Card trạng thái máy kết hợp màu semantic với nhãn rõ ràng như `OK`, `WAIT` và `ERR`.
+- **Edge case scrollbar ở 320px:** Không đặt `min-width: 320px` cho `html`, `body` hoặc `#root`. Scrollbar dọc có thể làm layout viewport nhỏ hơn 320 CSS pixel và biến min-width đó thành horizontal overflow ở cấp document. Dùng `min-width: 0` cho document root và đặt ràng buộc nội tại bên trong component.
+- **Cascade của container query:** Card trong workspace phụ thuộc chiều rộng còn lại sau application chrome, không chỉ phụ thuộc viewport. Đặt container-query rule sau các viewport media rule có selector trùng lặp hoặc dùng specificity tương đương để breakpoint cũ không thể khôi phục min-width của grid track và làm cắt status/KPI card.
+- **Ma trận resize hiện tại:** Dashboard, Settings, Camera Manager và Database đã vượt qua kiểm tra overflow cấp document và element ngoài ý muốn ở các độ rộng `320`, `390`, `480`, `600`, `768`, `1024`, `1280`, `1600` và `1920` pixel. Chỉ cho phép overflow ngang bên trong tab rail, toolbar, dock và table wrapper có chiều rộng nội tại.
+
+## 11. Các lệnh Xác minh
+
+Chạy các lệnh sau sau khi thay đổi môi trường, authentication, I/O hoặc responsive layout:
+
+```bash
+bash scripts/install/verify-environment.sh
+bash scripts/test/test.sh
+bash scripts/build/build.sh
+codegraph sync .
+codegraph status .
+```
+
+Baseline hiện tại gồm ba backend unit test, hai integration test authentication/I/O, năm frontend test validation/lọc dữ liệu, TypeScript production build thành công và không có npm audit finding.

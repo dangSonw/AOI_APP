@@ -2,8 +2,10 @@
 node_modules/
 dist/
 .vite/
+*.tsbuildinfo
 .env
 .env.*
+!.env.example
 .DS_Store
 
 # Python
@@ -29,3 +31,7 @@ data/temp/*
 !data/cache/.gitkeep
 !data/logs/.gitkeep
 !data/temp/.gitkeep
+
+# Code intelligence cache
+.codegraph/
+.pytest_cache/

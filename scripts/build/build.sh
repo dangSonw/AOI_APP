@@ -10,6 +10,10 @@ echo "=== AOI System Build ==="
 echo "Project Root: $PROJECT_ROOT"
 cd "$PROJECT_ROOT"
 
+if ! command -v conda &>/dev/null && [ -x "$HOME/miniconda3/bin/conda" ]; then
+    export PATH="$HOME/miniconda3/bin:$PATH"
+fi
+
 # Ensure Conda env and frontend node_modules exist, if not, run setup.sh
 CONDA_ENV_NAME="aoi-app"
 if ! conda env list | grep -q -E "^${CONDA_ENV_NAME}[[:space:]]" || [ ! -d "frontend/node_modules" ]; then

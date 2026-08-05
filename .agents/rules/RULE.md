@@ -115,7 +115,22 @@ This document defines the standard rules for folder structure, file names, varia
 - Absolutely avoid absolute paths (e.g. `/home/...` or `C:\...` or `\\wsl.localhost\...`) to ensure the project remains portable and runs smoothly when transferred to other machines.
 - Use path utility libraries (like Python's `pathlib` or Node's `path`) with relative references to resolve local project assets dynamically.
 
-## 15. Examples
+## 15. Responsive interface rules
+- Product interfaces must use a light visual theme as the primary appearance: light neutral page backgrounds, white or near-white surfaces, dark readable text, and semantic accent colors reserved for actions and machine states. Dark surfaces are permitted only inside bounded technical visualizations such as camera feeds, optical images, heatmaps, and depth viewers where they improve data contrast.
+- Light-theme colors must meet WCAG AA contrast for text and interactive states. Status must never be communicated by color alone; pair color with a label, icon, shape, or pattern.
+- Web interfaces must adapt automatically to the available viewport and container size.
+- Use normal document flow with CSS Grid, Flexbox, responsive units, `min()`, `max()`, `clamp()`, and content-driven sizing.
+- Do not use `position: absolute` or `position: fixed` to place application components or reproduce Figma screen coordinates.
+- Do not position application components with hardcoded `top`, `right`, `bottom`, or `left` coordinates.
+- Figma coordinates are visual references, not implementation coordinates. Preserve hierarchy, proportions, spacing, and design tokens through responsive layout primitives.
+- Define responsive behavior for mobile, tablet, desktop, zoomed content, and both short and tall viewports.
+- Fixed dimensions are permitted only when they express an intrinsic constraint such as an icon size, border width, minimum accessible control height, or bounded `max-width`; they must not cause viewport overflow.
+- Validation messages and dynamic content must remain in normal document flow so they cannot overlap adjacent controls.
+- Layouts must resize continuously from 320px upward, including intermediate widths, browser zoom, split-screen windows, and containers made narrower by navigation panels. Do not design only for named device breakpoints.
+- Prefer container queries for components whose available width depends on surrounding application chrome. Horizontal scrolling is allowed only for intrinsically wide controls or data such as tab rails and tables, never for the document itself.
+- Verify changed interfaces at a minimum of 390px, 768px, 1280px, and 1920px viewport widths and confirm that no unintended horizontal overflow occurs.
+
+## 16. Examples
 - Folder: `user-management/`
 - Python file: `user_service.py`
 - TypeScript component: `user-profile-card.tsx`
@@ -123,6 +138,6 @@ This document defines the standard rules for folder structure, file names, varia
 - Commit: `feat(api): add user authentication`
 - Relative Path (Python): `Path(__file__).parent.parent / "data" / "images"` instead of `/home/sonev/graduation_project/main/AOI_APP/data/images`
 
-## 16. AI Experience and Memory rules
+## 17. AI Experience and Memory rules
 - When resolving a bug, encountering unique configurations, or identifying critical technical notes, the AI agent must record this knowledge.
 - Save these notes as `memory.md` (in English) and `memory.md.vn` (in Vietnamese) inside the `.agents/experience/` directory to preserve operational knowledge for future agents.

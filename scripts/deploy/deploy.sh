@@ -32,7 +32,7 @@ fi
 echo "AOI System is ready for deployment."
 echo "Production Launch Commands:"
 echo "1. Run backend server:"
-echo "   nohup conda run --no-capture-output -n $CONDA_ENV_NAME uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --workers 4 > backend.log 2>&1 &"
+echo "   nohup conda run --no-capture-output -n $CONDA_ENV_NAME python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --workers 4 > backend.log 2>&1 &"
 echo "2. Serve frontend:"
 echo "   Serve 'frontend/dist' directory using Nginx, Apache, or Caddy."
 echo "=== Deployment Check Passed ==="

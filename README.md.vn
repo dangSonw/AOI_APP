@@ -1,16 +1,172 @@
-# README.md.vn
+# AOI Studio
 
-## Mục đích
-Điểm bắt đầu cấp cao nhất cho kho lưu trữ hệ thống AOI và tài liệu dự án.
+AOI Studio là ứng dụng web kiểm tra quang học tự động trong công nghiệp. Mốc hiện tại triển khai trải nghiệm xác thực và shell workstation theo thiết kế Figma, tài khoản người dùng lưu trên PostgreSQL và không gian mô phỏng I/O vật lý dựa trên tệp.
 
-## Các tệp thuộc về đây
-Tổng quan về kho lưu trữ, tóm tắt kiến trúc, ghi chú thiết lập và tài liệu dành cho toàn bộ nhóm.
+## Mốc đã triển khai
 
-## Các tệp không nên đặt ở đây
-Logic nghiệp vụ, chi tiết triển khai cụ thể, dữ liệu được tạo ra trong quá trình chạy (runtime), hoặc các thông tin bảo mật (secrets).
+- Giao diện đăng nhập căn chỉnh theo pixel từ trang Figma `AOI Studio`, bao gồm trạng thái đăng ký và đặt lại mật khẩu dạng demo.
+- Shell workstation công nghiệp bám theo Figma với các view Dashboard, Settings, Camera Manager và Inspection Database.
+- Bố cục responsive cho desktop và mobile, có focus bàn phím, validation, loading, thành công, lỗi và trạng thái rỗng.
+- API xác thực FastAPI dùng Argon2 để băm mật khẩu và JWT bearer token.
+- Lưu người dùng trên PostgreSQL 16 với thiết lập schema có thể chạy lặp an toàn.
+- API I/O vật lý được bảo vệ, dùng `io/input.json` và `io/output.json`.
+- Dashboard mission-control React đọc input và ghi output theo cách nguyên tử thông qua service layer.
+- Bản demo tương tác cho hiệu chuẩn camera, tùy chọn workstation, tìm kiếm inspection, chọn evidence và xuất CSV.
+- Unit test và integration test cho xác thực, validation, lọc record và I/O vật lý.
 
-## Nội dung ví dụ trong tương lai
-Sơ đồ kiến trúc gốc, hướng dẫn làm quen (onboarding), danh sách kiểm tra môi trường chạy và ghi chú phát hành (release notes).
+## Kiến trúc
 
-## Mối quan hệ phụ thuộc
-Phụ thuộc vào tất cả các thư mục chính để viết tài liệu và điều phối giữa frontend, backend, core, database và operations.
+```text
+React + TypeScript + Vite
+        |
+        | JSON / Bearer JWT
+        v
+FastAPI API
+   |             |
+   v             v
+PostgreSQL    io/*.json
+người dùng    mô phỏng trạng thái vật lý
+```
+
+Component frontend chỉ hiển thị UI và gọi service. FastAPI xác thực request và điều phối dịch vụ xác thực hoặc I/O. SQLAlchemy quản lý model lưu trữ, còn thao tác tệp I/O vật lý được cô lập trong service backend.
+
+## Môi trường Ubuntu WSL đã xác minh
+
+Triển khai đã được xác minh trên Ubuntu 24.04.3 LTS trong WSL với:
+
+- Node.js 20.20.2 và npm 10.8.2
+- Miniconda 26.5.3 với môi trường Python 3.12 `aoi-app`
+- PostgreSQL 16.14
+- CodeGraph 1.5.0 chạy native Linux bên trong WSL
+
+### Bootstrap hệ thống bằng một lệnh
+
+Không gọi các shell script bằng lệnh `bash` của Windows từ PowerShell. Lệnh đó có thể khởi động Git Bash/Cygwin và chọn Node.js hoặc Conda của Windows. Trước tiên hãy vào Ubuntu WSL:
+
+```powershell
+wsl.exe -d Ubuntu
+```
+
+Sau đó, trong terminal Ubuntu, chuyển đến repository và chạy một lần trên máy mới:
+
+```bash
+bash scripts/install/bootstrap-ubuntu.sh
+```
+
+Script cài dependency hệ thống, Node.js 20, Miniconda, PostgreSQL và CodeGraph, sau đó chạy thiết lập dự án. Script cần quyền `sudo` để cài package hệ điều hành.
+
+### Thiết lập dự án khi đã có prerequisite
+
+```bash
+bash scripts/install/setup.sh
+```
+
+Script thiết lập sẽ:
+
+1. Tạo môi trường Conda `aoi-app` từ conda-forge.
+2. Cài dependency backend và frontend.
+3. Tạo `.env` với credential local ngẫu nhiên nếu tệp chưa tồn tại.
+4. Khởi tạo role, database và schema PostgreSQL.
+5. Xác minh PostgreSQL, permission của `.env` và JSON I/O vật lý.
+
+Không bao giờ commit `.env`. Chỉ commit `.env.example` khi khóa cấu hình thay đổi.
+
+## Chạy ứng dụng
+
+Từ terminal Ubuntu WSL:
+
+```bash
+bash scripts/run_dev.sh
+```
+
+Từ PowerShell khi thư mục hiện tại là repository này, hãy dùng launcher WSL portable:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-dev-wsl.ps1
+```
+
+Không chạy trực tiếp `bash scripts/run_dev.sh` từ PowerShell. Các development script sẽ chủ động dừng khi phát hiện Git Bash, Cygwin, Node.js Windows hoặc Conda Windows.
+
+Nếu cả hai dịch vụ AOI đã hoạt động bình thường trên các cổng được cấu hình, launcher sẽ thông báo AOI Studio đang chạy và thoát mà không khởi động tiến trình trùng lặp. Nếu chỉ một cổng bị chiếm hoặc health check thất bại, hãy kiểm tra listener mà launcher in ra rồi dừng tiến trình cũ hoặc không liên quan trước khi thử lại.
+
+- Frontend: [http://127.0.0.1:5173](http://127.0.0.1:5173)
+- Health của backend: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
+- Tài liệu OpenAPI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+Mở UI trên cổng `5173`. Cổng `8000` chỉ dành cho API và root của cổng này hiện trả `404`; redirect root cùng phản hồi favicon theo kế hoạch vẫn chưa được triển khai.
+
+Email operator local là `operator@aoi.local`. Đọc `SEED_ADMIN_PASSWORD` từ tệp `.env` không được Git theo dõi để lấy mật khẩu local. Backend startup chỉ tạo tài khoản seed khi tài khoản chưa tồn tại. Quá trình này không cập nhật mật khẩu của tài khoản hiện có, vì vậy chỉ thay đổi `SEED_ADMIN_PASSWORD` sẽ không luân chuyển mật khẩu đã lưu của tài khoản đó.
+
+### Xử lý sự cố đăng nhập
+
+Nếu form đăng nhập hiển thị `The AOI service is unavailable. Check the backend connection.`, trình duyệt không thể hoàn tất request API. Đây là vấn đề về trạng thái dịch vụ, mạng, CORS hoặc cấu hình API frontend, không phải phản hồi mật khẩu không hợp lệ.
+
+1. Khởi động ứng dụng bằng một trong các launcher được hỗ trợ ở trên.
+2. Kiểm tra trực tiếp backend:
+
+   ```bash
+   curl http://127.0.0.1:8000/health
+   ```
+
+   Backend sẵn sàng trả JSON chứa `"status":"ok"`.
+3. Xác nhận frontend đang dùng API base URL mong đợi. Frontend đọc `VITE_API_BASE_URL` từ `.env` tại repository và mặc định dùng `http://127.0.0.1:8000`.
+4. Nếu có thể truy cập backend nhưng credential bị từ chối, backend trả HTTP `401` với `The email or password is incorrect.` Tài khoản không active trả HTTP `403`.
+
+Origin CORS mặc định là `http://127.0.0.1:5173`. Trong development, alias loopback tương ứng `http://localhost:5173` cũng được chấp nhận để cả hai URL local đều có thể gọi API. Các origin khác vẫn bị từ chối; ngoài development, hãy giữ `FRONTEND_ORIGIN` khớp với origin trình duyệt đã triển khai. Không bao giờ dán giá trị secret từ `.env` vào log, issue hoặc tài liệu.
+
+## Kiểm thử và build
+
+```bash
+bash scripts/test/test.sh
+bash scripts/build/build.sh
+```
+
+Lần chạy test đầy đủ mới nhất đã vượt qua ba backend unit test, hai integration test, năm frontend test và bước kiểm tra TypeScript.
+
+Các lệnh frontend trực tiếp:
+
+```bash
+cd frontend
+npm run typecheck
+npm run test
+npm run build
+npm audit
+```
+
+## Mô phỏng I/O vật lý
+
+- `io/input.json` biểu diễn tín hiệu do thiết bị hoặc cảm biến bên ngoài web app ghi. Web app chỉ đọc tệp này.
+- `io/output.json` biểu diễn tín hiệu actuator hoặc điều khiển do web app ghi.
+- Mỗi trạng thái có `revision` tăng dần và timestamp UTC `updatedAt`.
+- Ghi output dùng tệp tạm và thay thế nguyên tử để tránh trạng thái JSON bị ghi dở.
+- Cả hai endpoint I/O đều yêu cầu bearer token hợp lệ.
+
+Giao diện JSON hiện tại là ranh giới mô phỏng. Adapter phần cứng tương lai có thể thay thế file service mà không đưa logic phần cứng vào frontend.
+
+## API của mốc hiện tại
+
+| Phương thức | Đường dẫn | Mục đích | Xác thực |
+|---|---|---|---|
+| `GET` | `/health` | Sức khỏe dịch vụ | Không |
+| `POST` | `/api/auth/login` | Đăng nhập | Không |
+| `POST` | `/api/auth/register` | Tạo tài khoản | Không |
+| `POST` | `/api/auth/password-reset` | Trả phản hồi reset không tiết lộ tài khoản | Không |
+| `GET` | `/api/io/inputs` | Đọc input mô phỏng | Bearer token |
+| `GET` | `/api/io/outputs` | Đọc output mô phỏng | Bearer token |
+| `PUT` | `/api/io/outputs` | Cập nhật output nguyên tử | Bearer token |
+
+Gửi email đặt lại mật khẩu chưa được triển khai trong mốc này. Endpoint luôn trả cùng một thông báo an toàn dù tài khoản có tồn tại hay không.
+
+## Quy trình Figma và CodeGraph
+
+File Figma đã kết nối là `AOI`, trang `AOI Studio`. Các tham chiếu đã triển khai gồm frame xác thực `41:991`, Dashboard `36:849`, Settings `36:1176`, Camera Manager `36:1569` và Database `36:1632`. Phần triển khai giữ phân cấp công nghiệp, tỷ lệ, khoảng cách, màu sắc và typography bằng Grid và Flexbox responsive thay vì tọa độ màn hình Figma. Tất cả workspace đã triển khai được kiểm tra ở độ rộng viewport 390, 768, 1280 và 1920 pixel mà không có horizontal overflow ở cấp document.
+
+Dùng CodeGraph native Linux tại thư mục gốc repository:
+
+```bash
+codegraph sync .
+codegraph status .
+codegraph explore AuthPage WorkspacePage DashboardPage physical_io
+```
+
+Không lập chỉ mục repository WSL bằng Windows Node qua đường dẫn UNC vì khóa SQLite không đáng tin cậy trong cấu hình đó.

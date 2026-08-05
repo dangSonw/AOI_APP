@@ -1,10 +1,52 @@
-﻿import React from 'react';
+﻿import { useEffect, useState } from 'react';
+import { AuthPage } from './pages/AuthPage';
+import { WorkspacePage } from './pages/WorkspacePage';
+import type { AuthSession } from './types/auth';
+
+const SESSION_STORAGE_KEY = 'aoi-studio-session';
+
+function loadStoredSession(): AuthSession | null {
+  const storedSession = localStorage.getItem(SESSION_STORAGE_KEY)
+    ?? sessionStorage.getItem(SESSION_STORAGE_KEY);
+
+  if (!storedSession) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(storedSession) as AuthSession;
+  } catch {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    return null;
+  }
+}
 
 export default function App() {
-  return (
-    <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-      <h1>AOI Application Shell</h1>
-      <p>Frontend scaffold placeholder for the industrial inspection platform.</p>
-    </div>
+  const [session, setSession] = useState<AuthSession | null>(loadStoredSession);
+
+  useEffect(() => {
+    document.title = session ? 'Inspection Workspace | AOI Studio' : 'Sign in | AOI Studio';
+  }, [session]);
+
+  const handleAuthenticated = (nextSession: AuthSession, shouldPersist: boolean) => {
+    const storage = shouldPersist ? localStorage : sessionStorage;
+    const alternateStorage = shouldPersist ? sessionStorage : localStorage;
+
+    alternateStorage.removeItem(SESSION_STORAGE_KEY);
+    storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextSession));
+    setSession(nextSession);
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    setSession(null);
+  };
+
+  return session ? (
+    <WorkspacePage session={session} onSignOut={handleSignOut} />
+  ) : (
+    <AuthPage onAuthenticated={handleAuthenticated} />
   );
 }

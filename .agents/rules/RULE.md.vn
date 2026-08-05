@@ -115,7 +115,22 @@ Tài liệu này định nghĩa các quy tắc chuẩn để thống nhất cấ
 - Tuyệt đối tránh sử dụng đường dẫn tuyệt đối (absolute path, ví dụ: bắt đầu với `/home/...`, `C:\...` hoặc `\\wsl.localhost\...`) để đảm bảo dự án có thể di động và chạy trơn tru khi chuyển sang máy khác.
 - Sử dụng các thư viện tiện ích đường dẫn (như `pathlib` của Python hoặc `path` của Node) với tham chiếu tương đối để phân giải tài nguyên dự án cục bộ một cách linh hoạt.
 
-## 15. Ví dụ
+## 15. Quy tắc giao diện responsive
+- Giao diện sản phẩm phải dùng giao diện sáng làm diện mạo chính: nền trang trung tính sáng, bề mặt trắng hoặc gần trắng, chữ tối dễ đọc và màu nhấn semantic chỉ dành cho hành động cùng trạng thái máy. Bề mặt tối chỉ được phép nằm trong vùng trực quan hóa kỹ thuật có giới hạn như camera feed, ảnh quang học, heatmap và depth viewer khi chúng giúp tăng độ tương phản dữ liệu.
+- Màu của giao diện sáng phải đáp ứng độ tương phản WCAG AA cho chữ và trạng thái tương tác. Không được truyền đạt trạng thái chỉ bằng màu; phải kết hợp màu với nhãn, biểu tượng, hình dạng hoặc pattern.
+- Giao diện web phải tự động thích ứng với kích thước viewport và container hiện có.
+- Sử dụng normal document flow cùng CSS Grid, Flexbox, đơn vị responsive, `min()`, `max()`, `clamp()` và kích thước phụ thuộc nội dung.
+- Không dùng `position: absolute` hoặc `position: fixed` để đặt component ứng dụng hoặc tái tạo tọa độ màn hình Figma.
+- Không định vị component ứng dụng bằng tọa độ `top`, `right`, `bottom` hoặc `left` hardcode.
+- Tọa độ Figma là tham chiếu trực quan, không phải tọa độ triển khai. Giữ phân cấp, tỷ lệ, khoảng cách và design token bằng các primitive layout responsive.
+- Phải định nghĩa hành vi responsive cho mobile, tablet, desktop, nội dung khi zoom và cả viewport thấp lẫn cao.
+- Chỉ được dùng kích thước cố định khi thể hiện ràng buộc nội tại như kích thước icon, độ dày border, chiều cao control tối thiểu đảm bảo accessibility hoặc `max-width` có giới hạn; chúng không được gây tràn viewport.
+- Thông báo validation và nội dung động phải nằm trong normal document flow để không chồng lên control bên cạnh.
+- Layout phải resize liên tục từ 320px trở lên, bao gồm các độ rộng trung gian, browser zoom, cửa sổ chia đôi và container bị thu hẹp bởi navigation panel. Không được chỉ thiết kế cho các breakpoint thiết bị được đặt tên.
+- Ưu tiên container query cho component có chiều rộng khả dụng phụ thuộc application chrome xung quanh. Chỉ cho phép cuộn ngang đối với control hoặc dữ liệu vốn có chiều rộng lớn như tab rail và bảng, không bao giờ cho toàn bộ document.
+- Xác minh giao diện đã thay đổi tối thiểu tại độ rộng viewport 390px, 768px, 1280px và 1920px, đồng thời bảo đảm không có horizontal overflow ngoài ý muốn.
+
+## 16. Ví dụ
 - Thư mục: `user-management/`
 - File Python: `user_service.py`
 - Component TypeScript: `user-profile-card.tsx`
@@ -123,6 +138,6 @@ Tài liệu này định nghĩa các quy tắc chuẩn để thống nhất cấ
 - Commit: `feat(api): add user authentication`
 - Đường dẫn tương đối (Python): `Path(__file__).parent.parent / "data" / "images"` thay vì `/home/sonev/graduation_project/main/AOI_APP/data/images`
 
-## 16. Quy tắc ghi nhớ kinh nghiệm AI (Experience & Memory)
+## 17. Quy tắc ghi nhớ kinh nghiệm AI (Experience & Memory)
 - Khi phát hiện hoặc sửa chữa một lỗi (bug), khi gặp các cấu hình đặc biệt, hoặc khi có các lưu ý kỹ thuật quan trọng, AI phải ghi lại trải nghiệm này.
 - Lưu trữ các lưu ý này dưới dạng file `memory.md` (tiếng Anh) và `memory.md.vn` (tiếng Việt) trong thư mục `.agents/experience/` để tích lũy kiến thức vận hành cho các agent sau này.

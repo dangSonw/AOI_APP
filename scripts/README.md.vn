@@ -4,33 +4,69 @@ Thư mục này chứa các kịch bản tự động để thiết lập, xây 
 
 ## Yêu cầu trước khi chạy
 
-Các kịch bản được thiết kế để chạy trong môi trường tương thích POSIX (Linux, macOS hoặc Windows Subsystem for Linux - WSL).
+Các script ứng dụng được thiết kế để chạy bên trong Ubuntu hoặc Ubuntu WSL. Git Bash và Cygwin trên Windows không được hỗ trợ vì có thể trộn lẫn executable Node.js, npm và Conda giữa Windows với Linux.
 Đảm bảo bạn đã cài đặt các công cụ sau trên hệ thống của mình:
 - **Conda** (Miniconda hoặc Anaconda)
 - **NodeJS** và **npm**
 - **CMake** (tùy chọn, cần thiết để biên dịch các module C++ native)
+
+Trên Ubuntu WSL, cài đặt và xác minh toàn bộ công cụ cần thiết bằng:
+
+```bash
+bash scripts/install/bootstrap-ubuntu.sh
+```
 
 ## Danh mục Kịch bản
 
 Tất cả các kịch bản được viết bằng đường dẫn tương đối, cho phép chúng hoạt động chính xác bất kể kho lưu trữ được nhân bản ở đâu.
 
 ### 1. Thiết lập Cài đặt (`scripts/install/setup.sh`)
-Thiết lập môi trường phát triển bằng cách kiểm tra các phụ thuộc hệ thống, tạo một môi trường Python trong Conda có tên là `aoi-app`, cài đặt các thư viện backend, chạy `npm install` ở frontend và tạo các thư mục lưu trữ dữ liệu cần thiết trong `data/`.
+Thiết lập môi trường phát triển bằng cách tạo môi trường Python `aoi-app` từ conda-forge, cài package, sinh cấu hình local an toàn, khởi tạo PostgreSQL và xác minh JSON I/O vật lý.
 
 **Cách dùng:**
 ```bash
 bash scripts/install/setup.sh
 ```
 
-### 2. Chạy môi trường Phát triển (`scripts/run_dev.sh`)
-Khởi chạy đồng thời cả máy chủ phát triển FastAPI backend và Vite frontend. Nhấn `Ctrl+C` sẽ dọn dẹp và dừng cả hai tiến trình.
+Các script cài đặt hỗ trợ:
 
-**Cách dùng:**
+- `scripts/install/bootstrap-ubuntu.sh`: cài dependency hệ thống Ubuntu, Node.js 20, Miniconda, PostgreSQL và CodeGraph native Linux.
+- `scripts/install/create-local-env.sh`: tạo `.env` không được Git theo dõi với credential local ngẫu nhiên và permission `600`.
+- `scripts/install/setup-postgresql.sh`: tạo hoặc cập nhật role, database và schema ứng dụng.
+- `scripts/install/verify-environment.sh`: xác minh service, schema, permission cấu hình và các tệp JSON.
+
+### 2. Chạy môi trường Phát triển (`scripts/run_dev.sh`)
+Khởi chạy đồng thời cả máy chủ phát triển FastAPI backend và Vite frontend. Nhấn `Ctrl+C` hoặc đóng terminal điều khiển sẽ dọn dẹp toàn bộ process group, bao gồm Uvicorn reload worker và tiến trình con của Vite.
+Nếu cả hai dịch vụ đã hoạt động bình thường, script sẽ báo stack hiện có và thoát thành công thay vì khởi động server trùng lặp. Xung đột cổng không đầy đủ hoặc không liên quan vẫn là lỗi và kèm thông tin listener.
+
+**Terminal Ubuntu WSL:**
 ```bash
 bash scripts/run_dev.sh
 ```
+
+Dừng stack đang chạy, kể cả stack còn sót lại từ terminal cũ:
+
+```bash
+bash scripts/run_dev.sh stop
+```
+
+Kiểm tra trạng thái mà không khởi động tiến trình mới:
+
+```bash
+bash scripts/run_dev.sh status
+```
+
+Lệnh stop xác minh cả command line và working directory của repository trước khi gửi tín hiệu đến process group, vì vậy nó không chủ ý dừng project Vite hoặc Uvicorn không liên quan.
+
+**PowerShell tại thư mục repository:**
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-dev-wsl.ps1
+```
+
+Không dùng trực tiếp `bash scripts/run_dev.sh` trong PowerShell. Executable `bash` của Windows không phải runtime Ubuntu WSL.
 - API Backend sẽ chạy tại: [http://127.0.0.1:8000](http://127.0.0.1:8000) (tự động tải lại khi thay đổi code)
 - Server phát triển frontend sẽ bắt đầu (kiểm tra đầu ra terminal để biết cổng hoạt động của Vite)
+- Frontend chạy tại: [http://127.0.0.1:5173](http://127.0.0.1:5173)
 
 ### 3. Biên dịch Dự án (`scripts/build/build.sh`)
 Biên dịch các tài nguyên sẵn sàng cho production của frontend (được đưa vào `frontend/dist`) và biên dịch thư viện C++ native core (nếu đã cài đặt CMake) trong `core/native/build`.
@@ -73,7 +109,8 @@ bash scripts/release/release.sh
 ## Các Quy tắc Quan trọng khi Viết Script
 1. **Luôn sử dụng Đường dẫn Tương đối**: Tuyệt đối không hardcode đường dẫn tuyệt đối (ví dụ: `/home/user/...` hoặc `C:\Users\...`). Xác định thư mục bằng cách sử dụng các tham chiếu tương đối động (ví dụ: `$(dirname "${BASH_SOURCE[0]}")`).
 2. **Quản lý Phụ thuộc An toàn**: Làm cho các script hoạt động độc lập và an toàn. Nếu một script phụ thuộc vào trạng thái khác (như `setup.sh`), nó nên tự kiểm tra trạng thái đó trước hoặc đưa ra cảnh báo cho người dùng.
-3. **Quyền Thực thi**: Đảm bảo tất cả các kịch bản đều có quyền thực thi:
+3. **Bảo vệ Secret**: Không in hoặc commit giá trị từ `.env`. Chỉ commit `.env.example`.
+4. **Quyền Thực thi**: Đảm bảo tất cả các kịch bản đều có quyền thực thi:
    ```bash
-   chmod +x scripts/run_dev.sh scripts/install/setup.sh scripts/build/build.sh scripts/test/test.sh scripts/deploy/deploy.sh scripts/release/release.sh
+   chmod +x scripts/run_dev.sh scripts/install/*.sh scripts/utils/*.sh scripts/build/build.sh scripts/test/test.sh scripts/deploy/deploy.sh scripts/release/release.sh
    ```
