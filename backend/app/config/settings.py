@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = 'HS256'
     jwt_access_token_expire_minutes: int = 60
     physical_io_directory: str = 'io'
+    projects_data_directory: str = 'data/projects'
     seed_admin_email: str = 'operator@aoi.local'
     seed_admin_password: str = Field(min_length=8)
     seed_admin_full_name: str = 'AOI Operator'
@@ -33,6 +34,10 @@ class Settings(BaseSettings):
     @property
     def physical_io_path(self) -> Path:
         return PROJECT_ROOT / self.physical_io_directory
+
+    @property
+    def projects_data_path(self) -> Path:
+        return PROJECT_ROOT / self.projects_data_directory
 
     @property
     def frontend_origins(self) -> list[str]:
