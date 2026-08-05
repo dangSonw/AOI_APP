@@ -1,0 +1,428 @@
+# Kế hoạch triển khai Trình biên tập Workflow
+
+> **Dành cho agent triển khai:** BẮT BUỘC DÙNG SUB-SKILL: dùng superpowers:subagent-driven-development (khuyến nghị) hoặc superpowers:executing-plans để thực hiện từng task. Các bước dùng cú pháp checkbox (`- [ ]`) để theo dõi.
+
+**Mục tiêu:** Xây dựng catalog AOI và trình biên tập DAG có kiểu, chỉ phục vụ cấu hình, lưu an toàn theo revision và kết nối với dashboard.
+
+**Kiến trúc:** Module Python thuần trong `core/` sở hữu metadata catalog, domain workflow, validation và stable ordering. FastAPI ánh xạ sang schema camelCase và lưu một tài liệu JSON nguyên tử cho mỗi recipe slug hợp lệ. React sở hữu draft schema AOI chưa lưu và chỉ chuyển đổi sang `@xyflow/react` tại biên canvas.
+
+**Tech Stack:** Python 3.11, dataclass/enum, Pydantic 2, FastAPI, pytest, React 18, TypeScript 5.6, `@xyflow/react` 12.x, Vitest, CSS Grid/Flex.
+
+## Ràng buộc toàn cục
+
+- Chỉ cấu hình: không cài hoặc import OpenCV, PyTorch, Anomalib, CUDA, model weight hay inference code.
+- Giữ nguyên `docs/algorithm/README.md/algo.md` và toàn bộ tài liệu thuật toán của người dùng.
+- Connection yêu cầu standard type bằng tuyệt đối; self-loop, duplicate, input non-variadic đã dùng và cycle đều không hợp lệ.
+- Lưu JSON camelCase do AOI sở hữu tại `data/projects/<recipe-slug>/workflow.json`; không lưu object nội bộ React Flow.
+- Ghi qua file tạm cùng thư mục, flush, `fsync` và thay thế nguyên tử.
+- Update yêu cầu `revision` không âm khớp chính xác; update cũ trả HTTP `409` và không ghi đè storage.
+- Mọi API catalog/workflow dùng bearer authentication dependency hiện có.
+- Lỗi UI nằm trong document flow với `aria-live`; control có keyboard focus rõ và text label.
+- Không gây tràn document ngoài ý muốn tại 390, 768, 1280 và 1920 px; tôn trọng reduced motion.
+- Chạy `bash scripts/test/test.sh` và `bash scripts/build/build.sh` trước khi hoàn tất.
+
+## Bản đồ file
+
+- `core/algorithms/models.py`: type catalog bất biến và định nghĩa parameter/port.
+- `core/algorithms/catalog.py`: catalog configuration-only có thứ tự.
+- `core/pipeline/models.py`: domain workflow và validation issue.
+- `core/pipeline/validation.py`: validation graph và parameter.
+- `core/pipeline/ordering.py`: stable topological ordering.
+- `core/pipeline/defaults.py`: default workflow Rev C · Mainboard hợp lệ.
+- `backend/app/schemas/workflow.py`: transport schema camelCase và chuyển đổi core.
+- `backend/app/services/workflow_repository.py`: an toàn slug, read, kiểm tra revision và atomic write.
+- `backend/app/api/workflows.py`: endpoint catalog/workflow có auth và ánh xạ status.
+- `frontend/src/types/workflow.ts`: type API contract.
+- `frontend/src/services/workflow-service.ts`: request workflow có auth.
+- `frontend/src/utils/workflow-graph.ts`: local validation, tạo node, ordering, filter và dirty state.
+- `frontend/src/components/workflow/*`: catalog, node, canvas, inspector và execution rail.
+- `frontend/src/pages/WorkflowEditorPage.tsx`: vòng đời draft, save/conflict/navigation.
+- `frontend/src/pages/DashboardPage.tsx`: tóm tắt workflow đã lưu có thể thu gọn.
+- `frontend/src/pages/WorkspacePage.tsx`: tải workflow recipe đang active và tích hợp workspace.
+
+---
+
+### Task 1: Domain và định nghĩa Core Catalog
+
+**File:**
+- Tạo: `core/algorithms/__init__.py`
+- Tạo: `core/algorithms/models.py`
+- Tạo: `core/algorithms/catalog.py`
+- Tạo: `tests/core/test_algorithm_catalog.py`
+
+**Interface:**
+- Cung cấp: `DataType`, `PortDirection`, `ParameterKind`, `PortDefinition`, `ParameterDefinition`, `AlgorithmDefinition`, `get_algorithm_catalog() -> tuple[AlgorithmDefinition, ...]`, `get_algorithm_definition(algorithm_id: str) -> AlgorithmDefinition | None`.
+- Thứ tự catalog theo mục 5.1–5.7 và mọi entry có `availability='configuration-only'`.
+
+- [ ] **Bước 1: Viết catalog contract test đang thất bại**
+
+```python
+def test_catalog_identifiers_and_port_keys_are_unique() -> None:
+    catalog = get_algorithm_catalog()
+    assert len(catalog) >= 50
+    assert len({item.id for item in catalog}) == len(catalog)
+    for item in catalog:
+        keys = [port.key for port in (*item.inputs, *item.outputs)]
+        assert len(keys) == len(set(keys))
+        assert item.availability == 'configuration-only'
+
+def test_decision_fusion_accepts_variadic_scores() -> None:
+    definition = get_algorithm_definition('decision-fusion')
+    assert definition is not None
+    assert definition.inputs[0].data_type is DataType.SCORE
+    assert definition.inputs[0].variadic is True
+```
+
+- [ ] **Bước 2: Chạy test và xác nhận module chưa có làm test fail**
+
+Chạy: `conda run -n aoi-app python -m pytest tests/core/test_algorithm_catalog.py -v`
+
+- [ ] **Bước 3: Triển khai frozen domain record và catalog tài liệu đầy đủ**
+
+Dùng `@dataclass(frozen=True, slots=True)`, collection tuple, ID kebab-case, numeric parameter có bound, select option rõ, metadata required/default, port có kiểu và thứ tự, mô tả operator tiếng Anh và documentation reference. Bao gồm record acquisition/pipeline cùng mọi thuật toán được nêu ở mục 5 của design.
+
+- [ ] **Bước 4: Chạy catalog test**
+
+Chạy: `conda run -n aoi-app python -m pytest tests/core/test_algorithm_catalog.py -v`
+Mong đợi: mọi catalog contract test pass mà không import thư viện runtime.
+
+- [ ] **Bước 5: Commit**
+
+```bash
+git add core/algorithms tests/core/test_algorithm_catalog.py
+git commit -m "feat(core): add configuration algorithm catalog"
+```
+
+### Task 2: Model Workflow Core, Validation và Stable Ordering
+
+**File:**
+- Tạo: `core/pipeline/__init__.py`
+- Tạo: `core/pipeline/models.py`
+- Tạo: `core/pipeline/validation.py`
+- Tạo: `core/pipeline/ordering.py`
+- Tạo: `core/pipeline/defaults.py`
+- Tạo: `tests/core/test_pipeline_validation.py`
+- Tạo: `tests/core/test_pipeline_ordering.py`
+- Tạo: `tests/core/test_default_workflow.py`
+
+**Interface:**
+- Cung cấp: `Point`, `PortInstance`, `WorkflowNode`, `Connection`, `Workflow`, `ValidationIssue`.
+- Cung cấp: `validate_workflow(workflow: Workflow) -> tuple[ValidationIssue, ...]` và `stable_topological_order(workflow: Workflow, preferred_order: tuple[str, ...] | None = None) -> tuple[str, ...]`.
+- Cung cấp: `create_default_workflow(recipe_slug='rev-c-mainboard', recipe_name='Rev C · Mainboard') -> Workflow`.
+
+- [ ] **Bước 1: Viết validation và ordering test đang thất bại**
+
+```python
+def test_cycle_and_type_mismatch_have_stable_codes() -> None:
+    assert 'type-mismatch' in issue_codes(type_mismatch_workflow())
+    assert 'cycle' in issue_codes(cyclic_workflow())
+
+def test_stable_order_preserves_preference_between_ready_nodes() -> None:
+    workflow = branched_workflow()
+    assert stable_topological_order(workflow, ('source', 'right', 'left', 'merge')) == (
+        'source', 'right', 'left', 'merge'
+    )
+
+def test_execution_order_contains_every_dependency_first() -> None:
+    assert validate_workflow(branched_workflow()) == ()
+    assert 'dependency-order' in issue_codes(dependency_after_consumer_workflow())
+```
+
+- [ ] **Bước 2: Chạy core test tập trung và quan sát failure**
+
+Chạy: `conda run -n aoi-app python -m pytest tests/core/test_pipeline_validation.py tests/core/test_pipeline_ordering.py tests/core/test_default_workflow.py -v`
+
+- [ ] **Bước 3: Triển khai validation xác định đầy đủ**
+
+Kiểm tra position hữu hạn, ID dạng UUID duy nhất, algorithm/port tồn tại, kind/range/option parameter, endpoint tồn tại và đúng direction, type bằng tuyệt đối, duplicate connection, self-loop, input cardinality, required input, cycle, membership/uniqueness execution order và dependency ordering. Trả issue theo thứ tự node/connection/rule xác định với code chính xác ở mục 7 của design.
+
+- [ ] **Bước 4: Triển khai Kahn ordering có preferred-order tie breaking và default graph phân nhánh**
+
+Default graph là `Image input → ECC registration → {Median–MAD, PatchCore, Golden component matching} → Decision fusion → Decision output`, revision `0`, version `1`, UTC `updated_at` và execution order hợp lệ.
+
+- [ ] **Bước 5: Chạy toàn bộ core test và commit**
+
+```bash
+conda run -n aoi-app python -m pytest tests/core/ -v
+git add core/pipeline tests/core
+git commit -m "feat(core): validate and order typed workflows"
+```
+
+### Task 3: Backend Schema và Atomic Repository
+
+**File:**
+- Tạo: `backend/app/schemas/workflow.py`
+- Tạo: `backend/app/services/workflow_repository.py`
+- Sửa: `backend/app/config/settings.py`
+- Tạo: `tests/backend/test_workflow_schemas.py`
+- Tạo: `tests/backend/test_workflow_repository.py`
+
+**Interface:**
+- Cung cấp schema class phản chiếu mọi catalog/workflow value và `WorkflowSchema.from_core(...)`, `WorkflowSchema.to_core()`.
+- Cung cấp `InvalidRecipeSlug`, `WorkflowStorageError`, `StaleWorkflowRevision`.
+- Cung cấp `WorkflowRepository(root: Path)`, `.read(slug: str) -> Workflow`, `.save(slug: str, submitted: Workflow) -> Workflow`.
+- Thêm `Settings.projects_data_directory: str = 'data/projects'` và `projects_data_path`.
+
+- [ ] **Bước 1: Viết camelCase round-trip và repository test đang thất bại**
+
+```python
+def test_workflow_schema_round_trip_is_camel_case() -> None:
+    schema = WorkflowSchema.from_core(create_default_workflow())
+    payload = schema.model_dump(mode='json', by_alias=True)
+    assert 'recipeSlug' in payload and 'executionOrder' in payload and 'updatedAt' in payload
+    assert schema.to_core() == schema.to_core()
+
+def test_save_increments_revision_and_rejects_stale_write(tmp_path: Path) -> None:
+    repository = WorkflowRepository(tmp_path)
+    saved = repository.save('rev-c-mainboard', create_default_workflow())
+    assert saved.revision == 1
+    with pytest.raises(StaleWorkflowRevision):
+        repository.save('rev-c-mainboard', create_default_workflow())
+
+@pytest.mark.parametrize('slug', ('../secret', 'Rev-C', 'a/b', ''))
+def test_recipe_slug_rejects_traversal(slug: str, tmp_path: Path) -> None:
+    with pytest.raises(InvalidRecipeSlug):
+        WorkflowRepository(tmp_path).read(slug)
+```
+
+- [ ] **Bước 2: Chạy backend test tập trung và xác nhận failure**
+
+Chạy: `PYTHONPATH=backend conda run -n aoi-app python -m pytest tests/backend/test_workflow_schemas.py tests/backend/test_workflow_repository.py -v`
+
+- [ ] **Bước 3: Triển khai conversion, safe path resolution, locking và durable atomic replacement**
+
+Validate `^[a-z0-9]+(?:-[a-z0-9]+)*$`; chỉ resolve `root/slug/workflow.json`; serialize alias với newline cuối. Bảo vệ read-check-write bằng process lock, ghi `.workflow.json.tmp`, flush và `os.fsync`, `os.replace`, sau đó best-effort `fsync` thư mục cha. Xóa file tạm sau lỗi và không để absolute path xuất hiện trong message.
+
+- [ ] **Bước 4: Chạy backend unit test và commit**
+
+```bash
+PYTHONPATH=backend conda run -n aoi-app python -m pytest tests/backend/ -v
+git add backend/app/config/settings.py backend/app/schemas/workflow.py backend/app/services/workflow_repository.py tests/backend
+git commit -m "feat(backend): persist revisioned workflow JSON"
+```
+
+### Task 4: REST API Workflow có xác thực
+
+**File:**
+- Tạo: `backend/app/api/workflows.py`
+- Sửa: `backend/app/main.py`
+- Tạo: `tests/integration/test_workflow_api.py`
+
+**Interface:**
+- Cung cấp `GET /api/algorithms`, `GET /api/recipes/{recipeSlug}/workflow`, `PUT /api/recipes/{recipeSlug}/workflow`.
+- Ánh xạ lỗi: slug/graph `422`, stale revision `409`, persisted data/write failure `503`, anonymous `401`.
+
+- [ ] **Bước 1: Viết authenticated API contract test đang thất bại**
+
+```python
+def test_workflow_endpoints_require_authentication(client: TestClient) -> None:
+    assert client.get('/api/algorithms').status_code == 401
+    assert client.get('/api/recipes/rev-c-mainboard/workflow').status_code == 401
+
+def test_invalid_graph_returns_structured_issues(auth_client: TestClient) -> None:
+    payload = default_payload()
+    payload['connections'][0]['targetPortId'] = 'missing-port'
+    response = auth_client.put('/api/recipes/rev-c-mainboard/workflow', json=payload)
+    assert response.status_code == 422
+    assert response.json()['detail'][0]['code'] == 'unknown-port'
+```
+
+- [ ] **Bước 2: Chạy API test và xác nhận route chưa có làm test fail**
+
+Chạy: `PYTHONPATH=backend conda run -n aoi-app python -m pytest tests/integration/test_workflow_api.py -v`
+
+- [ ] **Bước 3: Triển khai router và exception mapping**
+
+Inject `CurrentUser` vào mọi handler. Bảo đảm path slug khớp body `recipeSlug`. Trả catalog schema có thứ tự, default trong memory khi storage chưa có, workflow đã tăng revision sau PUT và `ValidationIssueSchema` có cấu trúc khi graph lỗi.
+
+- [ ] **Bước 4: Chạy backend/integration test và commit**
+
+```bash
+PYTHONPATH=backend conda run -n aoi-app python -m pytest tests/backend tests/integration -v
+git add backend/app/api/workflows.py backend/app/main.py tests/integration/test_workflow_api.py
+git commit -m "feat(api): expose authenticated workflow endpoints"
+```
+
+### Task 5: Frontend Contract, Service và Graph Helper có test
+
+**File:**
+- Tạo: `frontend/src/types/workflow.ts`
+- Tạo: `frontend/src/services/workflow-service.ts`
+- Sửa: `frontend/src/services/api-client.ts`
+- Tạo: `frontend/src/utils/workflow-graph.ts`
+- Tạo: `frontend/src/utils/workflow-graph.test.ts`
+
+**Interface:**
+- Cung cấp interface TypeScript camelCase khớp chính xác JSON backend.
+- Cung cấp `readAlgorithmCatalog(token)`, `readWorkflow(token, slug)`, `saveWorkflow(token, workflow)`.
+- Cung cấp `createNodeFromDefinition`, `validateConnection`, `validateDraft`, `stableTopologicalOrder`, `moveExecutionNode`, `filterCatalog`, `isWorkflowDirty`.
+- `ApiError` vẫn cho phép đọc `status` và `detail` đã parse để phân biệt `409`.
+
+- [ ] **Bước 1: Viết helper test đang thất bại**
+
+```typescript
+it('rejects type mismatches and cycles', () => {
+  expect(validateConnection(workflow, mismatchedConnection, catalog).code).toBe('type-mismatch');
+  expect(validateConnection(workflow, cycleConnection, catalog).code).toBe('cycle');
+});
+
+it('creates defaults and filters every searchable catalog field', () => {
+  const node = createNodeFromDefinition(patchCore, { x: 20, y: 40 });
+  expect(node.parameters.memoryBankSize).toBe(patchCore.parameters[0].defaultValue);
+  expect(filterCatalog(catalog, 'feature distribution')).toContain(patchCore);
+});
+```
+
+- [ ] **Bước 2: Chạy Vitest và xác nhận helper chưa có làm test fail**
+
+Chạy: `cd frontend && npm run test -- workflow-graph.test.ts`
+
+- [ ] **Bước 3: Triển khai project-owned type và pure deterministic helper**
+
+Phản chiếu backend issue code và parameter union. Tạo ID bằng `crypto.randomUUID()`. Tách editable label khỏi type/template key bất biến. Reorder bằng cách di chuyển một node ID; validate dependency order sau mỗi lần move; Auto order dùng saved preference làm stable tie breaker.
+
+- [ ] **Bước 4: Chạy frontend test/typecheck và commit**
+
+```bash
+cd frontend && npm run test && npm run typecheck
+git add frontend/src/types/workflow.ts frontend/src/services frontend/src/utils/workflow-graph.ts frontend/src/utils/workflow-graph.test.ts
+git commit -m "feat(frontend): add workflow contracts and graph helpers"
+```
+
+### Task 6: React Flow Canvas và Component Editor
+
+**File:**
+- Sửa: `frontend/package.json`
+- Sửa: `frontend/package-lock.json`
+- Sửa: `frontend/src/main.tsx`
+- Tạo: `frontend/src/components/workflow/AlgorithmCatalog.tsx`
+- Tạo: `frontend/src/components/workflow/WorkflowNode.tsx`
+- Tạo: `frontend/src/components/workflow/WorkflowCanvas.tsx`
+- Tạo: `frontend/src/components/workflow/NodeInspector.tsx`
+- Tạo: `frontend/src/components/workflow/ExecutionOrderRail.tsx`
+
+**Interface:**
+- `WorkflowCanvas` nhận AOI node/connection và emit thay đổi schema AOI; `Node`/`Edge` React Flow không thoát khỏi component.
+- Mọi editor control nhận callback từ `WorkflowEditorPage`; component không tự fetch.
+
+- [ ] **Bước 1: Cài interaction dependency và base stylesheet**
+
+Chạy: `cd frontend && npm install @xyflow/react@^12.8.0`
+
+Import `@xyflow/react/dist/style.css` một lần từ `frontend/src/main.tsx` trước project style.
+
+- [ ] **Bước 2: Xây catalog truy cập được và custom typed node**
+
+Catalog hỗ trợ search, category group, native drag payload `application/x-aoi-algorithm` và nút Add. Custom node render `Configuration only`, input/output handle có ID bằng port instance ID, text data type, selection state và remove action dùng được bằng bàn phím.
+
+- [ ] **Bước 3: Xây controlled bounded canvas**
+
+Dùng `ReactFlowProvider`, controlled node/edge, `screenToFlowPosition`, `isValidConnection`, `onConnect`, cập nhật node position, xóa selected edge, `Background`, `Controls`, fit view và `MiniMap` responsive. Xác nhận xóa node khi có dependent edge trước khi emit removal.
+
+- [ ] **Bước 4: Xây typed inspector và execution rail**
+
+Render text/number/boolean/select control từ parameter metadata với constraint inline. Port label được sửa; standard type/required/template field chỉ đọc. Rail hỗ trợ native drag reorder cùng nút Move up/Move down, hiển thị dependency error và cung cấp Auto order.
+
+- [ ] **Bước 5: Typecheck và commit**
+
+```bash
+cd frontend && npm run typecheck && npm run build
+git add frontend/package.json frontend/package-lock.json frontend/src/main.tsx frontend/src/components/workflow
+git commit -m "feat(frontend): build typed workflow canvas components"
+```
+
+### Task 7: Editor State, Revision Conflict và Workspace Navigation
+
+**File:**
+- Tạo: `frontend/src/pages/WorkflowEditorPage.tsx`
+- Sửa: `frontend/src/pages/WorkspacePage.tsx`
+- Sửa: `frontend/src/types/workspace.ts`
+- Sửa: `frontend/src/components/StudioChrome.tsx`
+- Sửa: `frontend/src/components/ProjectExplorer.tsx`
+
+**Interface:**
+- Thêm `WorkspaceView = ... | 'workflow-editor'`.
+- `WorkspacePage` sở hữu `savedWorkflow`, reload recipe active `rev-c-mainboard` và truyền workflow tới dashboard/editor.
+- Navigation đi qua `requestViewChange`; draft editor bẩn yêu cầu `window.confirm` trước khi đổi view.
+
+- [ ] **Bước 1: Triển khai state machine load, draft, validation và save**
+
+Fetch catalog/workflow song song khi vào editor. Giữ `savedWorkflow` và `draftWorkflow`; suy ra dirty state từ AOI value có thể serialize. Disable Save khi loading, saving, không đổi hoặc không hợp lệ. Khi thành công thay cả hai value bằng response server.
+
+- [ ] **Bước 2: Triển khai trạng thái conflict-safe và failure**
+
+Khi `ApiError.status === 409`, giữ draft, hiện conflict message `aria-live` và cung cấp `Reload server version`. Với lỗi khác, giữ draft và bật lại retry. Catalog/workflow trống có trạng thái giải thích retry/add.
+
+- [ ] **Bước 3: Nối entry editor và xác nhận navigation khi chưa lưu**
+
+Dashboard settings và mục Workflow trong Project explorer mở `workflow-editor`; Back to workspace dùng guarded navigation. Thêm title mapping editor và giữ nguyên hành vi Studio chrome hiện có.
+
+- [ ] **Bước 4: Chạy test/typecheck và commit**
+
+```bash
+cd frontend && npm run test && npm run typecheck
+git add frontend/src/pages/WorkflowEditorPage.tsx frontend/src/pages/WorkspacePage.tsx frontend/src/types/workspace.ts frontend/src/components/StudioChrome.tsx frontend/src/components/ProjectExplorer.tsx
+git commit -m "feat(frontend): orchestrate workflow editor state"
+```
+
+### Task 8: Dashboard Inspection Flow và Responsive Styling
+
+**File:**
+- Sửa: `frontend/src/pages/DashboardPage.tsx`
+- Sửa: `frontend/src/styles/global.css`
+
+**Interface:**
+- `DashboardPage` nhận `Workflow | null` đã lưu và `onConfigureWorkflow`.
+- Thứ tự và tên trên dashboard lấy từ `workflow.executionOrder`; text trạng thái mọi node là `Configuration only`.
+
+- [ ] **Bước 1: Thay dữ liệu pipeline hard-code và thêm control collapse/settings truy cập được**
+
+Mặc định mở. Trên container rộng thu thành action rail; trên container hẹp thu thành compact header trong normal flow. Settings có label chính xác `Configure inspection workflow`; collapse có `aria-label` theo trạng thái và `aria-expanded`.
+
+- [ ] **Bước 2: Thêm layout editor, execution-spine identity, focus và responsive rule**
+
+Dùng token AOI hiện có cùng Ink `#0B1F33`, Blueprint `#1769E0`, Signal green `#149B68`, Warning amber `#B66A00`, Panel `#FFFFFF`, Grid `#EEF3F8`. Wide dùng ba cột catalog/canvas/inspector; medium dùng catalog rail và canvas/inspector; narrow stack bounded region. Ẩn minimap khi thiếu không gian và tắt transition không thiết yếu dưới `prefers-reduced-motion`.
+
+- [ ] **Bước 3: Build và commit**
+
+```bash
+cd frontend && npm run test && npm run typecheck && npm run build
+git add frontend/src/pages/DashboardPage.tsx frontend/src/styles/global.css
+git commit -m "feat(frontend): connect responsive inspection workflow"
+```
+
+### Task 9: Xác minh End-to-End và Tài liệu
+
+**File:**
+- Sửa: `README.md`
+- Sửa: `.agents/experience/memory.md`
+
+**Interface:**
+- Ghi lại ownership workflow storage, API endpoint, revision conflict và phạm vi configuration-only.
+
+- [ ] **Bước 1: Chạy xác minh tự động đầy đủ**
+
+```bash
+bash scripts/test/test.sh
+bash scripts/build/build.sh
+```
+
+Mong đợi: core/backend/integration/frontend test, TypeScript check, Vite build và native scaffold build đều pass.
+
+- [ ] **Bước 2: Chạy xác minh trình duyệt có đăng nhập**
+
+Tại 390x600, 768x900, 1280x800 và 1920x1080, kiểm tra panel collapse/settings, catalog Add và drag/drop, di chuyển node, edge hợp lệ/không hợp lệ, xóa edge/node, zoom/pan/fit, chỉnh inspector, rail drag và button, Auto order, save, stale `409`, retry, reload, unsaved navigation, focus visibility, reduced motion và `document.documentElement.scrollWidth <= window.innerWidth`.
+
+- [ ] **Bước 3: Kiểm tra persisted JSON và runtime claim**
+
+Xác nhận `data/projects/rev-c-mainboard/workflow.json` là camelCase, revision tăng đúng một lần mỗi save, không còn `.tmp`, và UI/catalog ghi `Configuration only` mà không gợi ý OpenCV/PyTorch/Anomalib đã cài.
+
+- [ ] **Bước 4: Ghi tài liệu contract và commit**
+
+```bash
+git add README.md .agents/experience/memory.md
+git commit -m "docs: record workflow editor contracts"
+git status --short
+```
+
+Chỉ tài liệu thuật toán untracked có sẵn do người dùng sở hữu được phép còn lại.
