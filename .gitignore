@@ -37,3 +37,8 @@ data/temp/*
 # Code intelligence cache
 .codegraph/
 .pytest_cache/
+
+# Gitnexus
+.claude
+AGENTS.md
+CLAUDE.md
