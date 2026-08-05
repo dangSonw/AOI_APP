@@ -1,13 +1,14 @@
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000').replace(/\/$/, '');
 
 interface ApiErrorBody {
-  detail?: string;
+  detail?: unknown;
 }
 
 export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly detail?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -38,7 +39,13 @@ export async function apiRequest<T>(
 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({})) as ApiErrorBody;
-    throw new ApiError(errorBody.detail ?? 'The request could not be completed.', response.status);
+    const detail = errorBody.detail;
+    const message = typeof detail === 'string'
+      ? detail
+      : Array.isArray(detail) && typeof detail[0]?.message === 'string'
+        ? detail[0].message
+        : 'The request could not be completed.';
+    throw new ApiError(message, response.status, detail);
   }
 
   if (response.status === 204) {
