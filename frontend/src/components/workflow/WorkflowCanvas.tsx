@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  applyNodeChanges,
   Background,
   BackgroundVariant,
   Controls,
@@ -7,6 +8,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
+  useUpdateNodeInternals,
   type Connection,
   type Edge,
   type EdgeChange,
@@ -37,14 +39,19 @@ const nodeTypes: NodeTypes = { workflow: WorkflowNode };
 
 function CanvasContent(props: WorkflowCanvasProps) {
   const { screenToFlowPosition } = useReactFlow<WorkflowFlowNode, Edge>();
+  const updateNodeInternals = useUpdateNodeInternals();
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
-  const nodes = useMemo<WorkflowFlowNode[]>(() => props.workflow.nodes.map((node) => ({
+  const removeNodeRef = useRef(props.onRemoveNode);
+  removeNodeRef.current = props.onRemoveNode;
+  const handleRemoveNode = useCallback((nodeId: string) => removeNodeRef.current(nodeId), []);
+  const mappedNodes = useMemo<WorkflowFlowNode[]>(() => props.workflow.nodes.map((node) => ({
     id: node.id,
     type: 'workflow',
     position: node.position,
     selected: node.id === props.selectedNodeId,
-    data: { value: node, onRemove: props.onRemoveNode },
-  })), [props.workflow.nodes, props.selectedNodeId, props.onRemoveNode]);
+    data: { value: node, onRemove: handleRemoveNode },
+  })), [props.workflow.nodes, props.selectedNodeId, handleRemoveNode]);
+  const [nodes, setNodes] = useState<WorkflowFlowNode[]>(mappedNodes);
   const edges = useMemo<Edge[]>(() => props.workflow.connections.map((connection) => ({
     id: connection.id,
     source: connection.sourceNodeId,
@@ -54,6 +61,20 @@ function CanvasContent(props: WorkflowCanvasProps) {
     type: 'smoothstep',
     selected: connection.id === selectedEdgeId,
   })), [props.workflow.connections, selectedEdgeId]);
+
+  useEffect(() => {
+    setNodes((currentNodes) => mappedNodes.map((node) => {
+      const currentNode = currentNodes.find((candidate) => candidate.id === node.id);
+      return currentNode ? { ...currentNode, ...node, measured: currentNode.measured } : node;
+    }));
+  }, [mappedNodes]);
+
+  useEffect(() => {
+    const animationFrame = requestAnimationFrame(() => {
+      updateNodeInternals(props.workflow.nodes.map((node) => node.id));
+    });
+    return () => cancelAnimationFrame(animationFrame);
+  }, [props.workflow.nodes, updateNodeInternals]);
 
   const toDraft = useCallback((connection: Connection | Edge): ConnectionDraft | null => {
     if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) return null;
@@ -81,6 +102,7 @@ function CanvasContent(props: WorkflowCanvasProps) {
   }, [props, toDraft]);
 
   const handleNodesChange = useCallback((changes: NodeChange<WorkflowFlowNode>[]) => {
+    setNodes((currentNodes) => applyNodeChanges(changes, currentNodes));
     for (const change of changes) {
       if (change.type === 'position' && change.position) props.onMoveNode(change.id, change.position);
       if (change.type === 'remove') props.onRemoveNode(change.id);
@@ -132,6 +154,11 @@ function CanvasContent(props: WorkflowCanvasProps) {
         onPaneClick={() => { props.onSelectNode(null); setSelectedEdgeId(null); }}
         onEdgeClick={(_, edge) => setSelectedEdgeId(edge.id)}
         onEdgesDelete={(deleted) => deleted.forEach((edge) => props.onRemoveConnection(edge.id))}
+        onBeforeDelete={async ({ nodes: deletedNodes }) => {
+          if (deletedNodes.length === 0) return true;
+          deletedNodes.forEach((node) => props.onRemoveNode(node.id));
+          return false;
+        }}
         onEdgeDoubleClick={(_, edge) => props.onRemoveConnection(edge.id)}
         fitView
         fitViewOptions={{ padding: 0.2 }}

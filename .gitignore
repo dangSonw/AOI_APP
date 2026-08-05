@@ -27,9 +27,11 @@ core/native/build/
 # Local data cache/logs (keep directory structure but ignore contents if needed)
 data/cache/*
 data/logs/*
+data/projects/*
 data/temp/*
 !data/cache/.gitkeep
 !data/logs/.gitkeep
+!data/projects/.gitkeep
 !data/temp/.gitkeep
 
 # Code intelligence cache

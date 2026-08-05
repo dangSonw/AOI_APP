@@ -274,7 +274,7 @@ trap 'cleanup $?' EXIT
 
 echo "Starting Backend API (FastAPI) on http://127.0.0.1:8000..."
 cd "$PROJECT_ROOT/backend"
-setsid conda run --no-capture-output -n "$CONDA_ENV_NAME" \
+setsid env PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/backend" conda run --no-capture-output -n "$CONDA_ENV_NAME" \
     python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 &
 BACKEND_PROCESS_GROUP=$!
 
