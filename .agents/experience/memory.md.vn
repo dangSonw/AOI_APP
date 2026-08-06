@@ -123,3 +123,30 @@ Baseline hiện tại gồm 15 backend test, 14 core test, 12 integration test, 
 - Một scaffold generator trước đây đã tạo các thư mục tên `README.md` chứa file placeholder `README.md` giống hệt nhau. Các đường dẫn này không tạo ranh giới module, gây rối khi điều hướng file và không được tạo lại.
 - Giữ tài liệu vận hành được duy trì tại thư mục gốc repository và dưới `scripts/`; đặt báo cáo theo chủ đề trực tiếp dưới `docs/<topic>/` thay vì bọc trong một thư mục mang tên README.
 - Không giữ thư mục source module chưa dùng bằng tài liệu placeholder. Chỉ thêm thư mục khi có phần triển khai. Với thư mục runtime bắt buộc, dùng `.gitkeep` có phạm vi hẹp và quy tắc ignore tương ứng.
+
+## 15. Tự động điền Thông tin Đăng nhập và Xác thực theo Tab
+
+- Chrome Password Manager cần metadata credential theo quy ước, không chỉ label và kiểu input. Form đăng nhập dùng `name="username"` với `autocomplete="username"`, và `name="password"` với `autocomplete="current-password"`.
+- Xác thực AOI Studio có phạm vi theo tab. Chỉ lưu phiên đã xác thực trong `sessionStorage`: refresh tab hiện tại vẫn giữ workspace, còn mở trang trong tab mới sẽ bắt đầu ở màn hình đăng nhập.
+- Không bao giờ khôi phục xác thực từ `localStorage`. Xóa entry local-storage legacy `aoi-studio-session` khi khởi động để token cũ hoặc hết hạn không thể bỏ qua màn hình đăng nhập rồi gây lỗi API bảo vệ.
+
+## 16. Console Simulator Độc lập và Đầu vào Camera Windows
+
+- Giữ các điều khiển chỉ dành cho simulation trong một console loopback độc lập thay vì HMI production có xác thực. Endpoint fault injection, reset, jog và interlock ảo tuyệt đối không được xuất hiện trong hardware adapter.
+- Trong WSL, ưu tiên `getUserMedia()` của trình duyệt cho webcam Windows. Trình duyệt quản lý quyền camera và upload frame được chọn dưới dạng PNG; cách này tránh USB/IP, khác biệt driver `/dev/video*` và đường dẫn tuyệt đối Windows.
+- Folder được chọn bằng trình duyệt cung cấp nội dung file chứ không cung cấp đường dẫn thư mục có tính di động. Chuẩn hóa các định dạng ảnh trình duyệt hỗ trợ thành PNG lossless và sao chép vào vùng lưu trữ do simulator quản lý với giới hạn dung lượng và ID an toàn.
+- `AOI_SIMULATOR_NO_BROWSER=1` giúp launcher độc lập an toàn cho automation, trong khi chế độ tương tác bình thường vẫn mở trình duyệt Windows.
+
+## 17. Gateway Thiết bị có Xác thực và Tính Toàn vẹn Artifact
+
+- Trình duyệt chỉ giao tiếp với FastAPI control plane có xác thực. Origin camera và motion adapter là giá trị cấu hình loopback đáng tin cậy, không phải tham số request, vì vậy gateway không thể bị dùng làm proxy mạng tùy ý.
+- Typed adapter client xác minh protocol `1.0`, danh tính service, readiness, contract response Pydantic và timeout connect/read/write có giới hạn trước thao tác thiết bị. Vẫn cho phép đọc health của phần cứng unavailable để chẩn đoán, nhưng từ chối capture và lệnh motion nếu adapter chưa báo `ready`.
+- Camera capture chưa được chấp nhận là ready cho đến khi backend tải inspection artifact, áp giới hạn media type và dung lượng, kiểm byte length và so sánh SHA-256 với metadata capture. Browser nhận nội dung đã xác minh qua cổng backend `8000`, không gọi trực tiếp camera adapter.
+- Không đưa điều khiển chỉ dành cho simulator như jog, reset, thay đổi interlock và fault injection lên gateway production. Gateway dùng chung chỉ cung cấp health, capabilities, capture, motion state, home, absolute move, stop và clear-fault mà hardware adapter có thể triển khai an toàn.
+
+## 18. Cấu hình Hardware Dùng chung và An toàn Polling
+
+- Xem trạng thái adapter là nguồn sự thật duy nhất cho cả AOI Studio và Simulator Console. Thiết lập camera và motion dùng chung contract `GET/PUT /configuration` giống nhau trong simulator adapter và hardware adapter; lựa chọn nguồn ảnh cùng điều khiển fault chỉ dành cho simulation vẫn được tách riêng.
+- Polling tuyệt đối không được ghi đè draft chưa lưu của operator. Đánh dấu form cấu hình là dirty tại input event đầu tiên, tạm dừng thay thế draft khi dirty và chỉ tiếp tục đồng bộ sau khi Apply thành công.
+- Hardware mode phải khởi động HMI khi adapter CSI/UART phản hồi protocol hợp lệ nhưng báo `unavailable`. Hiển thị chẩn đoán, không request trạng thái/cấu hình vận hành, vô hiệu hóa command và không bao giờ thay bằng simulator adapter.
+- Trong simulation mode, `run_dev.sh` quản lý console như process group thứ năm. Các lần kiểm tra `status` sau phải đọc runtime mode từ PID file được bảo vệ; nếu không, lệnh status sẽ áp dụng sai ngữ nghĩa health của hardware cho simulation stack đang chạy.

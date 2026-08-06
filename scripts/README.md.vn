@@ -36,13 +36,16 @@ Các script cài đặt hỗ trợ:
 - `scripts/install/verify-environment.sh`: xác minh service, schema, permission cấu hình và các tệp JSON.
 
 ### 2. Chạy môi trường Phát triển (`scripts/run_dev.sh`)
-Khởi chạy đồng thời cả máy chủ phát triển FastAPI backend và Vite frontend. Nhấn `Ctrl+C` hoặc đóng terminal điều khiển sẽ dọn dẹp toàn bộ process group, bao gồm Uvicorn reload worker và tiến trình con của Vite.
-Nếu cả hai dịch vụ đã hoạt động bình thường, script sẽ báo stack hiện có và thoát thành công thay vì khởi động server trùng lặp. Xung đột cổng không đầy đủ hoặc không liên quan vẫn là lỗi và kèm thông tin listener.
+Khởi chạy đồng thời camera adapter, motion adapter, FastAPI backend và Vite frontend. Simulation mode rõ ràng còn khởi động commissioning console trên cổng `9200` và mở cả hai tab trình duyệt. Nhấn `Ctrl+C` hoặc đóng terminal điều khiển sẽ dọn dẹp mọi process group được sở hữu, bao gồm Uvicorn reload worker, tiến trình con Vite và console.
+Nếu stack đầy đủ của mode hiện tại đã hoạt động bình thường, script sẽ báo stack hiện có và thoát thành công thay vì khởi động server trùng lặp. Hardware adapter có thể báo `unavailable` khi chưa kết nối mà không ngăn HMI khởi động ở chế độ chẩn đoán; không có simulator fallback. Xung đột cổng không đầy đủ hoặc không liên quan vẫn là lỗi và kèm thông tin listener.
 
 **Terminal Ubuntu WSL:**
 ```bash
 bash scripts/run_dev.sh
+bash scripts/run_dev.sh simulation
 ```
+
+Đặt `AOI_SIMULATOR_NO_BROWSER=1` khi automation dùng simulation mode và không được mở tab trình duyệt.
 
 Dừng stack đang chạy, kể cả stack còn sót lại từ terminal cũ:
 
@@ -68,7 +71,27 @@ Không dùng trực tiếp `bash scripts/run_dev.sh` trong PowerShell. Executabl
 - Server phát triển frontend sẽ bắt đầu (kiểm tra đầu ra terminal để biết cổng hoạt động của Vite)
 - Frontend chạy tại: [http://127.0.0.1:5173](http://127.0.0.1:5173)
 
-### 3. Biên dịch Dự án (`scripts/build/build.sh`)
+### 3. Console Simulator Độc lập (`scripts/run_simulator.sh`)
+
+Chỉ khởi động camera ảo, bộ điều khiển chuyển động ảo và console commissioning local. Chế độ này không cần đăng nhập AOI Studio hoặc PostgreSQL. Lệnh khởi động mặc định sẽ mở trình duyệt Windows tại [http://127.0.0.1:9200](http://127.0.0.1:9200).
+
+```bash
+bash scripts/run_simulator.sh
+bash scripts/run_simulator.sh status
+bash scripts/run_simulator.sh stop
+```
+
+Panel camera hỗ trợ test pattern xác định, folder ảnh được chọn bằng trình duyệt và webcam Windows được chụp thông qua quyền của trình duyệt. Frame từ folder và webcam được chuyển sang PNG trong trình duyệt rồi sao chép vào vùng lưu trữ do simulator quản lý; đường dẫn tuyệt đối Windows không bao giờ được lưu. Panel chuyển động hỗ trợ homing, jog XYZ, stop/reset, interlock cửa và kết nối, emergency stop và fault injection xác định.
+
+Với kiểm tra tự động không được mở tab trình duyệt:
+
+```bash
+AOI_SIMULATOR_NO_BROWSER=1 bash scripts/run_simulator.sh
+```
+
+Mỗi ảnh nguồn upload bị giới hạn 16 MiB. Trình duyệt có thể đọc nguồn JPEG, PNG, WebP hoặc BMP nhưng chuẩn hóa đầu vào simulator thành PNG lossless. Webcam yêu cầu cấp quyền camera cho trang loopback trong Chrome hoặc Edge.
+
+### 4. Biên dịch Dự án (`scripts/build/build.sh`)
 Biên dịch các tài nguyên sẵn sàng cho production của frontend (được đưa vào `frontend/dist`) và biên dịch thư viện C++ native core (nếu đã cài đặt CMake) trong `core/native/build`.
 
 **Cách dùng:**
@@ -76,11 +99,13 @@ Biên dịch các tài nguyên sẵn sàng cho production của frontend (đư�
 bash scripts/build/build.sh
 ```
 
-### 4. Công cụ chạy Kiểm thử (`scripts/test/test.sh`)
+### 5. Công cụ chạy Kiểm thử (`scripts/test/test.sh`)
 Chạy các bài kiểm thử một cách tuần tự cho các phân tầng khác nhau:
 - Các kiểm thử Backend trong `tests/backend/` bằng `pytest`.
 - Các kiểm thử logic Core trong `tests/core/` bằng `pytest`.
 - Các kiểm thử tích hợp (Integration) trong `tests/integration/` bằng `pytest`.
+- Các kiểm thử contract adapter dùng chung trong `tests/contract/` bằng `pytest`.
+- Các kiểm thử camera, chuyển động và console trong `tests/simulator/` bằng `pytest`.
 - Các kiểm thử và kiểm tra kiểu dữ liệu (Type checking) frontend trong `frontend/`.
 
 **Cách dùng:**
@@ -88,7 +113,7 @@ Chạy các bài kiểm thử một cách tuần tự cho các phân tầng khá
 bash scripts/test/test.sh
 ```
 
-### 5. Kiểm tra khả năng Triển khai (`scripts/deploy/deploy.sh`)
+### 6. Kiểm tra khả năng Triển khai (`scripts/deploy/deploy.sh`)
 Xác minh xem các tài nguyên phiên bản production đã được biên dịch thành công chưa và cung cấp hướng dẫn chạy máy chủ trong môi trường production đằng sau một máy chủ proxy ngược (reverse proxy).
 
 **Cách dùng:**
@@ -96,7 +121,7 @@ Xác minh xem các tài nguyên phiên bản production đã được biên dị
 bash scripts/deploy/deploy.sh
 ```
 
-### 6. Đóng gói Bản phát hành (`scripts/release/release.sh`)
+### 7. Đóng gói Bản phát hành (`scripts/release/release.sh`)
 Chạy một bản build sạch và đóng gói các tài nguyên production (dist, backend, core, database, docs, scripts) vào một tệp nén `.tar.gz` nằm trong thư mục `release/`. Các thư mục phục vụ phát triển (như `.venv` hoặc `__pycache__`) sẽ được loại trừ khỏi tệp lưu trữ.
 
 **Cách dùng:**
@@ -112,5 +137,5 @@ bash scripts/release/release.sh
 3. **Bảo vệ Secret**: Không in hoặc commit giá trị từ `.env`. Chỉ commit `.env.example`.
 4. **Quyền Thực thi**: Đảm bảo tất cả các kịch bản đều có quyền thực thi:
    ```bash
-   chmod +x scripts/run_dev.sh scripts/install/*.sh scripts/utils/*.sh scripts/build/build.sh scripts/test/test.sh scripts/deploy/deploy.sh scripts/release/release.sh
+   chmod +x scripts/run_dev.sh scripts/run_simulator.sh scripts/install/*.sh scripts/utils/*.sh scripts/build/build.sh scripts/test/test.sh scripts/deploy/deploy.sh scripts/release/release.sh
    ```

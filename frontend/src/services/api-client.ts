@@ -53,3 +53,22 @@ export async function apiRequest<T>(
   }
   return response.json() as Promise<T>;
 }
+
+export async function apiBlobRequest(path: string, accessToken: string): Promise<Blob> {
+  const headers = new Headers({ Authorization: `Bearer ${accessToken}` });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { headers, cache: 'no-store' });
+  } catch {
+    throw new ApiError('The AOI service is unavailable. Check the backend connection.', 0);
+  }
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({})) as ApiErrorBody;
+    throw new ApiError(
+      typeof errorBody.detail === 'string' ? errorBody.detail : 'The request could not be completed.',
+      response.status,
+      errorBody.detail,
+    );
+  }
+  return response.blob();
+}

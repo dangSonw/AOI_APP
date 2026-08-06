@@ -123,3 +123,30 @@ The current baseline is 15 backend tests, 14 core tests, 12 integration tests, 1
 - A scaffold generator previously created directories named `README.md` containing identical `README.md` placeholder files. These paths add no module boundary, confuse file navigation, and must not be recreated.
 - Keep maintained operational documentation at the repository root and under `scripts/`; keep topic-specific reports directly under `docs/<topic>/` rather than inside a README-named wrapper directory.
 - Do not preserve unused source-module directories with placeholder documentation. Add the directory when implementation exists. For required runtime directories, use narrowly scoped `.gitkeep` files and matching ignore rules instead.
+
+## 15. Browser Credential Autofill and Tab-Scoped Authentication
+
+- Chrome password autofill needs conventional credential metadata, not only labels and input types. The sign-in form uses `name="username"` with `autocomplete="username"` and `name="password"` with `autocomplete="current-password"`.
+- AOI Studio authentication is tab-scoped. Store the authenticated session only in `sessionStorage`: refreshing the current tab preserves the workspace, while opening the site in a new tab starts at sign-in.
+- Never restore authentication from `localStorage`. Remove the legacy `aoi-studio-session` local-storage entry during startup so previously persisted or expired tokens cannot bypass sign-in and trigger protected API errors.
+
+## 16. Standalone Simulator Console and Windows Camera Input
+
+- Keep simulation-only controls in a standalone loopback console rather than the authenticated production HMI. Fault injection, reset, jog, and virtual interlock endpoints must never appear in hardware adapters.
+- In WSL, prefer browser `getUserMedia()` for a Windows webcam. The browser owns camera permission and uploads a selected frame as PNG; this avoids USB/IP attachment, `/dev/video*` driver differences, and absolute Windows paths.
+- Browser-selected folders expose file contents, not a portable directory path. Normalize supported browser image formats to lossless PNG and copy them into simulator-managed storage with bounded size and safe IDs.
+- `AOI_SIMULATOR_NO_BROWSER=1` keeps the standalone launcher automation-safe while normal interactive startup still opens the Windows browser.
+
+## 17. Authenticated Device Gateway and Artifact Integrity
+
+- The browser communicates only with the authenticated FastAPI control plane. Camera and motion adapter origins are trusted loopback configuration values, never request parameters, so the gateway cannot be used as an arbitrary network proxy.
+- Typed adapter clients validate protocol `1.0`, service identity, readiness, Pydantic response contracts, and bounded connect/read/write timeouts before device operations. Preserve health reads for unavailable hardware diagnostics, but reject capture and motion commands unless the adapter reports `ready`.
+- A camera capture is not accepted as ready until the backend downloads its inspection artifact, enforces the media-type and size limits, verifies byte length, and compares SHA-256 with capture metadata. The browser receives verified content through backend port `8000`, not directly from the camera adapter.
+- Keep simulator-only controls such as jog, reset, interlock mutation, and fault injection off the production gateway. The shared gateway exposes only health, capabilities, capture, motion state, home, absolute move, stop, and clear-fault contracts that hardware adapters can implement safely.
+
+## 18. Shared Hardware Configuration and Polling Safety
+
+- Treat adapter state as the single source of truth for both AOI Studio and the Simulator Console. Common camera and motion settings use identical `GET/PUT /configuration` contracts in simulation and hardware adapters; simulation-only source selection and fault controls remain separate.
+- Polling must never overwrite an unsaved operator draft. Mark a configuration form dirty on its first input event, suspend draft replacement while dirty, and resume synchronization only after a successful Apply.
+- Hardware mode must start the HMI when CSI/UART adapters respond with a valid protocol but report `unavailable`. Show diagnostics, omit operational state/configuration requests, disable commands, and never substitute simulator adapters.
+- In simulation mode, `run_dev.sh` owns the console as a fifth process group. Runtime mode must be read from the protected PID file for later `status` checks, otherwise a status invocation incorrectly applies hardware health semantics to a running simulation stack.

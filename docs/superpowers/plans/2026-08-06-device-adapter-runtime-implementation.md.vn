@@ -1,0 +1,82 @@
+# Kế hoạch Triển khai Adapter Thiết bị và Runtime Kiểm tra AOI
+
+> **Dành cho agent triển khai:** Bắt buộc thực hiện từng task bằng subagent-driven-development hoặc executing-plans. Mọi thay đổi hành vi theo chu trình red-green-refactor.
+
+**Mục tiêu:** Cung cấp runtime AOI mặc định hardware với camera/motion simulator tương ứng, API loopback đáng tin cậy, inspection run được lưu, baseline thị giác deterministic và ranh giới adapter CSI/UART cho Jetson.
+
+**Kiến trúc:** Contract thiết bị chung nằm trong `core/devices`. Bốn process adapter FastAPI độc lập triển khai contract camera/motion ở hardware và simulation mode. Backend chính có xác thực điều phối adapter và lưu inspection record có thể truy vết; trình duyệt chỉ giao tiếp backend chính.
+
+**Công nghệ:** Python 3.12, FastAPI, Pydantic 2, SQLAlchemy 2, HTTPX, pytest, OpenCV headless, NumPy, pySerial, React 18, TypeScript 5.6, Vitest, Jetson Argus/GStreamer.
+
+## Ràng buộc Chung
+
+- Hardware là mặc định và không bao giờ tự fallback sang simulation.
+- Port adapter chỉ bind `127.0.0.1`.
+- Artifact inspection lossless và được kiểm checksum; preview không bao giờ là input inspection.
+- Firmware MCU sở hữu timing motor, homing, limit, emergency stop và watchdog.
+- Không reset hoặc ghi đè thay đổi login chưa commit.
+- Mọi Markdown thay đổi có bản `.md.vn`.
+- Chạy CodeGraph impact trước khi sửa symbol hiện có và sync sau mỗi milestone.
+
+---
+
+## Task 1: Contract Thiết bị Chung
+
+Tạo model health, capability, capture, XYZ, command, state và fault có version/validation trong `core/devices`; thêm `tests/core/test_device_contracts.py`.
+
+## Task 2: Skeleton Bốn Adapter Service
+
+Tạo module tương ứng trong `hardware/camera`, `hardware/mcu`, `simulator/camera`, `simulator/mcu`; mọi app cung cấp health/version/capabilities và pass cùng contract test.
+
+## Task 3: Motion Simulator Deterministic và SSE
+
+Triển khai home/move/stop/clear-fault idempotent, workspace XYZ có giới hạn, fake clock, command record, revision và event SSE; test command trùng, stale, fault và in-position.
+
+## Task 4: UART Codec và Hardware Motion Adapter
+
+Triển khai binary frame có version, sequence, payload length, micromet nguyên, CRC-32, framing, heartbeat, timeout và pySerial lazy; test frame lỗi và pseudo-terminal.
+
+## Task 5: Camera Replay và Toàn vẹn Artifact
+
+Triển khai capture transaction idempotent, replay deterministic, artifact lossless, atomic write, SHA-256, metadata và fault injection; test không bao giờ công bố artifact chưa hoàn chỉnh.
+
+## Task 6: Adapter Camera CSI Jetson
+
+Triển khai tạo pipeline GStreamer/Argus lazy, capability, setting recipe bị khóa, output lossless, raw tùy chọn và health diagnostic; x86 không cần import Jetson.
+
+## Task 7: Launcher Mode và Vòng đời Bốn Process
+
+Sửa launcher/config để hỗ trợ hardware mặc định, `start --mode simulation`, alias `simulation`, port 9101/9102, bốn process group, health wait đầy đủ và không fallback.
+
+## Task 8: Adapter Client và Gateway Có Xác thực
+
+Tạo HTTPX client typed, timeout riêng, protocol/hash check, lỗi chuẩn hóa và endpoint gateway bảo vệ trong backend chính.
+
+## Task 9: Inspection Orchestrator Được Lưu
+
+Tạo state machine move-settle-capture-inspect-persist, cancellation, fault persistence và recovery không tự tiếp tục motion; thêm migration và API.
+
+## Task 10: Baseline Thị giác Deterministic
+
+Thêm OpenCV/NumPy và chỉ promote các runtime cần thiết: quality gate, undistortion, registration, median/MAD, absolute/gradient, connected components, normalization và quyết định ba trạng thái.
+
+## Task 11: Inspection Record và Evidence UI
+
+Thay record hard-code bằng API thật; kết nối Run với inspection API; hỗ trợ tìm kiếm, evidence, review override có actor/time và metrics trung thực.
+
+## Task 12: Vận hành, Tài liệu và Nghiệm thu
+
+Cập nhật `README.md`, `README.md.vn`, script docs/setup/test/deploy, memory song ngữ và script nghiệm thu Jetson/simulator soak.
+
+## Xác minh Cuối
+
+```bash
+bash scripts/test/test.sh
+bash scripts/build/build.sh
+bash -n scripts/run_dev.sh
+codegraph sync .
+codegraph status .
+git diff --check
+```
+
+Chạy simulation end-to-end, fault matrix, restart recovery và soak deterministic 1.000 run trước khi tuyên bố sẵn sàng trước phần cứng.

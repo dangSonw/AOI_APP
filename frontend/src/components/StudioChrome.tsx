@@ -19,6 +19,7 @@ interface StudioChromeProps {
 const TOP_VIEWS: Array<{ label: string; view: WorkspaceView }> = [
   { label: 'Workspace', view: 'dashboard' },
   { label: 'Database', view: 'database' },
+  { label: 'Hardware', view: 'hardware' },
   { label: 'Settings', view: 'settings' },
 ];
 

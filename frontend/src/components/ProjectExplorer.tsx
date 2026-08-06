@@ -14,7 +14,7 @@ const EXPLORER_ITEMS: Array<{
   isExpanded?: boolean;
 }> = [
   { label: 'Project', icon: 'P', view: 'dashboard', isExpanded: true },
-  { label: 'Hardware', icon: 'H' },
+  { label: 'Hardware', icon: 'H', view: 'hardware' },
   { label: 'Camera rig', icon: 'C', view: 'camera-manager' },
   { label: 'Workflow', icon: 'W', view: 'workflow-editor' },
   { label: 'Models', icon: 'M', isExpanded: true },

@@ -1,5 +1,6 @@
 interface AuthFieldProps {
   id: string;
+  name: string;
   label: string;
   type?: 'email' | 'password' | 'text';
   value: string;
@@ -15,6 +16,7 @@ interface AuthFieldProps {
 
 export function AuthField({
   id,
+  name,
   label,
   type = 'text',
   value,
@@ -38,6 +40,7 @@ export function AuthField({
       </div>
       <input
         id={id}
+        name={name}
         type={type}
         value={value}
         autoComplete={autoComplete}

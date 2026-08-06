@@ -1,0 +1,2 @@
+class DeviceContractError(RuntimeError):
+    pass

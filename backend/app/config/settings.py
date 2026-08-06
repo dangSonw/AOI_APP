@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     api_host: str = '127.0.0.1'
     api_port: int = 8000
     frontend_origin: str = 'http://127.0.0.1:5173'
+    camera_adapter_url: str = 'http://127.0.0.1:9101'
+    motion_adapter_url: str = 'http://127.0.0.1:9102'
     database_url: str = Field(min_length=1)
     jwt_secret_key: str = Field(min_length=32)
     jwt_algorithm: str = 'HS256'
@@ -25,6 +27,23 @@ class Settings(BaseSettings):
     seed_admin_email: str = 'operator@aoi.local'
     seed_admin_password: str = Field(min_length=8)
     seed_admin_full_name: str = 'AOI Operator'
+
+    @field_validator('camera_adapter_url', 'motion_adapter_url')
+    @classmethod
+    def validate_adapter_url(cls, value: str) -> str:
+        normalized_value = value.rstrip('/')
+        parsed_url = urlsplit(normalized_value)
+        if (
+            parsed_url.scheme != 'http'
+            or parsed_url.hostname not in {'127.0.0.1', 'localhost', '::1'}
+            or parsed_url.port is None
+            or parsed_url.path
+            or parsed_url.query
+            or parsed_url.fragment
+            or parsed_url.username is not None
+        ):
+            raise ValueError('Device adapter URLs must be loopback HTTP origins with an explicit port.')
+        return normalized_value
 
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / '.env',

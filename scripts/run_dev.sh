@@ -10,6 +10,13 @@ source "$SCRIPT_DIR/utils/require-ubuntu-wsl.sh"
 require_ubuntu_runtime
 
 ACTION="${1:-start}"
+RUNTIME_MODE="hardware"
+if [ "$ACTION" = "simulation" ]; then
+    ACTION="start"
+    RUNTIME_MODE="simulation"
+elif [ "$ACTION" = "start" ] && [ "${2:-}" = "--mode" ]; then
+    RUNTIME_MODE="${3:-}"
+fi
 CONDA_ENV_NAME="aoi-app"
 RUNTIME_BASE="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"
 RUNTIME_KEY="$(printf '%s' "$PROJECT_ROOT" | cksum | awk '{print $1}')"
@@ -24,12 +31,34 @@ print_header() {
 
 print_usage() {
     cat <<'EOF'
-Usage: bash scripts/run_dev.sh [start|stop|status]
+Usage: bash scripts/run_dev.sh [start|stop|status|simulation]
 
-  start   Start the backend and frontend (default).
+  start   Start hardware adapters, backend, and frontend (default).
+  start --mode simulation
+          Start simulator adapters, backend, and frontend.
+  simulation
+          Alias for start --mode simulation.
   stop    Stop AOI Studio processes started for this repository.
   status  Show whether this repository's development servers are running.
 EOF
+}
+
+open_windows_browser() {
+    local url="$1"
+    if command -v powershell.exe >/dev/null 2>&1; then
+        powershell.exe -NoProfile -NonInteractive -Command "Start-Process '$url'" >/dev/null 2>&1 || true
+    elif command -v wslview >/dev/null 2>&1; then
+        wslview "$url" >/dev/null 2>&1 || true
+    fi
+}
+
+read_runtime_mode() {
+    local stored_mode
+    [ -f "$PID_FILE" ] || return 0
+    stored_mode="$(awk -F= '$1 == "RUNTIME_MODE" {print $2; exit}' "$PID_FILE")"
+    if [ "$stored_mode" = "hardware" ] || [ "$stored_mode" = "simulation" ]; then
+        RUNTIME_MODE="$stored_mode"
+    fi
 }
 
 # Return process groups containing an AOI backend or frontend whose working
@@ -47,7 +76,7 @@ find_project_server_groups() {
         process_cwd="$(readlink "$process_dir/cwd" 2>/dev/null || true)"
 
         case "$process_cwd" in
-            "$PROJECT_ROOT/backend"|"$PROJECT_ROOT/frontend") ;;
+            "$PROJECT_ROOT"|"$PROJECT_ROOT/backend"|"$PROJECT_ROOT/frontend"|"$PROJECT_ROOT/simulator/console") ;;
             *) continue ;;
         esac
 
@@ -55,7 +84,12 @@ find_project_server_groups() {
         case "$process_cwd:$process_command" in
             "$PROJECT_ROOT/backend:"*"python -m uvicorn app.main:app"*"--port 8000"*|\
             "$PROJECT_ROOT/frontend:"*"npm run dev"*"--strictPort"*|\
-            "$PROJECT_ROOT/frontend:"*"vite"*"--strictPort"*) ;;
+            "$PROJECT_ROOT/frontend:"*"vite"*"--strictPort"*|\
+            "$PROJECT_ROOT:"*"python -m uvicorn hardware.camera.app:app"*"--port 9101"*|\
+            "$PROJECT_ROOT:"*"python -m uvicorn hardware.mcu.app:app"*"--port 9102"*|\
+            "$PROJECT_ROOT:"*"python -m uvicorn simulator.camera.app:app"*"--port 9101"*|\
+            "$PROJECT_ROOT:"*"python -m uvicorn simulator.mcu.app:app"*"--port 9102"*|\
+            "$PROJECT_ROOT/simulator/console:"*"python -m http.server 9200"*) ;;
             *) continue ;;
         esac
 
@@ -120,22 +154,54 @@ stop_project_servers() {
     return 0
 }
 
+adapter_is_healthy() {
+    local url="$1"
+    local response
+    response="$(curl --fail --silent --max-time 2 "$url")" || return 1
+    printf '%s' "$response" | grep -q '"protocolVersion":"1.0"' || return 1
+    if [ "$RUNTIME_MODE" = "simulation" ]; then
+        printf '%s' "$response" | grep -q '"status":"ready"'
+    else
+        printf '%s' "$response" | grep -Eq '"status":"(ready|degraded|unavailable)"'
+    fi
+}
+
 is_stack_healthy() {
-    ss -ltn "sport = :8000" 2>/dev/null | grep -q LISTEN && \
+    local is_base_healthy=false
+    if ss -ltn "sport = :9101" 2>/dev/null | grep -q LISTEN && \
+        ss -ltn "sport = :9102" 2>/dev/null | grep -q LISTEN && \
+        ss -ltn "sport = :8000" 2>/dev/null | grep -q LISTEN && \
         ss -ltn "sport = :5173" 2>/dev/null | grep -q LISTEN && \
         command -v curl &>/dev/null && \
+        adapter_is_healthy http://127.0.0.1:9101/health && \
+        adapter_is_healthy http://127.0.0.1:9102/health && \
         curl --fail --silent --max-time 2 http://127.0.0.1:8000/health | grep -q '"status":"ok"' && \
-        curl --fail --silent --max-time 2 --output /dev/null http://127.0.0.1:5173/
+        curl --fail --silent --max-time 2 --output /dev/null http://127.0.0.1:5173/; then
+        is_base_healthy=true
+    fi
+    $is_base_healthy || return 1
+    if [ "$RUNTIME_MODE" = "simulation" ]; then
+        ss -ltn "sport = :9200" 2>/dev/null | grep -q LISTEN && \
+            curl --fail --silent --max-time 2 --output /dev/null http://127.0.0.1:9200/
+    fi
 }
 
 wait_for_stack() {
-    local backend_group="$1"
-    local frontend_group="$2"
+    local camera_group="$1"
+    local motion_group="$2"
+    local backend_group="$3"
+    local frontend_group="$4"
+    local console_group="${5:-}"
     local attempt
 
     for attempt in {1..60}; do
-        if ! is_process_group_running "$backend_group" || \
+        if ! is_process_group_running "$camera_group" || \
+           ! is_process_group_running "$motion_group" || \
+           ! is_process_group_running "$backend_group" || \
            ! is_process_group_running "$frontend_group"; then
+            return 1
+        fi
+        if [ "$RUNTIME_MODE" = "simulation" ] && ! is_process_group_running "$console_group"; then
             return 1
         fi
 
@@ -162,6 +228,11 @@ show_status() {
         echo "Status: healthy"
         echo "Frontend: http://127.0.0.1:5173/"
         echo "Backend health: http://127.0.0.1:8000/health"
+        echo "Camera health: http://127.0.0.1:9101/health"
+        echo "Motion health: http://127.0.0.1:9102/health"
+        if [ "$RUNTIME_MODE" = "simulation" ]; then
+            echo "Simulator console: http://127.0.0.1:9200/"
+        fi
         return 0
     fi
 
@@ -180,15 +251,24 @@ ensure_port_is_available() {
 }
 
 write_pid_file() {
-    local backend_group="$1"
-    local frontend_group="$2"
+    local camera_group="$1"
+    local motion_group="$2"
+    local backend_group="$3"
+    local frontend_group="$4"
+    local console_group="${5:-}"
     local temporary_file="${PID_FILE}.$$"
 
     umask 077
     {
         printf 'SCRIPT_PID=%s\n' "$$"
+        printf 'RUNTIME_MODE=%s\n' "$RUNTIME_MODE"
+        printf 'CAMERA_PROCESS_GROUP=%s\n' "$camera_group"
+        printf 'MOTION_PROCESS_GROUP=%s\n' "$motion_group"
         printf 'BACKEND_PROCESS_GROUP=%s\n' "$backend_group"
         printf 'FRONTEND_PROCESS_GROUP=%s\n' "$frontend_group"
+        if [ -n "$console_group" ]; then
+            printf 'CONSOLE_PROCESS_GROUP=%s\n' "$console_group"
+        fi
         printf 'PROJECT_ROOT=%s\n' "$PROJECT_ROOT"
     } > "$temporary_file"
     mv -f "$temporary_file" "$PID_FILE"
@@ -226,6 +306,7 @@ case "$ACTION" in
         exit 0
         ;;
     status)
+        read_runtime_mode
         show_status
         exit $?
         ;;
@@ -242,11 +323,21 @@ case "$ACTION" in
         ;;
 esac
 
+if [ "$RUNTIME_MODE" != "hardware" ] && [ "$RUNTIME_MODE" != "simulation" ]; then
+    echo "Error: runtime mode must be 'hardware' or 'simulation'." >&2
+    print_usage >&2
+    exit 2
+fi
+
+read_runtime_mode
 mapfile -t EXISTING_GROUPS < <(find_project_server_groups)
 if [ "${#EXISTING_GROUPS[@]}" -gt 0 ] && is_stack_healthy; then
     echo "AOI Studio is already running."
     echo "Frontend: http://127.0.0.1:5173/"
     echo "Backend health: http://127.0.0.1:8000/health"
+    if [ "$RUNTIME_MODE" = "simulation" ]; then
+        echo "Simulator console: http://127.0.0.1:9200/"
+    fi
     echo "Stop command: bash scripts/run_dev.sh stop"
     echo "No duplicate development servers were started."
     exit 0
@@ -264,6 +355,11 @@ fi
 
 ensure_port_is_available 8000
 ensure_port_is_available 5173
+ensure_port_is_available 9101
+ensure_port_is_available 9102
+if [ "$RUNTIME_MODE" = "simulation" ]; then
+    ensure_port_is_available 9200
+fi
 
 # EXIT also covers startup failures and a terminal closing unexpectedly. Each
 # service runs in its own session/process group so cleanup reaches reload workers.
@@ -271,6 +367,25 @@ trap 'exit 130' SIGINT
 trap 'exit 143' SIGTERM
 trap 'exit 129' SIGHUP
 trap 'cleanup $?' EXIT
+
+if [ "$RUNTIME_MODE" = "simulation" ]; then
+    CAMERA_APP="simulator.camera.app:app"
+    MOTION_APP="simulator.mcu.app:app"
+else
+    CAMERA_APP="hardware.camera.app:app"
+    MOTION_APP="hardware.mcu.app:app"
+fi
+
+echo "Starting $RUNTIME_MODE camera adapter on http://127.0.0.1:9101..."
+cd "$PROJECT_ROOT"
+setsid env PYTHONPATH="$PROJECT_ROOT" conda run --no-capture-output -n "$CONDA_ENV_NAME" \
+    python -m uvicorn "$CAMERA_APP" --host 127.0.0.1 --port 9101 &
+CAMERA_PROCESS_GROUP=$!
+
+echo "Starting $RUNTIME_MODE motion adapter on http://127.0.0.1:9102..."
+setsid env PYTHONPATH="$PROJECT_ROOT" conda run --no-capture-output -n "$CONDA_ENV_NAME" \
+    python -m uvicorn "$MOTION_APP" --host 127.0.0.1 --port 9102 &
+MOTION_PROCESS_GROUP=$!
 
 echo "Starting Backend API (FastAPI) on http://127.0.0.1:8000..."
 cd "$PROJECT_ROOT/backend"
@@ -283,23 +398,42 @@ cd "$PROJECT_ROOT/frontend"
 setsid npm run dev -- --strictPort &
 FRONTEND_PROCESS_GROUP=$!
 
-MANAGES_SERVERS=true
-write_pid_file "$BACKEND_PROCESS_GROUP" "$FRONTEND_PROCESS_GROUP"
+CONSOLE_PROCESS_GROUP=""
+if [ "$RUNTIME_MODE" = "simulation" ]; then
+    echo "Starting Simulator Console on http://127.0.0.1:9200..."
+    cd "$PROJECT_ROOT/simulator/console"
+    setsid conda run --no-capture-output -n "$CONDA_ENV_NAME" python -m http.server 9200 --bind 127.0.0.1 &
+    CONSOLE_PROCESS_GROUP=$!
+fi
 
-if ! wait_for_stack "$BACKEND_PROCESS_GROUP" "$FRONTEND_PROCESS_GROUP"; then
+MANAGES_SERVERS=true
+write_pid_file "$CAMERA_PROCESS_GROUP" "$MOTION_PROCESS_GROUP" "$BACKEND_PROCESS_GROUP" "$FRONTEND_PROCESS_GROUP" "$CONSOLE_PROCESS_GROUP"
+
+if ! wait_for_stack "$CAMERA_PROCESS_GROUP" "$MOTION_PROCESS_GROUP" "$BACKEND_PROCESS_GROUP" "$FRONTEND_PROCESS_GROUP" "$CONSOLE_PROCESS_GROUP"; then
     echo "Error: one or more development servers failed to start." >&2
     exit 1
 fi
 
 echo "========================================="
 echo "AOI Development environment running!"
-echo "Press Ctrl+C to stop both servers."
+echo "Runtime mode: $RUNTIME_MODE"
+echo "Press Ctrl+C to stop all services."
 echo "You can also run: bash scripts/run_dev.sh stop"
+if [ "${AOI_SIMULATOR_NO_BROWSER:-0}" != "1" ]; then
+    open_windows_browser "http://127.0.0.1:5173/"
+    if [ "$RUNTIME_MODE" = "simulation" ]; then
+        open_windows_browser "http://127.0.0.1:9200/"
+    fi
+fi
 echo "========================================="
 
 # Exit when either service terminates; the EXIT trap stops the remaining group.
 set +e
-wait -n "$BACKEND_PROCESS_GROUP" "$FRONTEND_PROCESS_GROUP"
+if [ "$RUNTIME_MODE" = "simulation" ]; then
+    wait -n "$CAMERA_PROCESS_GROUP" "$MOTION_PROCESS_GROUP" "$BACKEND_PROCESS_GROUP" "$FRONTEND_PROCESS_GROUP" "$CONSOLE_PROCESS_GROUP"
+else
+    wait -n "$CAMERA_PROCESS_GROUP" "$MOTION_PROCESS_GROUP" "$BACKEND_PROCESS_GROUP" "$FRONTEND_PROCESS_GROUP"
+fi
 SERVER_EXIT_CODE=$?
 set -e
 

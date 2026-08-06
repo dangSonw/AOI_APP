@@ -1,6 +1,6 @@
 # AOI Studio
 
-AOI Studio is an industrial automated optical inspection web application. The current milestone implements the Figma-authored authentication experience and industrial workstation shell, PostgreSQL-backed user accounts, and a file-backed physical I/O simulation workspace.
+AOI Studio is an industrial automated optical inspection web application. The current milestone provides an authenticated React/FastAPI control plane, PostgreSQL-backed users, workflow configuration, file-backed physical I/O, versioned camera and three-axis motion contracts, local hardware adapter boundaries, deterministic simulators, and a verified backend gateway between the HMI and device services.
 
 ## Implemented milestone
 
@@ -13,22 +13,34 @@ AOI Studio is an industrial automated optical inspection web application. The cu
 - React mission-control dashboard that reads inputs and atomically writes output signals through the service layer.
 - Interactive camera calibration, workstation preferences, inspection search, evidence selection, and CSV export demonstrations.
 - Unit and integration tests for authentication, validation, record filtering, and physical I/O.
+- Versioned camera and three-axis motion contracts shared by hardware and simulator adapters.
+- Standalone virtual camera and MCU console with image-folder/webcam input, XYZ controls, interlocks, emergency stop, and fault injection.
+- Authenticated backend device gateway with protocol validation, bounded timeouts, typed responses, normalized errors, and inspection-image SHA-256 verification.
 
 ## Architecture
 
 ```text
-React + TypeScript + Vite
+React HMI :5173
         |
         | JSON / Bearer JWT
         v
-FastAPI API
-   |             |
-   v             v
-PostgreSQL    io/*.json
-users         physical state simulation
+FastAPI control plane :8000
+   |          |                 |
+   |          | HTTP loopback   `-- HTTP loopback --> Motion adapter :9102
+   |          `--------------------> Camera adapter :9101
+   |
+   |-- PostgreSQL: users
+   |-- data/projects: workflow recipes
+   |-- data/preferences: workstation preferences
+   `-- io/*.json: legacy physical I/O simulation
+
+Hardware mode:   camera adapter -> Jetson CSI boundary
+                 motion adapter -> MCU UART boundary
+Simulation mode: camera adapter -> deterministic/uploaded PNG replay
+                 motion adapter -> virtual XYZ state and safety interlocks
 ```
 
-Frontend components render UI and call services only. FastAPI validates requests and coordinates authentication or I/O services. SQLAlchemy owns persistence models, while physical I/O file operations are isolated in a backend service.
+Frontend components render UI and call only the FastAPI control plane. The browser never needs direct access to ports `9101` or `9102`. FastAPI authenticates requests, validates device contracts, checks adapter protocol `1.0`, normalizes upstream errors, and proxies verified artifacts. Shared device contracts live under `core/devices`; hardware and simulator implementations remain interchangeable behind the same adapter boundary.
 
 ## Verified Ubuntu WSL environment
 
@@ -79,6 +91,17 @@ From an Ubuntu WSL terminal:
 bash scripts/run_dev.sh
 ```
 
+The default mode starts hardware adapter boundaries and does not fall back to simulation. Until CSI and UART hardware implementations are available, run the complete stack explicitly in simulation mode:
+
+```bash
+bash scripts/run_dev.sh simulation
+# Equivalent: bash scripts/run_dev.sh start --mode simulation
+```
+
+Simulation mode starts five managed processes: camera adapter, motion adapter, backend, frontend, and Simulator Console. It opens AOI Studio at `http://127.0.0.1:5173` and the commissioning console at `http://127.0.0.1:9200` in the Windows browser. Use `AOI_SIMULATOR_NO_BROWSER=1` for automation. `status` and `stop` include the console process.
+
+Hardware mode starts the four production-boundary services without port `9200`. Disconnected CSI/UART adapters report `unavailable`; the launcher still starts the HMI in a diagnostic-safe state and never falls back to simulation.
+
 From PowerShell while the current directory is this repository, use the portable WSL launcher instead:
 
 ```powershell
@@ -92,10 +115,44 @@ If both AOI services are already healthy on their configured ports, the launcher
 - Frontend: [http://127.0.0.1:5173](http://127.0.0.1:5173)
 - Backend health: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 - OpenAPI documentation: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- Camera adapter health: [http://127.0.0.1:9101/health](http://127.0.0.1:9101/health)
+- Motion adapter health: [http://127.0.0.1:9102/health](http://127.0.0.1:9102/health)
+- Simulator Console in simulation mode: [http://127.0.0.1:9200](http://127.0.0.1:9200)
 
 Open the UI on port `5173`. Port `8000` is API-only, and its root currently returns `404`; the planned backend root redirect and favicon response are not implemented yet.
 
 The local operator email is `operator@aoi.local`. Read `SEED_ADMIN_PASSWORD` from the untracked `.env` file for the local password. Backend startup creates the seed account only when it does not already exist. It does not update the password of an existing account, so changing `SEED_ADMIN_PASSWORD` alone does not rotate that account's stored password.
+
+### Standalone device simulator
+
+To exercise only the virtual hardware without PostgreSQL, login, or the main HMI:
+
+```bash
+bash scripts/run_simulator.sh
+bash scripts/run_simulator.sh status
+bash scripts/run_simulator.sh stop
+```
+
+This opens [http://127.0.0.1:9200](http://127.0.0.1:9200). The camera can replay a deterministic pattern, browser-selected image folders, or a Windows webcam frame. The MCU panel exposes home, XYZ jog, stop/reset, safety-door and communication interlocks, emergency stop, and deterministic fault injection. Simulation-only controls are not exposed through the production backend gateway.
+
+### Hardware workspace and synchronized configuration
+
+Open **Hardware** from AOI Studio's top navigation or Project Explorer. The page reads health, camera preview, camera configuration, motion profile, motion coordinates, interlocks, and faults through authenticated backend port `8000`. The browser never calls adapter ports directly.
+
+Camera ID, sensor mode, exposure, gain, motion velocity, acceleration, and settle time use common `GET/PUT /configuration` resources implemented by both simulator and hardware adapters. The Hardware page and Simulator Console poll the same adapter state, so applied changes and motion positions synchronize in both directions. Unsaved form drafts are protected from polling updates.
+
+Image source selection, webcam access, jog, virtual interlock mutation, reset, and fault injection remain simulator-only. Hardware mode shows actionable CSI/UART diagnostics and disables operational controls until adapters report `ready`; this keeps the HMI stable before physical devices are connected.
+
+### Device adapter configuration
+
+The backend reads trusted loopback adapter origins from `.env`:
+
+```dotenv
+CAMERA_ADAPTER_URL=http://127.0.0.1:9101
+MOTION_ADAPTER_URL=http://127.0.0.1:9102
+```
+
+Only loopback HTTP origins with explicit ports are accepted. Device URLs never come from browser requests, preventing the gateway from becoming an arbitrary network proxy.
 
 ### Sign-in troubleshooting
 
@@ -121,7 +178,7 @@ bash scripts/test/test.sh
 bash scripts/build/build.sh
 ```
 
-The latest complete test run passed 15 backend tests, 14 core tests, 12 integration tests, 11 frontend tests, and TypeScript checking.
+The latest complete run passed 114 Python tests across backend, core, integration, adapter contract, and simulator suites; all 24 frontend tests and TypeScript checking also passed.
 
 Direct frontend commands are also available:
 
@@ -159,8 +216,29 @@ The current JSON interface is a simulation boundary. A future hardware adapter c
 | `PUT` | `/api/recipes/{recipeSlug}/workflow` | Validate and atomically save a complete workflow | Bearer token |
 | `GET` | `/api/workstation-preferences/{workstationId}` | Read dashboard and Photometric preferences | Bearer token |
 | `PUT` | `/api/workstation-preferences/{workstationId}` | Validate and atomically save workstation preferences | Bearer token |
+| `GET` | `/api/devices` | Read camera and motion adapter health together | Bearer token |
+| `GET` | `/api/camera/health` | Read camera implementation, mode, readiness, and protocol | Bearer token |
+| `GET` | `/api/camera/capabilities` | Read camera IDs, sensor modes, limits, and media types | Bearer token |
+| `POST` | `/api/camera/captures` | Create an idempotent capture and verify its artifact | Bearer token |
+| `GET` | `/api/camera/captures/{captureId}/inspection-image` | Proxy a bounded inspection image with SHA-256 header | Bearer token |
+| `GET` | `/api/motion/health` | Read motion implementation, mode, readiness, and protocol | Bearer token |
+| `GET` | `/api/motion/capabilities` | Read axes, workspace, homing, and event support | Bearer token |
+| `GET` | `/api/motion/state` | Read homing, XYZ pose, interlocks, and fault state | Bearer token |
+| `POST` | `/api/motion/commands/home` | Submit an idempotent home command | Bearer token |
+| `POST` | `/api/motion/commands/move-absolute` | Submit a bounded idempotent absolute move | Bearer token |
+| `POST` | `/api/motion/commands/stop` | Stop active virtual or hardware motion | Bearer token |
+| `POST` | `/api/motion/commands/clear-fault` | Clear a motion fault after interlocks are safe | Bearer token |
 
 Password-reset email delivery is intentionally not implemented in this milestone. The endpoint returns the same safe message whether an account exists or not.
+
+## Device gateway behavior and current limits
+
+- Every typed device operation checks adapter protocol compatibility and readiness before forwarding a request.
+- Connection failures become HTTP `503`, timeouts become `504`, invalid upstream contracts become `502`, and safe adapter `4xx` errors retain their status.
+- A camera capture is accepted only after the backend downloads the lossless PNG/TIFF artifact, enforces a 64 MiB limit, verifies media type and byte length, and compares SHA-256 with capture metadata.
+- Hardware mode never silently falls back to simulation. The current hardware camera and MCU adapters expose health/version/capabilities but intentionally report `unavailable`; Jetson CSI capture and UART transport remain future hardware-commissioning tasks.
+- The simulator MCU currently completes home and move commands deterministically rather than reproducing a real acceleration timeline. The next inspection-runtime milestone must add persisted run orchestration and confirm in-position state before capture.
+- The 58 workflow nodes remain configuration-only runtime placeholders. This gateway enables device communication but does not yet execute the AOI vision workflow or persist inspection results.
 
 ## Workflow editor and storage
 

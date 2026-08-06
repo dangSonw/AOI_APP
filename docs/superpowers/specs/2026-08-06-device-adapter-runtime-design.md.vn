@@ -1,0 +1,176 @@
+# Thiết kế Adapter Thiết bị và Runtime Kiểm tra AOI
+
+## Mục tiêu
+
+Hoàn thiện AOI Studio thành hệ thống kiểm tra độc lập phần cứng cho NVIDIA Jetson Orin Nano Super 8GB, một camera CSI và bộ điều khiển chuyển động ba trục bằng MCU ngoài kết nối UART. Cùng một ứng dụng lõi phải chạy được với simulator nội bộ đáng tin cậy trước khi có phần cứng thật.
+
+## Quyết định
+
+- Dùng service Python tùy biến, không dùng ROS 2.
+- Giữ control plane React/FastAPI/PostgreSQL.
+- Cô lập truy cập camera và MCU sau các HTTP service chỉ bind `127.0.0.1`.
+- Dùng HTTP request/response cho capture camera và lệnh motion.
+- Dùng Server-Sent Events cho trạng thái/lỗi motion; luôn xác nhận trạng thái quan trọng về an toàn qua `GET /state`.
+- Mặc định khởi động adapter hardware. Chỉ chạy simulator khi mode simulation được chỉ định rõ.
+- Không bao giờ tự fallback âm thầm từ hardware sang simulation.
+- Giữ các ranh giới tương ứng `hardware/camera`, `hardware/mcu`, `simulator/camera`, `simulator/mcu`, đồng thời chia sẻ contract từ `core/devices`.
+
+## Topology Runtime
+
+```text
+React HMI :5173
+    |
+FastAPI control plane :8000
+    |-- HTTP --> camera adapter :9101
+    `-- HTTP + SSE --> motion adapter :9102
+
+hardware mode:
+  camera adapter -> Jetson Argus/GStreamer -> camera CSI
+  motion adapter -> giao thức UART -> MCU -> động cơ X/Y/Z
+
+simulation mode:
+  camera adapter -> replay dataset deterministic
+  motion adapter -> state machine X/Y/Z ảo deterministic
+```
+
+Trình duyệt không gọi trực tiếp adapter. Backend chính sở hữu xác thực, điều phối, lưu trữ và lỗi hiển thị cho người dùng.
+
+## Contract Chung của Service
+
+Mỗi adapter cung cấp:
+
+- `GET /health`
+- `GET /version`
+- `GET /capabilities`
+
+Protocol version phải rõ ràng. Backend chính từ chối adapter không tương thích.
+
+## Contract Camera
+
+Camera service cung cấp cấu hình và capture transaction có tính idempotent:
+
+- `GET /configuration`
+- `PUT /configuration`
+- `POST /captures`
+- `GET /captures/{captureId}`
+- `GET /captures/{captureId}/inspection-image`
+- `GET /captures/{captureId}/raw` tùy chọn
+- `GET /preview`
+
+Ảnh inspection dùng PNG/TIFF lossless và không nhúng base64 trong JSON. Bayer RAW là tùy chọn theo capability vì hỗ trợ của sensor/driver Jetson khác nhau. Preview được đánh dấu rõ là artifact không dùng cho inspection.
+
+Mỗi capture ghi request ID, frame ID, timestamp UTC và monotonic, sensor/mode, exposure, gain, trạng thái white balance, vị trí XYZ mong đợi, calibration ID, processing profile, số byte, media type và SHA-256.
+
+Camera service ghi artifact qua file tạm cùng thư mục, flush và đồng bộ file, atomic replace, tính checksum rồi mới trả trạng thái `ready`. Lặp lại request ID trả cùng transaction hoàn chỉnh thay vì chụp lại.
+
+## Contract Motion
+
+Motion service cung cấp:
+
+- `GET /state`
+- `GET /events` dạng `text/event-stream`
+- `POST /commands/home`
+- `POST /commands/move-absolute`
+- `POST /commands/stop`
+- `POST /commands/clear-fault`
+- `GET /commands/{commandId}`
+
+Các trạng thái là `boot`, `not-homed`, `homing`, `idle`, `moving`, `stopping`, `fault`, `emergency-stop`. Mặc định dùng di chuyển tuyệt đối vì xử lý command trùng an toàn hơn di chuyển tương đối. Command dùng ID do client tạo và có tính idempotent.
+
+Runtime chính chỉ capture sau khi nhận event `in-position`, xác nhận `GET /state`, kiểm tra tolerance vị trí và chờ thời gian settle của recipe.
+
+## Ranh giới UART
+
+Chỉ `hardware/mcu` truy cập UART. Giao thức độc lập STM32, ESP32, Arduino hoặc RP2040:
+
+- frame binary có giới hạn;
+- protocol version và message type rõ ràng;
+- sequence number và payload length;
+- số nguyên fixed-width theo byte order đã khai báo;
+- XYZ và tốc độ biểu diễn bằng micromet nguyên;
+- CRC-32;
+- ranh giới frame escaped hoặc COBS;
+- heartbeat và watchdog;
+- xử lý sequence trùng.
+
+MCU sở hữu homing, trajectory, phát step, acceleration, hard/soft limit, emergency stop và hành vi khi mất truyền thông. Jetson chỉ gửi lệnh cấp cao.
+
+## Quyền sở hữu Thư mục
+
+```text
+core/devices/             domain và protocol contract chung
+hardware/camera/          adapter CSI Jetson
+hardware/mcu/             adapter motion UART
+simulator/camera/         adapter camera replay/synthetic
+simulator/mcu/            adapter motion ảo
+backend/app/clients/      HTTP client cho adapter
+backend/app/services/     điều phối inspection
+backend/app/api/          endpoint control plane có xác thực
+data/captures/            capture artifact bất biến
+data/inspections/         evidence và artifact trung gian
+data/calibration/         tài liệu calibration có version
+data/models/              model/golden artifact có version
+```
+
+## Vòng đời Inspection
+
+```text
+created -> precheck -> homing -> moving -> settling -> capturing
+        -> quality-gate -> registering -> inspecting -> deciding
+        -> persisting -> completed
+```
+
+Mọi trạng thái active có thể chuyển sang `cancelled` hoặc `faulted`. Transition được lưu. Sau restart, phần mềm không tự tiếp tục motion.
+
+## Pipeline Release Đầu tiên
+
+Chỉ một vertical slice đã test được phép chạy:
+
+1. capture replay hoặc CSI;
+2. undistortion khi có calibration;
+3. quality gate;
+4. registration;
+5. golden median/MAD;
+6. absolute difference và gradient evidence;
+7. lọc connected component;
+8. chuẩn hóa score và quyết định `PASS` / `REVIEW` / `FAIL`.
+
+PatchCore là candidate benchmark sau baseline OpenCV deterministic. Kết quả benchmark paper không phải bằng chứng nghiệm thu cho dữ liệu PCB.
+
+## Lưu trữ và Truy vết
+
+PostgreSQL lưu metadata/tham chiếu; ảnh lớn nằm trên filesystem NVMe. Kết quả ghi recipe/workflow revision, calibration version, hash model/golden, camera configuration, XYZ pose, hash ảnh raw/canonical, tham số node, threshold, timing, quyết định ban đầu và review override.
+
+Schema inspection phải dùng migration. Evidence có retention và kiểm tra dung lượng đĩa trước run.
+
+## Launcher
+
+```bash
+bash scripts/run_dev.sh
+bash scripts/run_dev.sh start
+bash scripts/run_dev.sh start --mode simulation
+bash scripts/run_dev.sh simulation
+bash scripts/run_dev.sh status
+bash scripts/run_dev.sh stop
+```
+
+Hardware là mặc định. Launcher quản lý process group camera, motion, backend, frontend; giữ các port 9101, 9102, 8000, 5173; đợi mọi health endpoint và dừng toàn bộ group sở hữu khi thoát.
+
+## Cổng Nghiệm thu
+
+- Hardware và simulator pass cùng contract test.
+- Một nghìn simulated run deterministic hoàn tất không deadlock hoặc sai artifact.
+- Có test timeout adapter, stale pose, checksum sai, camera fail, motion fault, mất UART, disk-full và backend restart.
+- Mọi run hoàn tất có thể tái lập từ version/checksum đã lưu.
+- UI/FastAPI handler không tạo xung motor hoặc mở CSI trực tiếp.
+- Hardware mode không fallback sang simulation nếu không có lệnh restart rõ ràng.
+- Toàn bộ test backend/core/integration/frontend, typecheck và build hiện có tiếp tục pass.
+
+## Tham khảo Ngoài
+
+- Kiến trúc camera NVIDIA Jetson: libargus, `nvarguscamerasrc`, GStreamer, V4L2 và hướng dẫn driver CSI.
+- EMVA GenICam cho thiết kế capability camera không phụ thuộc hãng trong tương lai.
+- EMVA 1288 / ISO 24942 cho đặc tính camera khách quan.
+- OPC UA Machine Vision Part 1 làm tham chiếu ngữ nghĩa cho state, recipe và result, không bắt buộc dùng OPC UA trong milestone này.
+- Thực hành calibration/registration OpenCV.
+- PatchCore CVPR 2022 và Anomalib cho phương pháp benchmark anomaly.

@@ -6,9 +6,11 @@ import {
   writePhysicalOutputs,
 } from '../services/physical-io-service';
 import { readAlgorithmCatalog, readWorkflow } from '../services/workflow-service';
+import { readDeviceSnapshot } from '../services/device-service';
 import { readWorkstationPreferences, saveWorkstationPreferences } from '../services/workstation-preference-service';
 import type { AuthSession } from '../types/auth';
 import type { PhysicalInputState, PhysicalOutputState } from '../types/physical-io';
+import type { DeviceSnapshot } from '../types/devices';
 import type { AlgorithmDefinition, Workflow } from '../types/workflow';
 import type { WorkstationPreferences } from '../types/workstation-preferences';
 import { createDefaultPreferences } from '../utils/workstation-preferences';
@@ -16,6 +18,7 @@ import type { WorkspaceView } from '../types/workspace';
 import { CameraManagerPage } from './CameraManagerPage';
 import { DashboardPage } from './DashboardPage';
 import { DatabasePage } from './DatabasePage';
+import { HardwarePage } from './HardwarePage';
 import { SettingsPage } from './SettingsPage';
 import { WorkflowEditorPage } from './WorkflowEditorPage';
 
@@ -43,6 +46,9 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
   const [draftPreferences, setDraftPreferences] = useState<WorkstationPreferences>(() => createDefaultPreferences(session.user.id, DEFAULT_WORKSTATION_ID));
   const [preferenceError, setPreferenceError] = useState('');
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
+  const [deviceSnapshot, setDeviceSnapshot] = useState<DeviceSnapshot | null>(null);
+  const [deviceError, setDeviceError] = useState('');
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
 
   const loadPhysicalState = useCallback(async () => {
     setError('');
@@ -64,6 +70,26 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
   useEffect(() => {
     void loadPhysicalState();
   }, [loadPhysicalState]);
+
+  const loadDevices = useCallback(async () => {
+    setIsLoadingDevices(true);
+    try {
+      const nextSnapshot = await readDeviceSnapshot(session.accessToken);
+      setDeviceSnapshot(nextSnapshot);
+      setDeviceError('');
+    } catch (loadError) {
+      setDeviceSnapshot(null);
+      setDeviceError(loadError instanceof Error ? loadError.message : 'Device adapters could not be loaded.');
+    } finally {
+      setIsLoadingDevices(false);
+    }
+  }, [session.accessToken]);
+
+  useEffect(() => {
+    void loadDevices();
+    const interval = window.setInterval(() => void loadDevices(), 1000);
+    return () => window.clearInterval(interval);
+  }, [loadDevices]);
 
   const loadSavedWorkflow = useCallback(async () => {
     setWorkflowError('');
@@ -117,6 +143,7 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
     const viewTitles: Record<WorkspaceView, string> = {
       dashboard: 'Inspection workspace',
       settings: 'Settings',
+      hardware: 'Hardware',
       'camera-manager': 'Camera manager',
       database: 'Inspection database',
       'workflow-editor': 'Workflow editor',
@@ -179,6 +206,7 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
         />
       )}
       {activeView === 'settings' && <SettingsPage preferences={draftPreferences} isDirty={isPreferencesDirty} isSaving={isSavingPreferences} error={preferenceError} onWorkstationIdChange={(workstationId) => setDraftPreferences((current) => ({ ...current, workstationId }))} onSave={savePreferences} />}
+      {activeView === 'hardware' && <HardwarePage accessToken={session.accessToken} snapshot={deviceSnapshot} error={deviceError} isLoading={isLoadingDevices} onRefresh={loadDevices} />}
       {activeView === 'camera-manager' && <CameraManagerPage preferences={draftPreferences} onChange={setDraftPreferences} />}
       {activeView === 'database' && <DatabasePage />}
       {activeView === 'workflow-editor' && (

@@ -1,6 +1,6 @@
 # AOI Studio
 
-AOI Studio là ứng dụng web kiểm tra quang học tự động trong công nghiệp. Mốc hiện tại triển khai trải nghiệm xác thực và shell workstation theo thiết kế Figma, tài khoản người dùng lưu trên PostgreSQL và không gian mô phỏng I/O vật lý dựa trên tệp.
+AOI Studio là ứng dụng web kiểm tra quang học tự động trong công nghiệp. Mốc hiện tại cung cấp control plane React/FastAPI có xác thực, người dùng lưu trên PostgreSQL, cấu hình workflow, I/O vật lý dựa trên tệp, contract camera và chuyển động ba trục có version, ranh giới hardware adapter local, simulator xác định và gateway backend đã được xác minh giữa HMI với các dịch vụ thiết bị.
 
 ## Mốc đã triển khai
 
@@ -13,22 +13,34 @@ AOI Studio là ứng dụng web kiểm tra quang học tự động trong công 
 - Dashboard mission-control React đọc input và ghi output theo cách nguyên tử thông qua service layer.
 - Bản demo tương tác cho hiệu chuẩn camera, tùy chọn workstation, tìm kiếm inspection, chọn evidence và xuất CSV.
 - Unit test và integration test cho xác thực, validation, lọc record và I/O vật lý.
+- Contract camera và chuyển động ba trục có version dùng chung cho hardware adapter và simulator adapter.
+- Console camera và MCU ảo độc lập với đầu vào folder ảnh/webcam, điều khiển XYZ, interlock, emergency stop và fault injection.
+- Gateway thiết bị backend có xác thực với kiểm tra protocol, timeout giới hạn, response có kiểu, chuẩn hóa lỗi và xác minh SHA-256 của ảnh inspection.
 
 ## Kiến trúc
 
 ```text
-React + TypeScript + Vite
+React HMI :5173
         |
         | JSON / Bearer JWT
         v
-FastAPI API
-   |             |
-   v             v
-PostgreSQL    io/*.json
-người dùng    mô phỏng trạng thái vật lý
+FastAPI control plane :8000
+   |          |                 |
+   |          | HTTP loopback   `-- HTTP loopback --> Motion adapter :9102
+   |          `--------------------> Camera adapter :9101
+   |
+   |-- PostgreSQL: người dùng
+   |-- data/projects: workflow recipe
+   |-- data/preferences: tùy chọn workstation
+   `-- io/*.json: mô phỏng I/O vật lý cũ
+
+Hardware mode:   camera adapter -> ranh giới Jetson CSI
+                 motion adapter -> ranh giới MCU UART
+Simulation mode: camera adapter -> replay PNG xác định/đã upload
+                 motion adapter -> trạng thái XYZ và safety interlock ảo
 ```
 
-Component frontend chỉ hiển thị UI và gọi service. FastAPI xác thực request và điều phối dịch vụ xác thực hoặc I/O. SQLAlchemy quản lý model lưu trữ, còn thao tác tệp I/O vật lý được cô lập trong service backend.
+Component frontend chỉ hiển thị UI và chỉ gọi FastAPI control plane. Trình duyệt không cần truy cập trực tiếp cổng `9101` hoặc `9102`. FastAPI xác thực request, validate contract thiết bị, kiểm tra protocol adapter `1.0`, chuẩn hóa lỗi upstream và proxy artifact đã xác minh. Contract thiết bị dùng chung nằm dưới `core/devices`; implementation hardware và simulator có thể thay thế cho nhau phía sau cùng ranh giới adapter.
 
 ## Môi trường Ubuntu WSL đã xác minh
 
@@ -79,6 +91,17 @@ Từ terminal Ubuntu WSL:
 bash scripts/run_dev.sh
 ```
 
+Chế độ mặc định khởi động các ranh giới hardware adapter và không fallback sang simulation. Cho đến khi implementation CSI và UART sẵn sàng, hãy chạy toàn bộ stack rõ ràng ở simulation mode:
+
+```bash
+bash scripts/run_dev.sh simulation
+# Tương đương: bash scripts/run_dev.sh start --mode simulation
+```
+
+Simulation mode khởi động năm tiến trình được quản lý: camera adapter, motion adapter, backend, frontend và Simulator Console. Chế độ này mở AOI Studio tại `http://127.0.0.1:5173` cùng commissioning console tại `http://127.0.0.1:9200` trong trình duyệt Windows. Dùng `AOI_SIMULATOR_NO_BROWSER=1` cho automation. Lệnh `status` và `stop` bao gồm cả tiến trình console.
+
+Hardware mode khởi động bốn dịch vụ theo ranh giới production mà không mở cổng `9200`. Adapter CSI/UART chưa kết nối báo `unavailable`; launcher vẫn khởi động HMI ở trạng thái chẩn đoán an toàn và không bao giờ fallback sang simulation.
+
 Từ PowerShell khi thư mục hiện tại là repository này, hãy dùng launcher WSL portable:
 
 ```powershell
@@ -92,10 +115,44 @@ Nếu cả hai dịch vụ AOI đã hoạt động bình thường trên các c�
 - Frontend: [http://127.0.0.1:5173](http://127.0.0.1:5173)
 - Health của backend: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 - Tài liệu OpenAPI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- Health camera adapter: [http://127.0.0.1:9101/health](http://127.0.0.1:9101/health)
+- Health motion adapter: [http://127.0.0.1:9102/health](http://127.0.0.1:9102/health)
+- Simulator Console trong simulation mode: [http://127.0.0.1:9200](http://127.0.0.1:9200)
 
 Mở UI trên cổng `5173`. Cổng `8000` chỉ dành cho API và root của cổng này hiện trả `404`; redirect root cùng phản hồi favicon theo kế hoạch vẫn chưa được triển khai.
 
 Email operator local là `operator@aoi.local`. Đọc `SEED_ADMIN_PASSWORD` từ tệp `.env` không được Git theo dõi để lấy mật khẩu local. Backend startup chỉ tạo tài khoản seed khi tài khoản chưa tồn tại. Quá trình này không cập nhật mật khẩu của tài khoản hiện có, vì vậy chỉ thay đổi `SEED_ADMIN_PASSWORD` sẽ không luân chuyển mật khẩu đã lưu của tài khoản đó.
+
+### Simulator thiết bị độc lập
+
+Để chỉ thử phần cứng ảo mà không cần PostgreSQL, đăng nhập hoặc HMI chính:
+
+```bash
+bash scripts/run_simulator.sh
+bash scripts/run_simulator.sh status
+bash scripts/run_simulator.sh stop
+```
+
+Lệnh mở [http://127.0.0.1:9200](http://127.0.0.1:9200). Camera có thể replay pattern xác định, folder ảnh được chọn bằng trình duyệt hoặc frame webcam Windows. Panel MCU cung cấp home, jog XYZ, stop/reset, interlock cửa an toàn và kết nối, emergency stop cùng fault injection xác định. Điều khiển chỉ dành cho simulation không được đưa qua gateway backend production.
+
+### Workspace Hardware và cấu hình đồng bộ
+
+Mở **Hardware** từ thanh điều hướng trên cùng hoặc Project Explorer của AOI Studio. Trang này đọc health, preview camera, cấu hình camera, motion profile, tọa độ motion, interlock và fault qua cổng backend có xác thực `8000`. Trình duyệt không gọi trực tiếp các cổng adapter.
+
+Camera ID, sensor mode, exposure, gain, vận tốc motion, gia tốc và settle time dùng resource `GET/PUT /configuration` chung được cả simulator adapter và hardware adapter triển khai. Trang Hardware và Simulator Console poll cùng một trạng thái adapter, vì vậy thay đổi đã Apply cùng vị trí motion được đồng bộ hai chiều. Draft form chưa lưu được bảo vệ khỏi cập nhật polling.
+
+Chọn nguồn ảnh, truy cập webcam, jog, thay đổi interlock ảo, reset và fault injection vẫn chỉ dành cho simulator. Hardware mode hiển thị chẩn đoán CSI/UART có thể xử lý và vô hiệu hóa điều khiển vận hành cho đến khi adapter báo `ready`; nhờ đó HMI vẫn ổn định trước khi kết nối thiết bị thật.
+
+### Cấu hình device adapter
+
+Backend đọc origin adapter loopback đáng tin cậy từ `.env`:
+
+```dotenv
+CAMERA_ADAPTER_URL=http://127.0.0.1:9101
+MOTION_ADAPTER_URL=http://127.0.0.1:9102
+```
+
+Chỉ origin HTTP loopback có cổng rõ ràng được chấp nhận. URL thiết bị không bao giờ đến từ request của browser, tránh biến gateway thành proxy mạng tùy ý.
 
 ### Xử lý sự cố đăng nhập
 
@@ -121,7 +178,7 @@ bash scripts/test/test.sh
 bash scripts/build/build.sh
 ```
 
-Lần chạy test đầy đủ mới nhất đã vượt qua 15 backend test, 14 core test, 12 integration test, 11 frontend test và bước kiểm tra TypeScript.
+Lần chạy đầy đủ mới nhất đã vượt qua 114 Python test trong các suite backend, core, integration, adapter contract và simulator; toàn bộ 24 frontend test cùng bước kiểm tra TypeScript cũng pass.
 
 Các lệnh frontend trực tiếp:
 
@@ -159,8 +216,29 @@ Giao diện JSON hiện tại là ranh giới mô phỏng. Adapter phần cứng
 | `PUT` | `/api/recipes/{recipeSlug}/workflow` | Validate và lưu nguyên tử toàn bộ workflow | Bearer token |
 | `GET` | `/api/workstation-preferences/{workstationId}` | Đọc tùy chọn Dashboard và Photometric | Bearer token |
 | `PUT` | `/api/workstation-preferences/{workstationId}` | Validate và lưu nguyên tử tùy chọn workstation | Bearer token |
+| `GET` | `/api/devices` | Đọc chung health của camera và motion adapter | Bearer token |
+| `GET` | `/api/camera/health` | Đọc implementation, mode, readiness và protocol camera | Bearer token |
+| `GET` | `/api/camera/capabilities` | Đọc camera ID, sensor mode, giới hạn và media type | Bearer token |
+| `POST` | `/api/camera/captures` | Tạo capture idempotent và xác minh artifact | Bearer token |
+| `GET` | `/api/camera/captures/{captureId}/inspection-image` | Proxy ảnh inspection giới hạn kèm header SHA-256 | Bearer token |
+| `GET` | `/api/motion/health` | Đọc implementation, mode, readiness và protocol motion | Bearer token |
+| `GET` | `/api/motion/capabilities` | Đọc trục, workspace, homing và hỗ trợ event | Bearer token |
+| `GET` | `/api/motion/state` | Đọc homing, pose XYZ, interlock và trạng thái fault | Bearer token |
+| `POST` | `/api/motion/commands/home` | Gửi lệnh home idempotent | Bearer token |
+| `POST` | `/api/motion/commands/move-absolute` | Gửi lệnh di chuyển tuyệt đối idempotent có giới hạn | Bearer token |
+| `POST` | `/api/motion/commands/stop` | Dừng chuyển động ảo hoặc phần cứng đang active | Bearer token |
+| `POST` | `/api/motion/commands/clear-fault` | Xóa motion fault sau khi interlock an toàn | Bearer token |
 
 Gửi email đặt lại mật khẩu chưa được triển khai trong mốc này. Endpoint luôn trả cùng một thông báo an toàn dù tài khoản có tồn tại hay không.
+
+## Hành vi gateway thiết bị và giới hạn hiện tại
+
+- Mỗi thao tác thiết bị có kiểu đều kiểm tra tính tương thích protocol và readiness của adapter trước khi chuyển request.
+- Lỗi kết nối trở thành HTTP `503`, timeout thành `504`, contract upstream không hợp lệ thành `502`; lỗi `4xx` an toàn từ adapter giữ nguyên status.
+- Camera capture chỉ được chấp nhận sau khi backend tải artifact PNG/TIFF lossless, áp giới hạn 64 MiB, kiểm media type cùng byte length và so sánh SHA-256 với metadata capture.
+- Hardware mode không bao giờ âm thầm fallback sang simulation. Hardware camera và MCU adapter hiện cung cấp health/version/capabilities nhưng chủ động báo `unavailable`; capture Jetson CSI và transport UART vẫn là tác vụ commissioning phần cứng tương lai.
+- MCU simulator hiện hoàn tất lệnh home và move theo cách xác định thay vì tái tạo timeline acceleration thật. Mốc inspection runtime tiếp theo phải thêm orchestration run có persistence và xác nhận trạng thái in-position trước khi capture.
+- 58 workflow node vẫn là runtime placeholder chỉ dành cho cấu hình. Gateway này cho phép giao tiếp thiết bị nhưng chưa thực thi workflow thị giác AOI hoặc lưu kết quả inspection.
 
 ## Workflow editor và lưu trữ
 

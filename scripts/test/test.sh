@@ -56,6 +56,26 @@ else
     echo "No integration tests found in tests/integration"
 fi
 
+# Run adapter contract tests
+echo "----------------------------------------"
+echo "Running Device Contract Tests..."
+echo "----------------------------------------"
+if find tests/contract -maxdepth 1 -name 'test_*.py' 2>/dev/null | grep -q .; then
+    conda run -n "$CONDA_ENV_NAME" python -m pytest tests/contract/ || exit_code=1
+else
+    echo "No device contract tests found in tests/contract"
+fi
+
+# Run hardware-independent simulator tests
+echo "----------------------------------------"
+echo "Running Simulator Tests..."
+echo "----------------------------------------"
+if find tests/simulator -maxdepth 1 -name 'test_*.py' 2>/dev/null | grep -q .; then
+    conda run -n "$CONDA_ENV_NAME" python -m pytest tests/simulator/ || exit_code=1
+else
+    echo "No simulator tests found in tests/simulator"
+fi
+
 echo "----------------------------------------"
 echo "Running Frontend Tests & Type Checks..."
 echo "----------------------------------------"

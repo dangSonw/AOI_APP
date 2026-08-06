@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth import router as auth_router
+from app.api.devices import router as devices_router
 from app.api.physical_io import router as physical_io_router
 from app.api.workflows import router as workflows_router
 from app.api.workstation_preferences import router as workstation_preferences_router
@@ -28,6 +29,7 @@ app.add_middleware(
     allow_headers=['*'],
 )
 app.include_router(auth_router)
+app.include_router(devices_router)
 app.include_router(physical_io_router)
 app.include_router(workflows_router)
 app.include_router(workstation_preferences_router)

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>AOI Simulator Console</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%23007f91%22/><circle cx=%2216%22 cy=%2216%22 r=%228%22 fill=%22none%22 stroke=%22white%22 stroke-width=%223%22/><circle cx=%2216%22 cy=%2216%22 r=%222%22 fill=%22white%22/></svg>" />
+    <link rel="stylesheet" href="simulator-console.css" />
+  </head>
+  <body>
+    <header class="console-header">
+      <div>
+        <span class="simulation-flag">SIMULATION · NO PHYSICAL MOTION</span>
+        <h1>Device commissioning console</h1>
+        <p>Drive virtual image acquisition and three-axis motion before hardware arrives.</p>
+      </div>
+      <div class="health-rail" aria-label="Simulator service status">
+        <span id="camera-health" class="status-chip status-chip--pending">Camera · checking</span>
+        <span id="motion-health" class="status-chip status-chip--pending">MCU · checking</span>
+      </div>
+    </header>
+
+    <main class="console-grid">
+      <section class="instrument instrument--camera" aria-labelledby="camera-title">
+        <header class="instrument__header">
+          <div><span class="instrument-code">CAM · 9101</span><h2 id="camera-title">Virtual camera</h2></div>
+          <button id="capture-button" class="button button--primary" type="button">Capture frame</button>
+        </header>
+
+        <div class="camera-layout">
+          <div class="preview-stage">
+            <img id="camera-preview" alt="Current virtual camera source" />
+            <video id="webcam-preview" autoplay muted playsinline hidden></video>
+            <canvas id="webcam-canvas" hidden></canvas>
+            <div class="preview-reticle" aria-hidden="true"><span></span></div>
+            <footer><span id="source-label">Built-in test pattern</span><code id="frame-size">—</code></footer>
+          </div>
+
+          <div class="control-stack">
+            <fieldset>
+              <legend>Image source</legend>
+              <label class="radio-card"><input type="radio" name="camera-source" value="test-pattern" checked /><span><strong>Test pattern</strong><small>Deterministic built-in PNG</small></span></label>
+              <label class="radio-card"><input type="radio" name="camera-source" value="folder" /><span><strong>Image folder</strong><small>Replay selected files in order</small></span></label>
+              <label class="radio-card"><input type="radio" name="camera-source" value="webcam" /><span><strong>Windows camera</strong><small>Browser camera permission required</small></span></label>
+            </fieldset>
+            <div class="source-actions">
+              <label class="button button--secondary file-button">Choose image folder<input id="folder-input" type="file" accept="image/png,image/jpeg,image/webp,image/bmp" multiple webkitdirectory /></label>
+              <button id="webcam-button" class="button button--secondary" type="button">Use Windows camera</button>
+              <button id="upload-webcam-button" class="button button--secondary" type="button" disabled>Use current webcam frame</button>
+            </div>
+            <label>Selected image<select id="image-select"><option value="">Built-in test pattern</option></select></label>
+          </div>
+        </div>
+
+        <div class="parameter-grid">
+          <label>Exposure <span><input id="exposure" type="number" min="1" max="10000000" value="8000" /> µs</span></label>
+          <label>Analog gain <span><input id="gain" type="number" min="0.1" max="256" step="0.1" value="1" /> ×</span></label>
+          <label>Frame delay <span><input id="frame-delay" type="number" min="0" max="10000" value="0" /> ms</span></label>
+          <label>Injected fault<select id="camera-fault"><option value="none">None</option><option value="failed-frame">Failed frame</option><option value="unavailable">Camera unavailable</option><option value="checksum-mismatch">Checksum mismatch</option></select></label>
+          <button id="apply-camera-configuration" class="button button--secondary" type="button">Apply shared camera settings</button>
+        </div>
+        <p id="camera-message" class="message" role="status"></p>
+      </section>
+
+      <section class="instrument instrument--motion" aria-labelledby="motion-title">
+        <header class="instrument__header">
+          <div><span class="instrument-code">MCU · 9102</span><h2 id="motion-title">Virtual motion controller</h2></div>
+          <span id="machine-state" class="state-readout">NOT HOMED</span>
+        </header>
+
+        <div class="motion-layout">
+          <div class="machine-visualization">
+            <div id="machine-bed" class="machine-bed" role="img" aria-label="Virtual XY machine bed">
+              <span class="axis-label axis-label--x">X · 300 mm</span>
+              <span class="axis-label axis-label--y">Y · 200 mm</span>
+              <span id="gantry-head" class="gantry-head"><i></i></span>
+            </div>
+            <div class="z-gauge"><span>Z</span><progress id="z-progress" max="150" value="0"></progress><output id="z-output">0.000 mm</output></div>
+          </div>
+
+          <div class="motion-controls">
+            <div class="coordinate-readout" aria-label="Current coordinates">
+              <span>X <output id="x-output">0.000</output></span>
+              <span>Y <output id="y-output">0.000</output></span>
+              <span>Z <output id="z-coordinate-output">0.000</output></span>
+              <small>millimetres</small>
+            </div>
+            <div class="command-row">
+              <button id="home-button" class="button button--primary" type="button">Home all axes</button>
+              <button id="stop-button" class="button button--warning" type="button">Stop</button>
+              <button id="reset-button" class="button button--secondary" type="button">Reset simulator</button>
+            </div>
+            <fieldset>
+              <legend>Jog controls</legend>
+              <label>Jog step<select id="jog-step"><option value="0.01">0.01 mm</option><option value="0.1">0.1 mm</option><option value="1" selected>1 mm</option><option value="10">10 mm</option></select></label>
+              <div class="jog-grid">
+                <span></span><button data-jog-axis="y" data-jog-direction="1">Y+</button><span></span>
+                <button data-jog-axis="x" data-jog-direction="-1">X−</button><span class="jog-origin">XYZ</span><button data-jog-axis="x" data-jog-direction="1">X+</button>
+                <span></span><button data-jog-axis="y" data-jog-direction="-1">Y−</button><span></span>
+                <button data-jog-axis="z" data-jog-direction="-1">Z−</button><span></span><button data-jog-axis="z" data-jog-direction="1">Z+</button>
+              </div>
+            </fieldset>
+          </div>
+        </div>
+
+        <div class="safety-grid">
+          <label class="switch-row"><span><strong>Safety door</strong><small>Open blocks motion</small></span><input id="door-closed" type="checkbox" checked /></label>
+          <label class="switch-row"><span><strong>MCU communication</strong><small>Watchdog link</small></span><input id="communication-connected" type="checkbox" checked /></label>
+          <button id="emergency-stop" class="emergency-button" type="button" aria-pressed="false">Emergency stop</button>
+          <label>Injected fault<select id="motion-fault"><option value="none">None</option><option value="axis-stuck">Axis stuck</option><option value="homing-timeout">Homing timeout</option><option value="position-stale">Position stale</option><option value="limit-hit">Limit hit</option><option value="command-timeout">Command timeout</option></select></label>
+          <button id="clear-fault-button" class="button button--secondary" type="button">Clear fault</button>
+          <label>Max velocity <span><input id="motion-velocity" type="number" min="0.1" value="20" /> mm/s</span></label>
+          <label>Max acceleration <span><input id="motion-acceleration" type="number" min="0.1" value="40" /> mm/s²</span></label>
+          <label>Settle time <span><input id="motion-settle" type="number" min="0" value="250" /> ms</span></label>
+          <button id="apply-motion-configuration" class="button button--secondary" type="button">Apply shared motion profile</button>
+        </div>
+        <p id="motion-message" class="message" role="status"></p>
+      </section>
+
+      <section class="event-panel" aria-labelledby="event-title">
+        <header><div><span class="instrument-code">TRACE</span><h2 id="event-title">Simulator events</h2></div><button id="clear-log" class="button button--quiet" type="button">Clear log</button></header>
+        <ol id="event-log" aria-live="polite"></ol>
+      </section>
+    </main>
+    <script src="simulator-console.js"></script>
+  </body>
+</html>

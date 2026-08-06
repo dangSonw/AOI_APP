@@ -13,7 +13,7 @@ import {
 type AuthMode = 'sign-in' | 'sign-up' | 'forgot-password';
 
 interface AuthPageProps {
-  onAuthenticated: (session: AuthSession, shouldPersist: boolean) => void;
+  onAuthenticated: (session: AuthSession) => void;
 }
 
 export function AuthPage({ onAuthenticated }: AuthPageProps) {
@@ -23,7 +23,6 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const [shouldPersist, setShouldPersist] = useState(true);
   const [errors, setErrors] = useState<AuthFieldErrors>({});
   const [formError, setFormError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -55,7 +54,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     }
 
     const session = await signIn({ email: email.trim(), password });
-    onAuthenticated(session, shouldPersist);
+    onAuthenticated(session);
   };
 
   const submitSignUp = async () => {
@@ -70,7 +69,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
       fullName: fullName.trim(),
       password,
     });
-    onAuthenticated(session, true);
+    onAuthenticated(session);
   };
 
   const submitPasswordReset = async () => {
@@ -126,6 +125,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
           {mode === 'sign-up' && (
             <AuthField
               id="full-name"
+              name="name"
               label="Full name"
               value={fullName}
               autoComplete="name"
@@ -137,10 +137,11 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
           <AuthField
             id="work-email"
+            name={mode === 'sign-in' ? 'username' : 'email'}
             label="Work email"
             type="email"
             value={email}
-            autoComplete="email"
+            autoComplete={mode === 'sign-in' ? 'username' : 'email'}
             placeholder="operator@aoi.local"
             error={errors.email}
             onChange={setEmail}
@@ -149,6 +150,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
           {mode !== 'forgot-password' && (
             <AuthField
               id="password"
+              name="password"
               label="Password"
               type={isPasswordVisible ? 'text' : 'password'}
               value={password}
@@ -166,6 +168,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
           {mode === 'sign-up' && (
             <AuthField
               id="confirm-password"
+              name="confirmPassword"
               label="Confirm password"
               type={isPasswordVisible ? 'text' : 'password'}
               value={confirmPassword}
@@ -178,14 +181,6 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
 
           {mode === 'sign-in' && (
             <div className="auth-form__options">
-              <label className="checkbox-control">
-                <input
-                  type="checkbox"
-                  checked={shouldPersist}
-                  onChange={(event) => setShouldPersist(event.target.checked)}
-                />
-                <span>Keep me signed in</span>
-              </label>
               <button className="text-button" type="button" onClick={() => switchMode('forgot-password')}>
                 Forgot password?
               </button>
