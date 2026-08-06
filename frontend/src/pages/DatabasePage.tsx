@@ -1,16 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StatusBadge } from '../components/StatusBadge';
-import {
-  readInspectionMetrics,
-  readInspections,
-  submitReview,
-} from '../services/inspection-service';
-import type {
-  InspectionFilters,
-  InspectionListItem,
-  InspectionListResponse,
-  InspectionMetrics,
-} from '../types/inspection';
+import { readInspectionMetrics, readInspections, submitReview } from '../services/inspection-service';
+import type { InspectionFilters, InspectionListItem, InspectionListResponse, InspectionMetrics } from '../types/inspection';
 
 const EMPTY_METRICS: InspectionMetrics = {
   totalInspections: 0, passCount: 0, failCount: 0, reviewCount: 0,
@@ -18,11 +9,7 @@ const EMPTY_METRICS: InspectionMetrics = {
 };
 const PAGE_SIZE = 25;
 
-interface DatabasePageProps {
-  accessToken: string;
-}
-
-export function DatabasePage({ accessToken }: DatabasePageProps) {
+export function DatabasePage({ accessToken }: { accessToken: string }) {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [resultFilter, setResultFilter] = useState('');
@@ -56,7 +43,7 @@ export function DatabasePage({ accessToken }: DatabasePageProps) {
       setListResponse(l);
       if (l.items.length > 0 && !selectedRecord) setSelectedRecord(l.items[0]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load inspection data.');
+      setError(e instanceof Error ? e.message : 'Could not load data.');
     } finally {
       setIsLoading(false);
     }
@@ -77,165 +64,4 @@ export function DatabasePage({ accessToken }: DatabasePageProps) {
     const header = 'Board ID,Recipe,Result,Defects,Score,Inspected At,Lot';
     const rows = items.map((r) =>
       [r.boardSerial, r.recipeName, r.result, r.defectCount, r.score ?? '', r.inspectedAt, r.lot]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','),
-    );
-    const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'aoi-inspection-records.csv'; a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const fmt = (iso: string) => { try { return new Date(iso).toLocaleString(); } catch { return iso; } };
-
-  const md = [
-    { value: metrics.totalInspections.toLocaleString(), label: 'PCB records', note: `${metrics.pendingReview} pending review` },
-    { value: `${metrics.firstPassYield}%`, label: 'First-pass yield', note: `${metrics.passCount} passed` },
-    { value: String(metrics.failCount + metrics.reviewCount), label: 'Flagged boards', note: `${metrics.pendingReview} require review` },
-    { value: metrics.totalDefects.toLocaleString(), label: 'Total defects', note: `${metrics.failCount} failed boards` },
-  ];
-
-  const sr = selectedRecord;
-
-  return (
-    <div className="database-page">
-      <DatabaseHeader query={query} setQuery={setQuery} resultFilter={resultFilter} setResultFilter={setResultFilter} setPage={setPage} />
-      {error && <p style={{ color: 'var(--studio-error)', padding: '8px 0' }}>{error}</p>}
-      <section className="database-metrics" aria-label="Database metrics">
-        {md.map((m) => (<article key={m.label}><strong>{m.value}</strong><span>{m.label}</span><small>{m.note}</small></article>))}
-      </section>
-      <section className="database-layout">
-        <RecordsPanel items={items} isLoading={isLoading} selectedId={sr?.id ?? null} total={total} page={page} totalPages={totalPages} debouncedQuery={debouncedQuery} onSelect={setSelectedRecord} onExport={exportRecords} onPageChange={setPage} />
-        <EvidencePanel record={sr} onReview={handleReview} fmt={fmt} />
-      </section>
-    </div>
-  );
-}
-
-function DatabaseHeader({ query, setQuery, resultFilter, setResultFilter, setPage }: {
-  query: string; setQuery: (v: string) => void;
-  resultFilter: string; setResultFilter: (v: string) => void;
-  setPage: (v: number) => void;
-}) {
-  return (
-    <header className="workspace-title-row database-header">
-      <div>
-        <span className="overline">Inspection database</span>
-        <h1>Board history &amp; evidence</h1>
-        <p>Review inspection results, defect records, and captured evidence.</p>
-      </div>
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <select
-          value={resultFilter}
-          onChange={(e) => { setResultFilter(e.target.value); setPage(1); }}
-          style={{ minHeight: '42px', padding: '0 12px', border: '1px solid var(--studio-border)', borderRadius: '8px', background: '#ffffff' }}
-        >
-          <option value="">All results</option>
-          <option value="PASS">Pass</option>
-          <option value="FAIL">Fail</option>
-          <option value="REVIEW">Review</option>
-        </select>
-        <label className="database-search">
-          <span className="sr-only">Search inspection records</span>
-          <span aria-hidden="true">⌕</span>
-          <input value={query} placeholder="Search serial, lot, or recipe" onChange={(e) => setQuery(e.target.value)} />
-        </label>
-      </div>
-    </header>
-  );
-}
-
-function RecordsPanel({ items, isLoading, selectedId, total, page, totalPages, debouncedQuery, onSelect, onExport, onPageChange }: {
-  items: InspectionListItem[]; isLoading: boolean; selectedId: number | null;
-  total: number; page: number; totalPages: number; debouncedQuery: string;
-  onSelect: (r: InspectionListItem) => void; onExport: () => void; onPageChange: (p: number) => void;
-}) {
-  const fmt = (iso: string) => { try { return new Date(iso).toLocaleString(); } catch { return iso; } };
-  return (
-    <div className="records-panel">
-      <header className="section-heading">
-        <div><span className="overline">Records</span><h2>Recent inspections</h2></div>
-        <button className="studio-secondary-button" type="button" onClick={onExport} disabled={items.length === 0}>Export CSV</button>
-      </header>
-      <div className="records-table-wrap">
-        {isLoading ? (
-          <p style={{ padding: '24px', textAlign: 'center', color: 'var(--studio-muted)' }}>Loading inspection records…</p>
-        ) : (
-          <table className="records-table">
-            <thead><tr><th>Board ID</th><th>Recipe</th><th>Result</th><th>Defects</th><th>Inspected</th></tr></thead>
-            <tbody>
-              {items.map((r) => (
-                <tr key={r.id} className={selectedId === r.id ? 'records-table__selected' : ''} onClick={() => onSelect(r)}>
-                  <td><button type="button" onClick={() => onSelect(r)}>{r.boardSerial}</button></td>
-                  <td>{r.recipeName}</td>
-                  <td><StatusBadge status={r.result === 'PASS' ? 'success' : r.result === 'FAIL' ? 'error' : 'warning'} label={r.result} /></td>
-                  <td>{r.defectCount}</td>
-                  <td>{fmt(r.inspectedAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {!isLoading && items.length === 0 && (
-
-function EvidencePanel({ record, onReview, fmt }: {
-  record: InspectionListItem | null;
-  onReview: (id: number, decision: 'PASS' | 'FAIL') => void;
-  fmt: (iso: string) => string;
-}) {
-  if (!record) {
-    return (
-      <aside className="evidence-panel">
-        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--studio-muted)' }}>
-          Select an inspection record to view details.
-        </div>
-      </aside>
-    );
-  }
-
-  return (
-    <aside className="evidence-panel">
-      <div className="panel-heading"><span>Selected evidence</span><span>{record.boardSerial}</span></div>
-      <div className="evidence-preview" role="img" aria-label={`Captured PCB evidence for ${record.boardSerial}`}>
-        <span className="evidence-board" />
-        {record.defectCount > 0 && <span className="evidence-defect">Defect 01</span>}
-      </div>
-      <StatusBadge
-        status={record.result === 'PASS' ? 'success' : record.result === 'FAIL' ? 'error' : 'warning'}
-        label={record.result === 'REVIEW' ? `Review required · ${record.defectCount} defects` : record.result}
-      />
-      <dl className="property-list">
-        <div><dt>Recipe</dt><dd>{record.recipeName}</dd></div>
-        <div><dt>Lot</dt><dd>{record.lot || '—'}</dd></div>
-        <div><dt>Score</dt><dd>{record.score != null ? record.score.toFixed(2) : '—'}</dd></div>
-        <div><dt>Cycle time</dt><dd>{record.cycleTimeMs != null ? `${record.cycleTimeMs} ms` : '—'}</dd></div>
-        <div><dt>Operator</dt><dd>{record.operatorName}</dd></div>
-        <div><dt>Inspected</dt><dd>{fmt(record.inspectedAt)}</dd></div>
-        {record.reviewDecision && (
-          <div><dt>Review</dt><dd>{record.reviewDecision}</dd></div>
-        )}
-      </dl>
-      {record.result === 'REVIEW' && !record.reviewDecision && (
-        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-          <button className="studio-primary-button" type="button" onClick={() => onReview(record.id, 'PASS')}>Accept (PASS)</button>
-          <button className="studio-secondary-button" type="button" onClick={() => onReview(record.id, 'FAIL')}>Reject (FAIL)</button>
-        </div>
-      )}
-    </aside>
-  );
-}
-
-          <p className="empty-state">{debouncedQuery ? `No inspection records match "${debouncedQuery}".` : 'No inspection records found.'}</p>
-        )}
-      </div>
-      <footer className="records-panel__footer">
-        <span>Showing {items.length} of {total.toLocaleString()} records</span>
-        <span style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-          <button type="button" disabled={page <= 1} onClick={() => onPageChange(page - 1)} style={{ cursor: page <= 1 ? 'default' : 'pointer' }}>← Prev</button>
-          <span>{page} / {totalPages}</span>
-          <button type="button" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} style={{ cursor: page >= totalPages ? 'default' : 'pointer' }}>Next →</button>
-        </span>
-      </footer>
-    </div>
-  );
-}
-
+        .map((v) => \
