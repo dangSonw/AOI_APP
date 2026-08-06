@@ -1,111 +1,241 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StatusBadge } from '../components/StatusBadge';
-import type { InspectionRecord } from '../types/workspace';
-import { filterInspectionRecords, INSPECTION_RECORDS } from '../utils/inspection-records';
+import {
+  readInspectionMetrics,
+  readInspections,
+  submitReview,
+} from '../services/inspection-service';
+import type {
+  InspectionFilters,
+  InspectionListItem,
+  InspectionListResponse,
+  InspectionMetrics,
+} from '../types/inspection';
 
-const DATABASE_METRICS = [
-  { value: '12,481', label: 'PCB records', note: '+5.2% this week' },
-  { value: '99.1%', label: 'First-pass yield', note: '+0.4% from last week' },
-  { value: '286', label: 'Flagged boards', note: '18 require review' },
-  { value: '4.8 TB', label: 'Image archive', note: '82% storage utilised' },
-];
+const EMPTY_METRICS: InspectionMetrics = {
+  totalInspections: 0, passCount: 0, failCount: 0, reviewCount: 0,
+  firstPassYield: 0, totalDefects: 0, pendingReview: 0,
+};
+const PAGE_SIZE = 25;
 
-export function DatabasePage() {
+interface DatabasePageProps {
+  accessToken: string;
+}
+
+export function DatabasePage({ accessToken }: DatabasePageProps) {
   const [query, setQuery] = useState('');
-  const [selectedRecord, setSelectedRecord] = useState<InspectionRecord>(INSPECTION_RECORDS[1]);
-  const filteredRecords = useMemo(() => filterInspectionRecords(INSPECTION_RECORDS, query), [query]);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [resultFilter, setResultFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [metrics, setMetrics] = useState<InspectionMetrics>(EMPTY_METRICS);
+  const [listResponse, setListResponse] = useState<InspectionListResponse | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<InspectionListItem | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => { setDebouncedQuery(query.trim()); setPage(1); }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const filters: InspectionFilters = useMemo(() => ({
+    page, pageSize: PAGE_SIZE,
+    result: resultFilter || undefined,
+    search: debouncedQuery || undefined,
+  }), [page, resultFilter, debouncedQuery]);
+
+  const loadData = useCallback(async () => {
+    setError('');
+    setIsLoading(true);
+    try {
+      const [m, l] = await Promise.all([
+        readInspectionMetrics(accessToken),
+        readInspections(accessToken, filters),
+      ]);
+      setMetrics(m);
+      setListResponse(l);
+      if (l.items.length > 0 && !selectedRecord) setSelectedRecord(l.items[0]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load inspection data.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [accessToken, filters, selectedRecord]);
+
+  useEffect(() => { void loadData(); }, [loadData]);
+
+  const items = listResponse?.items ?? [];
+  const totalPages = listResponse?.totalPages ?? 1;
+  const total = listResponse?.total ?? 0;
+
+  const handleReview = async (id: number, decision: 'PASS' | 'FAIL') => {
+    try { await submitReview(accessToken, id, decision); void loadData(); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Review failed.'); }
+  };
 
   const exportRecords = () => {
-    const header = 'Board ID,Recipe,Result,Defects,Captured,Lot';
-    const rows = filteredRecords.map((record) => (
-      [record.boardId, record.recipe, record.result, record.defects, record.capturedAt, record.lot]
-        .map((value) => `"${String(value).replace(/"/g, '""')}"`)
-        .join(',')
-    ));
+    const header = 'Board ID,Recipe,Result,Defects,Score,Inspected At,Lot';
+    const rows = items.map((r) =>
+      [r.boardSerial, r.recipeName, r.result, r.defectCount, r.score ?? '', r.inspectedAt, r.lot]
+        .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','),
+    );
     const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'aoi-inspection-records.csv';
-    anchor.click();
+    const a = document.createElement('a'); a.href = url; a.download = 'aoi-inspection-records.csv'; a.click();
     URL.revokeObjectURL(url);
   };
 
+  const fmt = (iso: string) => { try { return new Date(iso).toLocaleString(); } catch { return iso; } };
+
+  const md = [
+    { value: metrics.totalInspections.toLocaleString(), label: 'PCB records', note: `${metrics.pendingReview} pending review` },
+    { value: `${metrics.firstPassYield}%`, label: 'First-pass yield', note: `${metrics.passCount} passed` },
+    { value: String(metrics.failCount + metrics.reviewCount), label: 'Flagged boards', note: `${metrics.pendingReview} require review` },
+    { value: metrics.totalDefects.toLocaleString(), label: 'Total defects', note: `${metrics.failCount} failed boards` },
+  ];
+
+  const sr = selectedRecord;
+
   return (
     <div className="database-page">
-      <header className="workspace-title-row database-header">
-        <div>
-          <span className="overline">Inspection database</span>
-          <h1>Board history & evidence</h1>
-          <p>Review inspection results, defect records, and captured evidence.</p>
-        </div>
-        <label className="database-search">
-          <span className="sr-only">Search inspection records</span>
-          <span aria-hidden="true">⌕</span>
-          <input value={query} placeholder="Search serial, lot, recipe, or result" onChange={(event) => setQuery(event.target.value)} />
-        </label>
-      </header>
-
+      <DatabaseHeader query={query} setQuery={setQuery} resultFilter={resultFilter} setResultFilter={setResultFilter} setPage={setPage} />
+      {error && <p style={{ color: 'var(--studio-error)', padding: '8px 0' }}>{error}</p>}
       <section className="database-metrics" aria-label="Database metrics">
-        {DATABASE_METRICS.map((metric) => (
-          <article key={metric.label}>
-            <strong>{metric.value}</strong>
-            <span>{metric.label}</span>
-            <small>{metric.note}</small>
-          </article>
-        ))}
+        {md.map((m) => (<article key={m.label}><strong>{m.value}</strong><span>{m.label}</span><small>{m.note}</small></article>))}
       </section>
-
       <section className="database-layout">
-        <div className="records-panel">
-          <header className="section-heading">
-            <div><span className="overline">Records</span><h2>Recent inspections</h2></div>
-            <button className="studio-secondary-button" type="button" onClick={exportRecords}>Export CSV</button>
-          </header>
-          <div className="records-table-wrap">
-            <table className="records-table">
-              <thead><tr><th>Board ID</th><th>Recipe</th><th>Result</th><th>Defects</th><th>Captured</th></tr></thead>
-              <tbody>
-                {filteredRecords.map((record) => (
-                  <tr
-                    key={record.boardId}
-                    className={record.boardId === selectedRecord.boardId ? 'records-table__selected' : ''}
-                    onClick={() => setSelectedRecord(record)}
-                  >
-                    <td><button type="button" onClick={() => setSelectedRecord(record)}>{record.boardId}</button></td>
-                    <td>{record.recipe}</td>
-                    <td><StatusBadge status={record.result === 'PASS' ? 'success' : record.result === 'FAIL' ? 'error' : 'warning'} label={record.result} /></td>
-                    <td>{record.defects}</td>
-                    <td>{record.capturedAt}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {filteredRecords.length === 0 && <p className="empty-state">No inspection records match “{query}”.</p>}
-          </div>
-          <footer className="records-panel__footer">Showing {filteredRecords.length} of 12,481 records <span>1&nbsp;&nbsp;2&nbsp;&nbsp;3&nbsp;&nbsp; Next →</span></footer>
-        </div>
-
-        <aside className="evidence-panel">
-          <div className="panel-heading"><span>Selected evidence</span><span>{selectedRecord.boardId}</span></div>
-          <div className="evidence-preview" role="img" aria-label={`Captured PCB evidence for ${selectedRecord.boardId}`}>
-            <span className="evidence-board" />
-            {selectedRecord.defects > 0 && <span className="evidence-defect">Defect 01</span>}
-          </div>
-          <StatusBadge
-            status={selectedRecord.result === 'PASS' ? 'success' : selectedRecord.result === 'FAIL' ? 'error' : 'warning'}
-            label={selectedRecord.result === 'REVIEW' ? `Review required · ${selectedRecord.defects} defects` : selectedRecord.result}
-          />
-          <dl className="property-list">
-            <div><dt>Recipe</dt><dd>{selectedRecord.recipe}</dd></div>
-            <div><dt>Lot</dt><dd>{selectedRecord.lot}</dd></div>
-            <div><dt>Camera</dt><dd>Top camera · 12 MP</dd></div>
-            <div><dt>Illumination</dt><dd>4× synchronized</dd></div>
-            <div><dt>Captured</dt><dd>{selectedRecord.capturedAt}</dd></div>
-          </dl>
-          <button className="studio-primary-button" type="button" disabled title="Defect review is not available in this milestone">Open defect review</button>
-        </aside>
+        <RecordsPanel items={items} isLoading={isLoading} selectedId={sr?.id ?? null} total={total} page={page} totalPages={totalPages} debouncedQuery={debouncedQuery} onSelect={setSelectedRecord} onExport={exportRecords} onPageChange={setPage} />
+        <EvidencePanel record={sr} onReview={handleReview} fmt={fmt} />
       </section>
     </div>
   );
 }
+
+function DatabaseHeader({ query, setQuery, resultFilter, setResultFilter, setPage }: {
+  query: string; setQuery: (v: string) => void;
+  resultFilter: string; setResultFilter: (v: string) => void;
+  setPage: (v: number) => void;
+}) {
+  return (
+    <header className="workspace-title-row database-header">
+      <div>
+        <span className="overline">Inspection database</span>
+        <h1>Board history &amp; evidence</h1>
+        <p>Review inspection results, defect records, and captured evidence.</p>
+      </div>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <select
+          value={resultFilter}
+          onChange={(e) => { setResultFilter(e.target.value); setPage(1); }}
+          style={{ minHeight: '42px', padding: '0 12px', border: '1px solid var(--studio-border)', borderRadius: '8px', background: '#ffffff' }}
+        >
+          <option value="">All results</option>
+          <option value="PASS">Pass</option>
+          <option value="FAIL">Fail</option>
+          <option value="REVIEW">Review</option>
+        </select>
+        <label className="database-search">
+          <span className="sr-only">Search inspection records</span>
+          <span aria-hidden="true">⌕</span>
+          <input value={query} placeholder="Search serial, lot, or recipe" onChange={(e) => setQuery(e.target.value)} />
+        </label>
+      </div>
+    </header>
+  );
+}
+
+function RecordsPanel({ items, isLoading, selectedId, total, page, totalPages, debouncedQuery, onSelect, onExport, onPageChange }: {
+  items: InspectionListItem[]; isLoading: boolean; selectedId: number | null;
+  total: number; page: number; totalPages: number; debouncedQuery: string;
+  onSelect: (r: InspectionListItem) => void; onExport: () => void; onPageChange: (p: number) => void;
+}) {
+  const fmt = (iso: string) => { try { return new Date(iso).toLocaleString(); } catch { return iso; } };
+  return (
+    <div className="records-panel">
+      <header className="section-heading">
+        <div><span className="overline">Records</span><h2>Recent inspections</h2></div>
+        <button className="studio-secondary-button" type="button" onClick={onExport} disabled={items.length === 0}>Export CSV</button>
+      </header>
+      <div className="records-table-wrap">
+        {isLoading ? (
+          <p style={{ padding: '24px', textAlign: 'center', color: 'var(--studio-muted)' }}>Loading inspection records…</p>
+        ) : (
+          <table className="records-table">
+            <thead><tr><th>Board ID</th><th>Recipe</th><th>Result</th><th>Defects</th><th>Inspected</th></tr></thead>
+            <tbody>
+              {items.map((r) => (
+                <tr key={r.id} className={selectedId === r.id ? 'records-table__selected' : ''} onClick={() => onSelect(r)}>
+                  <td><button type="button" onClick={() => onSelect(r)}>{r.boardSerial}</button></td>
+                  <td>{r.recipeName}</td>
+                  <td><StatusBadge status={r.result === 'PASS' ? 'success' : r.result === 'FAIL' ? 'error' : 'warning'} label={r.result} /></td>
+                  <td>{r.defectCount}</td>
+                  <td>{fmt(r.inspectedAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {!isLoading && items.length === 0 && (
+
+function EvidencePanel({ record, onReview, fmt }: {
+  record: InspectionListItem | null;
+  onReview: (id: number, decision: 'PASS' | 'FAIL') => void;
+  fmt: (iso: string) => string;
+}) {
+  if (!record) {
+    return (
+      <aside className="evidence-panel">
+        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--studio-muted)' }}>
+          Select an inspection record to view details.
+        </div>
+      </aside>
+    );
+  }
+
+  return (
+    <aside className="evidence-panel">
+      <div className="panel-heading"><span>Selected evidence</span><span>{record.boardSerial}</span></div>
+      <div className="evidence-preview" role="img" aria-label={`Captured PCB evidence for ${record.boardSerial}`}>
+        <span className="evidence-board" />
+        {record.defectCount > 0 && <span className="evidence-defect">Defect 01</span>}
+      </div>
+      <StatusBadge
+        status={record.result === 'PASS' ? 'success' : record.result === 'FAIL' ? 'error' : 'warning'}
+        label={record.result === 'REVIEW' ? `Review required · ${record.defectCount} defects` : record.result}
+      />
+      <dl className="property-list">
+        <div><dt>Recipe</dt><dd>{record.recipeName}</dd></div>
+        <div><dt>Lot</dt><dd>{record.lot || '—'}</dd></div>
+        <div><dt>Score</dt><dd>{record.score != null ? record.score.toFixed(2) : '—'}</dd></div>
+        <div><dt>Cycle time</dt><dd>{record.cycleTimeMs != null ? `${record.cycleTimeMs} ms` : '—'}</dd></div>
+        <div><dt>Operator</dt><dd>{record.operatorName}</dd></div>
+        <div><dt>Inspected</dt><dd>{fmt(record.inspectedAt)}</dd></div>
+        {record.reviewDecision && (
+          <div><dt>Review</dt><dd>{record.reviewDecision}</dd></div>
+        )}
+      </dl>
+      {record.result === 'REVIEW' && !record.reviewDecision && (
+        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+          <button className="studio-primary-button" type="button" onClick={() => onReview(record.id, 'PASS')}>Accept (PASS)</button>
+          <button className="studio-secondary-button" type="button" onClick={() => onReview(record.id, 'FAIL')}>Reject (FAIL)</button>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+          <p className="empty-state">{debouncedQuery ? `No inspection records match "${debouncedQuery}".` : 'No inspection records found.'}</p>
+        )}
+      </div>
+      <footer className="records-panel__footer">
+        <span>Showing {items.length} of {total.toLocaleString()} records</span>
+        <span style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <button type="button" disabled={page <= 1} onClick={() => onPageChange(page - 1)} style={{ cursor: page <= 1 ? 'default' : 'pointer' }}>← Prev</button>
+          <span>{page} / {totalPages}</span>
+          <button type="button" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)} style={{ cursor: page >= totalPages ? 'default' : 'pointer' }}>Next →</button>
+        </span>
+      </footer>
+    </div>
+  );
+}
+

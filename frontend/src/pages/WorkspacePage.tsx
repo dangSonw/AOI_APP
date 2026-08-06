@@ -208,7 +208,7 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
       {activeView === 'settings' && <SettingsPage preferences={draftPreferences} isDirty={isPreferencesDirty} isSaving={isSavingPreferences} error={preferenceError} onWorkstationIdChange={(workstationId) => setDraftPreferences((current) => ({ ...current, workstationId }))} onSave={savePreferences} />}
       {activeView === 'hardware' && <HardwarePage accessToken={session.accessToken} snapshot={deviceSnapshot} error={deviceError} isLoading={isLoadingDevices} onRefresh={loadDevices} />}
       {activeView === 'camera-manager' && <CameraManagerPage preferences={draftPreferences} onChange={setDraftPreferences} />}
-      {activeView === 'database' && <DatabasePage />}
+      {activeView === 'database' && <DatabasePage accessToken={session.accessToken} />}
       {activeView === 'workflow-editor' && (
         <WorkflowEditorPage
           accessToken={session.accessToken}
