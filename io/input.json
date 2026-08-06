@@ -8,7 +8,7 @@
   },
   "sensors": {
     "partPresent": true,
-    "cameraReady": true,
+    "cameraReady": false,
     "lineSpeedMillimetersPerSecond": 120
   }
 }

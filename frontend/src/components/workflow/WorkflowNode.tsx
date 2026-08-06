@@ -1,9 +1,11 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import type { WorkflowNode as WorkflowNodeValue } from '../../types/workflow';
+import type { AlgorithmDefinition, WorkflowNode as WorkflowNodeValue } from '../../types/workflow';
+import { RuntimeUseBadge } from '../RuntimeUseBadge';
 
 
 export interface WorkflowNodeData extends Record<string, unknown> {
   value: WorkflowNodeValue;
+  definition: AlgorithmDefinition;
   onRemove: (nodeId: string) => void;
 }
 
@@ -18,7 +20,7 @@ export function WorkflowNode({ id, data, selected }: NodeProps<WorkflowFlowNode>
         <div><span>{data.value.algorithmId}</span><strong>{data.value.displayName}</strong></div>
         <button className="nodrag workflow-node__remove" type="button" onClick={() => data.onRemove(id)} aria-label={`Remove ${data.value.displayName}`}>×</button>
       </header>
-      <div className="workflow-node__availability"><span aria-hidden="true" />Configuration only</div>
+      <div className="workflow-node__availability"><RuntimeUseBadge use={data.definition.use} /></div>
       <div className="workflow-node__ports">
         <div>
           {inputs.map((port) => (

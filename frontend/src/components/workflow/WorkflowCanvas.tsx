@@ -46,11 +46,15 @@ function CanvasContent(props: WorkflowCanvasProps) {
   const handleRemoveNode = useCallback((nodeId: string) => removeNodeRef.current(nodeId), []);
   const mappedNodes = useMemo<WorkflowFlowNode[]>(() => props.workflow.nodes.map((node) => ({
     id: node.id,
-    type: 'workflow',
+    type: 'workflow' as const,
     position: node.position,
     selected: node.id === props.selectedNodeId,
-    data: { value: node, onRemove: handleRemoveNode },
-  })), [props.workflow.nodes, props.selectedNodeId, handleRemoveNode]);
+    data: {
+      value: node,
+      definition: props.catalog.find((definition) => definition.id === node.algorithmId)!,
+      onRemove: handleRemoveNode,
+    },
+  })).filter((node) => node.data.definition), [props.workflow.nodes, props.catalog, props.selectedNodeId, handleRemoveNode]);
   const [nodes, setNodes] = useState<WorkflowFlowNode[]>(mappedNodes);
   const edges = useMemo<Edge[]>(() => props.workflow.connections.map((connection) => ({
     id: connection.id,

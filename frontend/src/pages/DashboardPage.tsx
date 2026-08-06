@@ -1,8 +1,11 @@
-import { useState } from 'react';
 import type { PhysicalInputState, PhysicalOutputState } from '../types/physical-io';
 import type { InspectionStatus } from '../types/workspace';
 import { StatusBadge } from '../components/StatusBadge';
 import type { Workflow } from '../types/workflow';
+import type { AlgorithmDefinition } from '../types/workflow';
+import type { DashboardPreferences, ViewerPreference } from '../types/workstation-preferences';
+import { CollapsiblePanelHeader } from '../components/CollapsiblePanelHeader';
+import { ViewerSizeControls } from '../components/ViewerSizeControls';
 
 interface DashboardPageProps {
   inputs: PhysicalInputState | null;
@@ -14,6 +17,9 @@ interface DashboardPageProps {
   workflow: Workflow | null;
   workflowError: string;
   onConfigureWorkflow: () => void;
+  catalog: AlgorithmDefinition[];
+  preferences: DashboardPreferences;
+  onPreferencesChange: (preferences: DashboardPreferences) => void;
 }
 
 const METRICS = [
@@ -24,8 +30,10 @@ const METRICS = [
   { label: 'Defects', value: '12', unit: 'flagged', delta: '0.96%' },
 ];
 
-export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, onOutputToggle, workflow, workflowError, onConfigureWorkflow }: DashboardPageProps) {
-  const [isFlowCollapsed, setIsFlowCollapsed] = useState(false);
+export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, onOutputToggle, workflow, workflowError, onConfigureWorkflow, catalog, preferences, onPreferencesChange }: DashboardPageProps) {
+  const panels = preferences.panels;
+  const updatePanel = <K extends keyof typeof panels>(key: K, value: typeof panels[K]) => onPreferencesChange({ panels: { ...panels, [key]: value } });
+  const togglePanel = (key: keyof typeof panels) => updatePanel(key, { ...panels[key], isCollapsed: !panels[key].isCollapsed });
   const lineStatus: InspectionStatus = isRunning ? 'running' : inputs ? (inputs.machine.emergencyStop ? 'error' : 'success') : 'warning';
   const lineStatusLabel = isRunning ? 'Inspection running' : inputs ? (inputs.machine.emergencyStop ? 'Emergency stop' : 'Line ready') : 'Awaiting I/O';
   const systemStatuses = [
@@ -44,18 +52,11 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, on
   return (
     <div className="dashboard-layout" aria-busy={isLoading}>
       <div className="dashboard-main">
-        <header className="workspace-title-row">
-          <div>
-            <span className="overline">Mission control</span>
-            <h1>Inspection workspace</h1>
-            <p>Live production state, optical views, and pipeline health.</p>
-          </div>
-          <StatusBadge status={lineStatus} label={lineStatusLabel} />
-        </header>
-
         {error && <p className="studio-message studio-message--error" role="alert">{error}</p>}
 
-        <div className="instrument-rail">
+        <section className={`dashboard-panel dashboard-state ${panels.state.isCollapsed ? 'dashboard-panel--collapsed' : ''}`}>
+          <CollapsiblePanelHeader title="State" isCollapsed={panels.state.isCollapsed} onToggle={() => togglePanel('state')} status={<StatusBadge status={lineStatus} label={lineStatusLabel} />} />
+          {!panels.state.isCollapsed && <div className="instrument-rail">
           <section className="system-strip" aria-label="System status">
             {systemStatuses.map((item) => (
               <article className={`system-status system-status--${item.status}`} key={item.label}>
@@ -74,11 +75,13 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, on
               </article>
             ))}
           </section>
-        </div>
+          </div>}
+        </section>
 
         <section className="viewer-grid" aria-label="Inspection viewers">
-          <article className="inspection-viewer">
-            <header><strong>2D optical view</strong><StatusBadge status="success" label="Live" /></header>
+          <article className={`inspection-viewer ${panels.optical2D.isCollapsed ? 'dashboard-panel--collapsed' : ''}`} style={{ '--viewer-width': panels.optical2D.widthUnits, '--viewer-height': panels.optical2D.heightUnits } as React.CSSProperties}>
+            <CollapsiblePanelHeader title="2D optical view" isCollapsed={panels.optical2D.isCollapsed} onToggle={() => togglePanel('optical2D')} status={<StatusBadge status="success" label="Live" />} controls={<ViewerSizeControls label="2D optical view" viewer={panels.optical2D} onChange={(viewer: ViewerPreference) => updatePanel('optical2D', viewer)} />} />
+            {!panels.optical2D.isCollapsed && <>
             <div className="pcb-visual pcb-visual--optical" role="img" aria-label="Simulated top-down PCB optical inspection">
               <span className="pcb-visual__board" />
               <span className="pcb-visual__roi pcb-visual__roi--one">ROI 03</span>
@@ -86,10 +89,12 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, on
               <span className="viewer-reticle" aria-hidden="true">+</span>
             </div>
             <footer><span>Top camera · 12 MP</span><span>8.0 ms · Gain 1.2</span></footer>
+            </>}
           </article>
 
-          <article className="inspection-viewer">
-            <header><strong>3D component heightmap</strong><StatusBadge status="success" label="Synced" /></header>
+          <article className={`inspection-viewer ${panels.heightmap3D.isCollapsed ? 'dashboard-panel--collapsed' : ''}`} style={{ '--viewer-width': panels.heightmap3D.widthUnits, '--viewer-height': panels.heightmap3D.heightUnits } as React.CSSProperties}>
+            <CollapsiblePanelHeader title="3D component heightmap" isCollapsed={panels.heightmap3D.isCollapsed} onToggle={() => togglePanel('heightmap3D')} status={<StatusBadge status="success" label="Synced" />} controls={<ViewerSizeControls label="3D component heightmap" viewer={panels.heightmap3D} onChange={(viewer: ViewerPreference) => updatePanel('heightmap3D', viewer)} />} />
+            {!panels.heightmap3D.isCollapsed && <>
             <div className="pcb-visual pcb-visual--depth" role="img" aria-label="Simulated PCB component depth map">
               <span className="depth-plane" />
               <span className="depth-component depth-component--one" />
@@ -98,15 +103,13 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, on
               <span className="depth-scale">0 μm<span />2400 μm</span>
             </div>
             <footer><span>Photometric stereo</span><span>RMSE 0.18°</span></footer>
+            </>}
           </article>
         </section>
 
-        <section className="io-console">
-          <header>
-            <div><span className="overline">Physical I/O</span><strong>Machine interface</strong></div>
-            <span>Revision {outputs?.revision ?? inputs?.revision ?? '—'}</span>
-          </header>
-          <div className="io-console__signals">
+        <section className={`io-console ${panels.physicalIo.isCollapsed ? 'dashboard-panel--collapsed' : ''}`}>
+          <CollapsiblePanelHeader title="Physical I/O" isCollapsed={panels.physicalIo.isCollapsed} onToggle={() => togglePanel('physicalIo')} status={<span>Revision {outputs?.revision ?? inputs?.revision ?? '—'}</span>} />
+          {!panels.physicalIo.isCollapsed && <div className="io-console__signals">
             {outputs && Object.entries(outputs.signals).map(([name, value]) => (
               <button
                 type="button"
@@ -119,11 +122,11 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, on
                 {formatSignalName(name)}
               </button>
             ))}
-          </div>
+          </div>}
         </section>
       </div>
 
-      <aside className={`pipeline-panel ${isFlowCollapsed ? 'pipeline-panel--collapsed' : ''}`} aria-label="Inspection flow">
+      <aside className={`pipeline-panel ${panels.inspectionFlow.isCollapsed ? 'pipeline-panel--collapsed' : ''}`} aria-label="Inspection flow">
         <div className="panel-heading">
           <span>Inspection flow</span>
           <span className="pipeline-panel__actions">
@@ -131,11 +134,11 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, on
             <button
               className="icon-button"
               type="button"
-              aria-label={isFlowCollapsed ? 'Expand inspection flow' : 'Collapse inspection flow'}
-              aria-expanded={!isFlowCollapsed}
-              onClick={() => setIsFlowCollapsed((current) => !current)}
+              aria-label={panels.inspectionFlow.isCollapsed ? 'Expand inspection flow' : 'Collapse inspection flow'}
+              aria-expanded={!panels.inspectionFlow.isCollapsed}
+              onClick={() => togglePanel('inspectionFlow')}
             >
-              {isFlowCollapsed ? '‹' : '›'}
+              {panels.inspectionFlow.isCollapsed ? '‹' : '›'}
             </button>
           </span>
         </div>
@@ -145,7 +148,7 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, on
           {orderedWorkflowNodes.map((step, index) => (
             <li className="pipeline-step pipeline-step--configuration" key={step.id}>
               <span className="pipeline-step__index">{String(index + 1).padStart(2, '0')}</span>
-              <span><strong>{step.displayName}</strong><small>Configuration only</small></span>
+              <span><strong>{step.displayName}</strong><small>{catalog.find((definition) => definition.id === step.algorithmId)?.use ?? 'test'}</small></span>
               <code>{step.algorithmId}</code>
             </li>
           ))}

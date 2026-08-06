@@ -1,35 +1,40 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { LightDirectionOverlay } from '../components/LightDirectionOverlay';
 import { StatusBadge } from '../components/StatusBadge';
+import type { PhotometricLight, WorkstationPreferences } from '../types/workstation-preferences';
+import { resizePhotometricLights } from '../utils/workstation-preferences';
 
-const LIGHT_VIEWS = [
-  { id: 1, direction: 'North', exposure: '8.0 ms', intensity: 82 },
-  { id: 2, direction: 'East', exposure: '8.0 ms', intensity: 74 },
-  { id: 3, direction: 'South', exposure: '8.0 ms', intensity: 88 },
-  { id: 4, direction: 'West', exposure: '8.0 ms', intensity: 79 },
-];
+interface CameraManagerPageProps {
+  preferences: WorkstationPreferences;
+  onChange: (preferences: WorkstationPreferences) => void;
+}
 
-export function CameraManagerPage() {
+export function CameraManagerPage({ preferences, onChange }: CameraManagerPageProps) {
   const [selectedView, setSelectedView] = useState(1);
-  const [intensity, setIntensity] = useState(82);
-  const [isApplying, setIsApplying] = useState(false);
   const [message, setMessage] = useState('');
+  const lights = preferences.photometric.lights;
+  const selectedLight = lights.find((light) => light.id === selectedView) ?? lights[0];
 
-  const handleApply = () => {
-    setIsApplying(true);
-    setMessage('');
-    window.setTimeout(() => {
-      setIsApplying(false);
-      setMessage('Calibration configuration applied.');
-    }, 450);
-  };
+  useEffect(() => {
+    if (!lights.some((light) => light.id === selectedView)) setSelectedView(lights[0]?.id ?? 1);
+  }, [lights, selectedView]);
+
+  const updatePhotometric = (lightCount: number, nextLights: PhotometricLight[]) => onChange({
+    ...preferences,
+    photometric: { lightCount, lights: nextLights },
+  });
+  const updateSelectedLight = (patch: Partial<PhotometricLight>) => updatePhotometric(
+    lights.length,
+    lights.map((light) => light.id === selectedLight.id ? { ...light, ...patch } : light),
+  );
 
   return (
     <div className="camera-page">
       <header className="workspace-title-row">
         <div>
           <span className="overline">Camera manager</span>
-          <h1>Multi-view photometric stereo</h1>
-          <p>Configure synchronized light views, validate calibration, and inspect reconstructed surface depth.</p>
+          <h1>Photometric</h1>
+          <p>Align each light vector with the camera and capture one synchronized image per light.</p>
         </div>
         <StatusBadge status="success" label="Calibration valid" />
       </header>
@@ -38,33 +43,30 @@ export function CameraManagerPage() {
         <div className="camera-captures">
           <header className="section-heading">
             <div><span className="overline">Capture set</span><h2>Synchronized light captures</h2></div>
-            <span>4 / 4 views valid</span>
+            <span>{lights.length} / {lights.length} views configured</span>
           </header>
           <div className="capture-grid">
-            {LIGHT_VIEWS.map((view) => (
+            {lights.map((light) => (
               <button
                 type="button"
-                key={view.id}
-                className={`capture-card ${selectedView === view.id ? 'capture-card--selected' : ''}`}
-                onClick={() => {
-                  setSelectedView(view.id);
-                  setIntensity(view.intensity);
-                }}
+                key={light.id}
+                className={`capture-card ${selectedView === light.id ? 'capture-card--selected' : ''}`}
+                onClick={() => setSelectedView(light.id)}
               >
-                <span className={`capture-card__preview capture-card__preview--${view.id}`}>
+                <span className="capture-card__preview">
                   <span className="capture-card__board" />
-                  <span className="capture-card__light" aria-hidden="true">{view.direction.slice(0, 1)}</span>
+                  <LightDirectionOverlay light={light} />
                 </span>
                 <span className="capture-card__meta">
-                  <strong>Light view {view.id}</strong>
-                  <span>{view.direction} · {view.exposure}</span>
+                  <strong>Light view {light.id}</strong>
+                  <span>Azimuth {light.azimuth}° · Elevation {light.elevation}°</span>
                 </span>
-                <StatusBadge status="success" label="Valid" />
+                <StatusBadge status="success" label="Configured" />
               </button>
             ))}
           </div>
           <article className="surface-viewer">
-            <header><strong>Reconstructed surface depth</strong><span>Selected view {selectedView}</span></header>
+            <header><strong>Reconstructed surface depth</strong><span>Selected view {selectedLight.id}</span></header>
             <div className="surface-viewer__canvas" role="img" aria-label="Simulated reconstructed PCB surface depth">
               <span className="surface-mesh" />
               <span className="surface-chip surface-chip--one" />
@@ -76,34 +78,19 @@ export function CameraManagerPage() {
         </div>
 
         <aside className="camera-inspector">
-          <div className="panel-heading"><span>Capture configuration</span><span>Rig 01</span></div>
-          <section>
-            <span className="overline">Light rig</span>
-            <strong>Ring-4 · synchronized</strong>
-            <p>25° elevation · Cross polarization</p>
-          </section>
-          <label className="range-control">
-            <span><strong>Intensity balance</strong><output>{intensity}%</output></span>
-            <input type="range" min="40" max="100" value={intensity} onChange={(event) => setIntensity(Number(event.target.value))} />
-          </label>
-          <dl className="property-list">
-            <div><dt>Exposure lock</dt><dd>8.0 ms</dd></div>
-            <div><dt>Polarization</dt><dd>Cross</dd></div>
-            <div><dt>Trigger delay</dt><dd>0.24 ms</dd></div>
-            <div><dt>Camera gain</dt><dd>1.2 dB</dd></div>
-          </dl>
-          <section className="quality-panel">
-            <span className="overline">Reconstruction quality</span>
-            <dl>
-              <div><dt>Surface coverage</dt><dd>99.2%</dd></div>
-              <div><dt>Normal RMSE</dt><dd>0.18°</dd></div>
-              <div><dt>Height repeatability</dt><dd>± 4.1 μm</dd></div>
-            </dl>
-          </section>
+          <div className="panel-heading"><span>Capture configuration</span><span>Image count {lights.length}</span></div>
+          <label className="camera-field"><span>Workstation ID</span><input value={preferences.workstationId} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" onChange={(event) => onChange({ ...preferences, revision: 0, workstationId: event.target.value })} /></label>
+          <label className="camera-field"><span>Number of lights and images</span><input type="number" min="1" max="64" value={lights.length} onChange={(event) => {
+            const lightCount = Math.min(64, Math.max(1, Number(event.target.value) || 1));
+            updatePhotometric(lightCount, resizePhotometricLights(lights, lightCount));
+          }} /></label>
+          <section><span className="overline">Selected light</span><strong>Light {selectedLight.id}</strong><p>Adjust the vector against the camera preview.</p></section>
+          <label className="range-control"><span><strong>Azimuth</strong><output>{selectedLight.azimuth}°</output></span><input type="range" min="0" max="359" value={selectedLight.azimuth} onChange={(event) => updateSelectedLight({ azimuth: Number(event.target.value) })} /></label>
+          <label className="range-control"><span><strong>Elevation</strong><output>{selectedLight.elevation}°</output></span><input type="range" min="0" max="90" value={selectedLight.elevation} onChange={(event) => updateSelectedLight({ elevation: Number(event.target.value) })} /></label>
+          <label className="range-control"><span><strong>Intensity</strong><output>{selectedLight.intensity}%</output></span><input type="range" min="0" max="100" value={selectedLight.intensity} onChange={(event) => updateSelectedLight({ intensity: Number(event.target.value) })} /></label>
+          <p className="camera-save-hint">Save this rig and the workspace layout from Settings.</p>
           {message && <p className="studio-message studio-message--success" role="status">{message}</p>}
-          <button className="studio-primary-button" type="button" disabled={isApplying} onClick={handleApply}>
-            {isApplying ? 'Applying…' : 'Recalibrate & apply'}
-          </button>
+          <button className="studio-primary-button" type="button" onClick={() => setMessage('Photometric draft validated. Save it from Settings.')}>Validate configuration</button>
         </aside>
       </section>
     </div>

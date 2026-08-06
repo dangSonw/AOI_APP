@@ -14,6 +14,7 @@ from core.algorithms import (
     PortDirection,
 )
 from core.pipeline import Connection, Point, PortInstance, ValidationIssue, Workflow, WorkflowNode
+from core.nodes import NodeUse, get_node_runtime
 
 
 class PortDefinitionSchema(ApiSchema):
@@ -52,6 +53,7 @@ class AlgorithmDefinitionSchema(ApiSchema):
     category: str
     documentation_group: str
     availability: str
+    use: NodeUse
     inputs: tuple[PortDefinitionSchema, ...]
     outputs: tuple[PortDefinitionSchema, ...]
     parameters: tuple[ParameterDefinitionSchema, ...]
@@ -59,6 +61,9 @@ class AlgorithmDefinitionSchema(ApiSchema):
 
     @classmethod
     def from_core(cls, definition: AlgorithmDefinition) -> Self:
+        runtime = get_node_runtime(definition.id)
+        if runtime is None:
+            raise ValueError(f'Algorithm {definition.id} does not have a runtime package.')
         return cls(
             id=definition.id,
             name=definition.name,
@@ -66,6 +71,7 @@ class AlgorithmDefinitionSchema(ApiSchema):
             category=definition.category,
             documentation_group=definition.documentation_group,
             availability=definition.availability,
+            use=runtime.use,
             inputs=tuple(PortDefinitionSchema.from_core(port) for port in definition.inputs),
             outputs=tuple(PortDefinitionSchema.from_core(port) for port in definition.outputs),
             parameters=tuple(ParameterDefinitionSchema.from_core(parameter) for parameter in definition.parameters),

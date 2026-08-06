@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import type { ValidationIssue, Workflow } from '../../types/workflow';
+import type { AlgorithmDefinition, ValidationIssue, Workflow } from '../../types/workflow';
 import { moveExecutionNode } from '../../utils/workflow-graph';
+import { RuntimeUseBadge } from '../RuntimeUseBadge';
 
 
 interface ExecutionOrderRailProps {
   workflow: Workflow;
+  catalog: AlgorithmDefinition[];
   issues: ValidationIssue[];
   onChange: (order: string[]) => void;
   onAutoOrder: () => void;
   onSelectNode: (nodeId: string) => void;
 }
 
-export function ExecutionOrderRail({ workflow, issues, onChange, onAutoOrder, onSelectNode }: ExecutionOrderRailProps) {
+export function ExecutionOrderRail({ workflow, catalog, issues, onChange, onAutoOrder, onSelectNode }: ExecutionOrderRailProps) {
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
   const nodes = new Map(workflow.nodes.map((node) => [node.id, node]));
   const orderIssues = issues.filter((issue) => issue.code === 'dependency-order' || issue.code === 'execution-order-mismatch' || issue.code === 'cycle');
@@ -48,7 +50,7 @@ export function ExecutionOrderRail({ workflow, issues, onChange, onAutoOrder, on
               <button type="button" className="execution-rail__node" onClick={() => onSelectNode(nodeId)}>
                 <span>{String(index + 1).padStart(2, '0')}</span>
                 <span><strong>{node.displayName}</strong><small>{node.algorithmId}</small></span>
-                <em>Configuration only</em>
+                <RuntimeUseBadge use={catalog.find((definition) => definition.id === node.algorithmId)?.use ?? 'test'} />
               </button>
               <div className="execution-rail__moves">
                 <button type="button" disabled={index === 0} aria-label={`Move ${node.displayName} up`} onClick={() => onChange(moveExecutionNode(workflow.executionOrder, nodeId, -1))}>↑</button>

@@ -28,10 +28,12 @@ core/native/build/
 data/cache/*
 data/logs/*
 data/projects/*
+data/preferences/*
 data/temp/*
 !data/cache/.gitkeep
 !data/logs/.gitkeep
 !data/projects/.gitkeep
+!data/preferences/.gitkeep
 !data/temp/.gitkeep
 
 # Code intelligence cache

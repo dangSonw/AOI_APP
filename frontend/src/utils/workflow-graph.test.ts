@@ -17,6 +17,7 @@ const imageInput: AlgorithmDefinition = {
   category: 'Acquisition',
   documentationGroup: 'Acquisition and pipeline components',
   availability: 'configuration-only',
+  use: 'test',
   inputs: [],
   outputs: [{ key: 'image', label: 'Image', direction: 'output', dataType: 'image', required: true, variadic: false }],
   parameters: [{ key: 'source', label: 'Source', kind: 'text', defaultValue: 'recipe-image', required: true, minimum: null, maximum: null, options: [], description: '' }],
@@ -30,6 +31,7 @@ const patchCore: AlgorithmDefinition = {
   category: 'Feature distribution',
   documentationGroup: 'Group B — Feature distribution',
   availability: 'configuration-only',
+  use: 'test',
   inputs: [{ key: 'image', label: 'Image', direction: 'input', dataType: 'image', required: true, variadic: false }],
   outputs: [
     { key: 'anomaly-map', label: 'Anomaly map', direction: 'output', dataType: 'anomaly-map', required: true, variadic: false },
@@ -46,6 +48,7 @@ const decisionFusion: AlgorithmDefinition = {
   category: 'Decision',
   documentationGroup: 'Acquisition and pipeline components',
   availability: 'configuration-only',
+  use: 'test',
   inputs: [{ key: 'scores', label: 'Scores', direction: 'input', dataType: 'score', required: true, variadic: true }],
   outputs: [{ key: 'decision', label: 'Decision', direction: 'output', dataType: 'decision', required: true, variadic: false }],
   parameters: [],

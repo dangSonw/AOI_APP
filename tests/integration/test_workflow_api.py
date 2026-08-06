@@ -39,6 +39,7 @@ def test_catalog_and_missing_workflow_are_returned_in_camel_case(client: TestCli
     assert catalog_response.status_code == 200
     assert len(catalog_response.json()) == 58
     assert catalog_response.json()[0]['availability'] == 'configuration-only'
+    assert catalog_response.json()[0]['use'] == 'test'
     assert catalog_response.json()[0]['outputs'][0]['dataType'] == 'image'
     assert workflow_response.status_code == 200
     assert workflow_response.json()['recipeSlug'] == 'rev-c-mainboard'

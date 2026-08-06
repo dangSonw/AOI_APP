@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { AlgorithmDefinition } from '../../types/workflow';
 import { filterCatalog } from '../../utils/workflow-graph';
+import { RuntimeUseBadge } from '../RuntimeUseBadge';
 
 
 export const ALGORITHM_DRAG_TYPE = 'application/x-aoi-algorithm';
@@ -67,7 +68,7 @@ export function AlgorithmCatalog({ catalog, onAdd, onRetry }: AlgorithmCatalogPr
                     </div>
                     <p>{definition.description}</p>
                     <footer>
-                      <span>Configuration only</span>
+                      <RuntimeUseBadge use={definition.use} />
                       <button type="button" onClick={() => onAdd(definition)} aria-label={`Add ${definition.name}`}>Add</button>
                     </footer>
                   </article>

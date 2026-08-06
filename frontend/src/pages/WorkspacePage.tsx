@@ -5,10 +5,13 @@ import {
   readPhysicalOutputs,
   writePhysicalOutputs,
 } from '../services/physical-io-service';
-import { readWorkflow } from '../services/workflow-service';
+import { readAlgorithmCatalog, readWorkflow } from '../services/workflow-service';
+import { readWorkstationPreferences, saveWorkstationPreferences } from '../services/workstation-preference-service';
 import type { AuthSession } from '../types/auth';
 import type { PhysicalInputState, PhysicalOutputState } from '../types/physical-io';
-import type { Workflow } from '../types/workflow';
+import type { AlgorithmDefinition, Workflow } from '../types/workflow';
+import type { WorkstationPreferences } from '../types/workstation-preferences';
+import { createDefaultPreferences } from '../utils/workstation-preferences';
 import type { WorkspaceView } from '../types/workspace';
 import { CameraManagerPage } from './CameraManagerPage';
 import { DashboardPage } from './DashboardPage';
@@ -18,6 +21,7 @@ import { WorkflowEditorPage } from './WorkflowEditorPage';
 
 
 const ACTIVE_RECIPE_SLUG = 'rev-c-mainboard';
+const DEFAULT_WORKSTATION_ID = 'station-01';
 
 interface WorkspacePageProps {
   session: AuthSession;
@@ -34,6 +38,11 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
   const [savedWorkflow, setSavedWorkflow] = useState<Workflow | null>(null);
   const [workflowError, setWorkflowError] = useState('');
   const [isWorkflowDirty, setIsWorkflowDirty] = useState(false);
+  const [catalog, setCatalog] = useState<AlgorithmDefinition[]>([]);
+  const [savedPreferences, setSavedPreferences] = useState<WorkstationPreferences>(() => createDefaultPreferences(session.user.id, DEFAULT_WORKSTATION_ID));
+  const [draftPreferences, setDraftPreferences] = useState<WorkstationPreferences>(() => createDefaultPreferences(session.user.id, DEFAULT_WORKSTATION_ID));
+  const [preferenceError, setPreferenceError] = useState('');
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false);
 
   const loadPhysicalState = useCallback(async () => {
     setError('');
@@ -59,7 +68,12 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
   const loadSavedWorkflow = useCallback(async () => {
     setWorkflowError('');
     try {
-      setSavedWorkflow(await readWorkflow(session.accessToken, ACTIVE_RECIPE_SLUG));
+      const [nextWorkflow, nextCatalog] = await Promise.all([
+        readWorkflow(session.accessToken, ACTIVE_RECIPE_SLUG),
+        readAlgorithmCatalog(session.accessToken),
+      ]);
+      setSavedWorkflow(nextWorkflow);
+      setCatalog(nextCatalog);
     } catch (loadError) {
       setWorkflowError(loadError instanceof Error ? loadError.message : 'The saved inspection workflow could not be loaded.');
     }
@@ -68,6 +82,36 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
   useEffect(() => {
     void loadSavedWorkflow();
   }, [loadSavedWorkflow]);
+
+  useEffect(() => {
+    const loadPreferences = async () => {
+      setPreferenceError('');
+      try {
+        const nextPreferences = await readWorkstationPreferences(session.accessToken, DEFAULT_WORKSTATION_ID);
+        setSavedPreferences(nextPreferences);
+        setDraftPreferences(structuredClone(nextPreferences));
+      } catch (loadError) {
+        setPreferenceError(loadError instanceof Error ? loadError.message : 'Workstation preferences could not be loaded.');
+      }
+    };
+    void loadPreferences();
+  }, [session.accessToken]);
+
+  const isPreferencesDirty = JSON.stringify(savedPreferences) !== JSON.stringify(draftPreferences);
+  const savePreferences = async () => {
+    setIsSavingPreferences(true);
+    setPreferenceError('');
+    try {
+      const saved = await saveWorkstationPreferences(session.accessToken, draftPreferences);
+      setSavedPreferences(saved);
+      setDraftPreferences(structuredClone(saved));
+    } catch (saveError) {
+      setPreferenceError(saveError instanceof Error ? saveError.message : 'Workstation preferences could not be saved.');
+      throw saveError;
+    } finally {
+      setIsSavingPreferences(false);
+    }
+  };
 
   useEffect(() => {
     const viewTitles: Record<WorkspaceView, string> = {
@@ -128,11 +172,14 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
           workflow={savedWorkflow}
           workflowError={workflowError}
           onConfigureWorkflow={() => requestViewChange('workflow-editor')}
+          catalog={catalog}
+          preferences={draftPreferences.dashboard}
+          onPreferencesChange={(dashboard) => setDraftPreferences((current) => ({ ...current, dashboard }))}
           onOutputToggle={(signalName, currentValue) => void toggleOutput(signalName, currentValue)}
         />
       )}
-      {activeView === 'settings' && <SettingsPage />}
-      {activeView === 'camera-manager' && <CameraManagerPage />}
+      {activeView === 'settings' && <SettingsPage preferences={draftPreferences} isDirty={isPreferencesDirty} isSaving={isSavingPreferences} error={preferenceError} onWorkstationIdChange={(workstationId) => setDraftPreferences((current) => ({ ...current, workstationId }))} onSave={savePreferences} />}
+      {activeView === 'camera-manager' && <CameraManagerPage preferences={draftPreferences} onChange={setDraftPreferences} />}
       {activeView === 'database' && <DatabasePage />}
       {activeView === 'workflow-editor' && (
         <WorkflowEditorPage

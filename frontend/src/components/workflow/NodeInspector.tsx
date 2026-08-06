@@ -1,4 +1,5 @@
 import type { AlgorithmDefinition, ParameterValue, WorkflowNode } from '../../types/workflow';
+import { RuntimeUseBadge } from '../RuntimeUseBadge';
 
 
 interface NodeInspectorProps {
@@ -29,6 +30,7 @@ export function NodeInspector({ node, definition, onChange }: NodeInspectorProps
         <code>{definition.id}</code>
       </header>
       <div className="workflow-inspector__body">
+        <RuntimeUseBadge use={definition.use} />
         <label className="workflow-field">
           <span>Display name</span>
           <input value={node.displayName} onChange={(event) => onChange({ ...node, displayName: event.target.value })} />

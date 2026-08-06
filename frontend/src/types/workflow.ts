@@ -15,6 +15,7 @@ export type DataType =
 export type PortDirection = 'input' | 'output';
 export type ParameterKind = 'boolean' | 'integer' | 'number' | 'text' | 'select';
 export type ParameterValue = boolean | number | string;
+export type NodeUse = 'test' | 'debug' | 'release';
 
 export interface PortDefinition {
   key: string;
@@ -44,6 +45,7 @@ export interface AlgorithmDefinition {
   category: string;
   documentationGroup: string;
   availability: 'configuration-only';
+  use: NodeUse;
   inputs: PortDefinition[];
   outputs: PortDefinition[];
   parameters: ParameterDefinition[];

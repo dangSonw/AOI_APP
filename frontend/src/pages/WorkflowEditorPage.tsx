@@ -216,6 +216,7 @@ export function WorkflowEditorPage({
       </div>
       <ExecutionOrderRail
         workflow={draftWorkflow}
+        catalog={catalog}
         issues={issues}
         onChange={(executionOrder) => updateDraft((workflow) => ({ ...workflow, executionOrder }))}
         onAutoOrder={() => updateDraft((workflow) => ({ ...workflow, executionOrder: stableTopologicalOrder(workflow) }))}
