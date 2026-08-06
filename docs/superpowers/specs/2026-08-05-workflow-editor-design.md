@@ -179,7 +179,7 @@ Each catalog entry contains:
 - `availability: "configuration-only"`;
 - ordered input and output port templates;
 - typed parameter definitions with default values, bounds/options, and required flags;
-- optional reference label for the source algorithm family described in `docs/algorithm/README.md/algo.md`.
+- optional reference label for the source algorithm family described in `docs/algorithm/algo.md`.
 
 ### 4.3 Workflow node
 

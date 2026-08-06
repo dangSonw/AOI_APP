@@ -154,21 +154,30 @@ The current JSON interface is a simulation boundary. A future hardware adapter c
 | `GET` | `/api/io/inputs` | Read simulated inputs | Bearer token |
 | `GET` | `/api/io/outputs` | Read simulated outputs | Bearer token |
 | `PUT` | `/api/io/outputs` | Atomically update outputs | Bearer token |
-| `GET` | `/api/algorithms` | Read the configuration-only algorithm catalog | Bearer token |
+| `GET` | `/api/algorithms` | Read the algorithm catalog and node runtime status | Bearer token |
 | `GET` | `/api/recipes/{recipeSlug}/workflow` | Read a persisted or default recipe workflow | Bearer token |
 | `PUT` | `/api/recipes/{recipeSlug}/workflow` | Validate and atomically save a complete workflow | Bearer token |
+| `GET` | `/api/workstation-preferences/{workstationId}` | Read dashboard and Photometric preferences | Bearer token |
+| `PUT` | `/api/workstation-preferences/{workstationId}` | Validate and atomically save workstation preferences | Bearer token |
 
 Password-reset email delivery is intentionally not implemented in this milestone. The endpoint returns the same safe message whether an account exists or not.
 
 ## Workflow editor and storage
 
 - The Workflow editor is available from the Dashboard Inspection flow settings action and the Project explorer Workflow item.
-- `core/algorithms` owns the ordered configuration catalog, typed ports, parameter definitions, and `configuration-only` availability metadata.
+- `core/algorithms` owns the ordered catalog, typed ports, and parameter definitions.
+- `core/nodes/<category>/<node-id>/node.py` provides one runtime contract per catalog item, including input keys, output keys, an `execute` entry point, and a `test`, `debug`, or `release` status.
 - `core/pipeline` owns workflow validation and stable topological ordering. Connections require exact type equality, and cycles, self-loops, duplicate connections, missing required inputs, and invalid execution order are rejected.
 - Recipe workflows are AOI-owned camelCase JSON documents stored under `data/projects/<recipe-slug>/workflow.json`. React Flow presentation objects are never persisted.
 - Successful saves require the submitted revision to match storage, increment the revision once, and use a sibling temporary file, flush, `fsync`, and atomic replacement. A stale save returns HTTP `409` without overwriting the newer file.
-- The current catalog and editor are configuration metadata only. They do not install or run OpenCV, PyTorch, Anomalib, model weights, training, or inference.
+- The current node modules are explicit runtime placeholders: their contracts are loadable, but their algorithm bodies raise a structured not-implemented error. They do not install or run OpenCV, PyTorch, Anomalib, model weights, training, or inference yet.
 - Local recipe workflow files are runtime data and are ignored by Git; `data/projects/.gitkeep` preserves the directory structure.
+
+## Repository documentation convention
+
+- Keep operational documentation in the root `README.md` and `README.md.vn`, script documentation in `scripts/README.md` and `scripts/README.md.vn`, and topic-specific documents under `docs/`.
+- Do not create directories named `README.md` or add repeated placeholder README files to reserve future modules.
+- Add a functional directory only when it contains source, configuration, tests, or maintained documentation. Runtime directories that must exist in a fresh clone use a scoped `.gitkeep` and matching ignore rules instead.
 
 ## Figma and CodeGraph workflow
 

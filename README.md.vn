@@ -154,21 +154,30 @@ Giao diện JSON hiện tại là ranh giới mô phỏng. Adapter phần cứng
 | `GET` | `/api/io/inputs` | Đọc input mô phỏng | Bearer token |
 | `GET` | `/api/io/outputs` | Đọc output mô phỏng | Bearer token |
 | `PUT` | `/api/io/outputs` | Cập nhật output nguyên tử | Bearer token |
-| `GET` | `/api/algorithms` | Đọc catalog thuật toán chỉ phục vụ cấu hình | Bearer token |
+| `GET` | `/api/algorithms` | Đọc catalog thuật toán và trạng thái runtime của node | Bearer token |
 | `GET` | `/api/recipes/{recipeSlug}/workflow` | Đọc workflow đã lưu hoặc workflow mặc định của recipe | Bearer token |
 | `PUT` | `/api/recipes/{recipeSlug}/workflow` | Validate và lưu nguyên tử toàn bộ workflow | Bearer token |
+| `GET` | `/api/workstation-preferences/{workstationId}` | Đọc tùy chọn Dashboard và Photometric | Bearer token |
+| `PUT` | `/api/workstation-preferences/{workstationId}` | Validate và lưu nguyên tử tùy chọn workstation | Bearer token |
 
 Gửi email đặt lại mật khẩu chưa được triển khai trong mốc này. Endpoint luôn trả cùng một thông báo an toàn dù tài khoản có tồn tại hay không.
 
 ## Workflow editor và lưu trữ
 
 - Có thể mở Workflow editor từ thao tác cài đặt Inspection flow trên Dashboard và mục Workflow trong Project explorer.
-- `core/algorithms` sở hữu catalog cấu hình có thứ tự, typed port, parameter definition và metadata availability `configuration-only`.
+- `core/algorithms` sở hữu catalog có thứ tự, typed port và parameter definition.
+- `core/nodes/<category>/<node-id>/node.py` cung cấp một runtime contract cho mỗi mục catalog, gồm input key, output key, entry point `execute` và trạng thái `test`, `debug` hoặc `release`.
 - `core/pipeline` sở hữu workflow validation và stable topological ordering. Connection yêu cầu type bằng tuyệt đối; cycle, self-loop, duplicate connection, thiếu required input và execution order không hợp lệ đều bị từ chối.
 - Workflow của recipe là tài liệu JSON camelCase do AOI sở hữu, được lưu dưới `data/projects/<recipe-slug>/workflow.json`. Object trình bày nội bộ của React Flow không bao giờ được lưu.
 - Lần lưu thành công yêu cầu revision gửi lên khớp storage, tăng revision đúng một lần và dùng file tạm cùng thư mục, flush, `fsync` cùng atomic replacement. Lần lưu stale trả HTTP `409` mà không ghi đè file mới hơn.
-- Catalog và editor hiện tại chỉ là metadata cấu hình. Chúng không cài hoặc chạy OpenCV, PyTorch, Anomalib, model weight, training hay inference.
+- Các module node hiện tại là runtime placeholder rõ ràng: contract có thể được nạp, nhưng thân thuật toán trả lỗi chưa triển khai có cấu trúc. Chúng chưa cài hoặc chạy OpenCV, PyTorch, Anomalib, model weight, training hay inference.
 - File workflow recipe local là dữ liệu runtime và bị Git bỏ qua; `data/projects/.gitkeep` giữ cấu trúc thư mục.
+
+## Quy ước tài liệu trong repository
+
+- Giữ tài liệu vận hành trong `README.md` và `README.md.vn` ở thư mục gốc, tài liệu script trong `scripts/README.md` và `scripts/README.md.vn`, còn tài liệu theo chủ đề đặt dưới `docs/`.
+- Không tạo thư mục có tên `README.md` hoặc thêm README placeholder lặp lại để giữ chỗ cho module tương lai.
+- Chỉ thêm thư mục chức năng khi thư mục đó chứa source, cấu hình, test hoặc tài liệu được duy trì. Thư mục runtime bắt buộc tồn tại trong bản clone mới phải dùng `.gitkeep` có phạm vi cụ thể và quy tắc ignore tương ứng.
 
 ## Quy trình Figma và CodeGraph
 

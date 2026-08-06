@@ -102,7 +102,7 @@ The current baseline is 15 backend tests, 14 core tests, 12 integration tests, 1
 
 ## 12. Workflow Editor Contracts and Diagnostics
 
-- **Configuration-only boundary:** Catalog presence means a method can be configured, not that OpenCV, PyTorch, Anomalib, model weights, training, or inference is installed. UI nodes and dashboard steps must display `Configuration only` explicitly.
+- **Runtime-package boundary:** Every catalog method has a matching package at `core/nodes/<category>/<node-id>/node.py` with explicit input/output variable names, a placeholder `execute()` entry point, and `USE = test | debug | release`. A package or `test` badge still does not imply that OpenCV, PyTorch, Anomalib, model weights, training, or inference is installed.
 - **Core ownership:** `core/algorithms` owns catalog metadata, typed port templates, and parameter constraints. `core/pipeline` owns graph validation and stable topological ordering. The frontend may provide immediate feedback but the backend must validate the complete submitted graph through core before persistence.
 - **Persistence contract:** Store AOI-owned camelCase documents under `data/projects/<recipe-slug>/workflow.json`. Writes use a sibling temporary file, flush, `fsync`, and atomic replacement. A save requires an exact revision match, increments once on success, and returns HTTP `409` for stale drafts without overwriting storage.
 - **Runtime data ownership:** Recipe workflow files under `data/projects/` are local runtime data and remain ignored by Git. Keep only `data/projects/.gitkeep` in source control.
@@ -110,3 +110,16 @@ The current baseline is 15 backend tests, 14 core tests, 12 integration tests, 1
 - **React Flow presentation state:** Apply every React Flow node change to local presentation nodes so measured dimensions remain initialized. Synchronize AOI node values into that presentation state while preserving `measured`, and call `useUpdateNodeInternals` after AOI nodes or ports change so existing edge paths remain visible.
 - **Atomic node deletion:** React Flow can emit dependent edge removals before a node removal callback. Intercept node deletion with `onBeforeDelete`, delegate the node-and-edge confirmation to the AOI draft owner, and cancel React Flow's default batch so rejecting confirmation leaves both nodes and edges unchanged.
 - **Browser verification:** The editor and Dashboard Inspection flow passed document-overflow checks at 390, 768, 1280, and 1920 pixel layout widths, including 390x600. Catalog drag/drop, typed edge acceptance/rejection, free node movement, zoom/fit, edge deletion, atomic node confirmation, execution drag reorder, keyboard alternatives, inspector parameters and variadic ports, successful saves, stale `409` recovery, focus visibility, and reduced motion were exercised in an authenticated browser.
+
+## 13. Workstation Preference Persistence
+
+- Store user-scoped workstation state under `data/preferences/users/<user-id>/<workstation-id>.json`; validate workstation IDs as lowercase kebab-case before creating a path.
+- Preference writes use the workflow repository's atomic pattern: sibling temporary file, flush, `fsync`, and `os.replace`. Exact revision matching prevents two browser tabs from silently overwriting each other.
+- Dashboard viewer size is persisted as bounded grid units rather than screen pixels so the layout remains portable across viewport sizes. Photometric image count is derived from light count and is never persisted as an independent value.
+- GitNexus re-indexing from WSL can fail with `invalid ELF header` when WSL resolves a Windows global npm installation containing a Windows native module. In that situation, use the up-to-date CodeGraph index and repair the Node/npm executable boundary before relying on GitNexus change detection.
+
+## 14. Repository Documentation Layout
+
+- A scaffold generator previously created directories named `README.md` containing identical `README.md` placeholder files. These paths add no module boundary, confuse file navigation, and must not be recreated.
+- Keep maintained operational documentation at the repository root and under `scripts/`; keep topic-specific reports directly under `docs/<topic>/` rather than inside a README-named wrapper directory.
+- Do not preserve unused source-module directories with placeholder documentation. Add the directory when implementation exists. For required runtime directories, use narrowly scoped `.gitkeep` files and matching ignore rules instead.

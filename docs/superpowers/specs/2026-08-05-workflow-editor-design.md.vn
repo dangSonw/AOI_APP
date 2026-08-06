@@ -179,7 +179,7 @@ Mỗi catalog entry gồm:
 - `availability: "configuration-only"`;
 - input/output port template có thứ tự;
 - typed parameter definition có default value, giới hạn/lựa chọn và required flag;
-- reference label tùy chọn cho họ thuật toán nguồn được mô tả trong `docs/algorithm/README.md/algo.md`.
+- reference label tùy chọn cho họ thuật toán nguồn được mô tả trong `docs/algorithm/algo.md`.
 
 ### 4.3 Workflow node
 

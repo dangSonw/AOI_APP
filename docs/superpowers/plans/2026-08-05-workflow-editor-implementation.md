@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Configuration only: do not install or import OpenCV, PyTorch, Anomalib, CUDA, model weights, or inference code.
-- Preserve `docs/algorithm/README.md/algo.md` and all user algorithm documentation.
+- Preserve `docs/algorithm/algo.md` and all user algorithm documentation.
 - Connections require exact standard-type equality; self-loops, duplicates, occupied non-variadic inputs, and cycles are invalid.
 - Persist AOI-owned camelCase JSON under `data/projects/<recipe-slug>/workflow.json`; never persist React Flow internal objects.
 - Writes use a sibling temporary file, flush, `fsync`, and atomic replacement.

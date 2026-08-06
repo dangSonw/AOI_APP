@@ -102,7 +102,7 @@ Baseline hiện tại gồm 15 backend test, 14 core test, 12 integration test, 
 
 ## 12. Contract và Chẩn đoán Workflow Editor
 
-- **Ranh giới chỉ phục vụ cấu hình:** Catalog có một method nghĩa là method đó có thể được cấu hình, không có nghĩa OpenCV, PyTorch, Anomalib, model weight, training hoặc inference đã được cài. Node trên UI và bước trên dashboard phải hiển thị rõ `Configuration only`.
+- **Ranh giới runtime package:** Mỗi method trong catalog có package tương ứng tại `core/nodes/<category>/<node-id>/node.py` với tên biến input/output rõ ràng, entry point `execute()` placeholder và `USE = test | debug | release`. Có package hoặc badge `test` vẫn không có nghĩa OpenCV, PyTorch, Anomalib, model weight, training hay inference đã được cài.
 - **Quyền sở hữu của core:** `core/algorithms` sở hữu catalog metadata, typed port template và parameter constraint. `core/pipeline` sở hữu graph validation và stable topological ordering. Frontend có thể phản hồi ngay nhưng backend phải validate toàn bộ graph gửi lên thông qua core trước khi lưu.
 - **Contract lưu trữ:** Lưu tài liệu camelCase do AOI sở hữu dưới `data/projects/<recipe-slug>/workflow.json`. Quá trình ghi dùng file tạm cùng thư mục, flush, `fsync` và atomic replacement. Lần lưu yêu cầu revision khớp chính xác, tăng đúng một lần khi thành công và trả HTTP `409` cho stale draft mà không ghi đè storage.
 - **Quyền sở hữu dữ liệu runtime:** File workflow recipe dưới `data/projects/` là dữ liệu runtime local và tiếp tục bị Git bỏ qua. Chỉ giữ `data/projects/.gitkeep` trong source control.
@@ -110,3 +110,16 @@ Baseline hiện tại gồm 15 backend test, 14 core test, 12 integration test, 
 - **Presentation state của React Flow:** Áp dụng mọi React Flow node change vào presentation node local để measured dimension tiếp tục được khởi tạo. Đồng bộ AOI node value vào presentation state đó nhưng giữ `measured`, đồng thời gọi `useUpdateNodeInternals` sau khi AOI node hoặc port đổi để edge path hiện có vẫn hiển thị.
 - **Xóa node nguyên tử:** React Flow có thể emit thao tác xóa dependent edge trước callback xóa node. Chặn xóa node bằng `onBeforeDelete`, giao confirmation node-và-edge cho owner của AOI draft và hủy batch mặc định của React Flow để khi từ chối confirmation thì cả node lẫn edge đều giữ nguyên.
 - **Xác minh trình duyệt:** Editor và Dashboard Inspection flow đã vượt qua kiểm tra document overflow tại layout width 390, 768, 1280 và 1920 pixel, bao gồm 390x600. Catalog drag/drop, chấp nhận/từ chối typed edge, di chuyển node tự do, zoom/fit, xóa edge, confirmation xóa node nguyên tử, execution drag reorder, phương án bàn phím, parameter và variadic port trong inspector, lưu thành công, phục hồi stale `409`, focus visibility và reduced motion đều đã được thực hiện trong trình duyệt có xác thực.
+
+## 13. Lưu Workstation Preference
+
+- Lưu trạng thái workstation theo user dưới `data/preferences/users/<user-id>/<workstation-id>.json`; validate workstation ID là lowercase kebab-case trước khi tạo đường dẫn.
+- Quá trình ghi preference dùng atomic pattern giống workflow repository: file tạm cùng thư mục, flush, `fsync` và `os.replace`. Revision phải khớp chính xác để hai tab trình duyệt không âm thầm ghi đè lẫn nhau.
+- Kích thước viewer trên Dashboard được lưu bằng grid unit có giới hạn thay vì pixel màn hình để layout sử dụng được trên nhiều viewport. Số ảnh Photometric luôn được suy ra từ số đèn và không được lưu thành giá trị độc lập.
+- GitNexus re-index từ WSL có thể lỗi `invalid ELF header` khi WSL resolve global npm Windows chứa native module Windows. Trong tình huống đó, dùng CodeGraph index đã cập nhật và sửa ranh giới executable Node/npm trước khi dựa vào GitNexus change detection.
+
+## 14. Bố cục Tài liệu trong Repository
+
+- Một scaffold generator trước đây đã tạo các thư mục tên `README.md` chứa file placeholder `README.md` giống hệt nhau. Các đường dẫn này không tạo ranh giới module, gây rối khi điều hướng file và không được tạo lại.
+- Giữ tài liệu vận hành được duy trì tại thư mục gốc repository và dưới `scripts/`; đặt báo cáo theo chủ đề trực tiếp dưới `docs/<topic>/` thay vì bọc trong một thư mục mang tên README.
+- Không giữ thư mục source module chưa dùng bằng tài liệu placeholder. Chỉ thêm thư mục khi có phần triển khai. Với thư mục runtime bắt buộc, dùng `.gitkeep` có phạm vi hẹp và quy tắc ignore tương ứng.

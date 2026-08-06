@@ -11,7 +11,7 @@
 ## Ràng buộc toàn cục
 
 - Chỉ cấu hình: không cài hoặc import OpenCV, PyTorch, Anomalib, CUDA, model weight hay inference code.
-- Giữ nguyên `docs/algorithm/README.md/algo.md` và toàn bộ tài liệu thuật toán của người dùng.
+- Giữ nguyên `docs/algorithm/algo.md` và toàn bộ tài liệu thuật toán của người dùng.
 - Connection yêu cầu standard type bằng tuyệt đối; self-loop, duplicate, input non-variadic đã dùng và cycle đều không hợp lệ.
 - Lưu JSON camelCase do AOI sở hữu tại `data/projects/<recipe-slug>/workflow.json`; không lưu object nội bộ React Flow.
 - Ghi qua file tạm cùng thư mục, flush, `fsync` và thay thế nguyên tử.
