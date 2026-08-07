@@ -25,7 +25,6 @@ conda-bld/
 core/native/build/
 
 # Local data storage: 
-!data/*/
 data/*/*
 
 # Code intelligence cache
