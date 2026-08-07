@@ -24,9 +24,7 @@ conda-bld/
 # Native C++ build directories
 core/native/build/
 
-# Local data storage: keep only the immediate subfolders of data/ (captures, datasets, ...),
-# ignore everything deeper than that (any file or folder nested inside those subfolders).
-data/*
+# Local data storage: 
 !data/*/
 data/*/*
 
