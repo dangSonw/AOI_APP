@@ -1,0 +1,20 @@
+{
+  "name": "test-dataset",
+  "description": "nothing",
+  "createdAt": "2026-08-07T03:10:53.979705+00:00",
+  "updatedAt": "2026-08-07T03:11:17.180219+00:00",
+  "categories": [
+    {
+      "name": "chil-1",
+      "imageCount": 0,
+      "totalSizeBytes": 0
+    },
+    {
+      "name": "chil-2",
+      "imageCount": 0,
+      "totalSizeBytes": 0
+    }
+  ],
+  "totalImages": 0,
+  "totalSizeBytes": 0
+}

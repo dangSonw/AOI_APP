@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     physical_io_directory: str = 'io'
     projects_data_directory: str = 'data/projects'
     preferences_data_directory: str = 'data/preferences'
+    datasets_data_directory: str = 'data/datasets'
+    captures_data_directory: str = 'data/captures'
     seed_admin_email: str = 'operator@aoi.local'
     seed_admin_password: str = Field(min_length=8)
     seed_admin_full_name: str = 'AOI Operator'
@@ -62,6 +64,14 @@ class Settings(BaseSettings):
     @property
     def preferences_data_path(self) -> Path:
         return PROJECT_ROOT / self.preferences_data_directory
+
+    @property
+    def datasets_data_path(self) -> Path:
+        return PROJECT_ROOT / self.datasets_data_directory
+
+    @property
+    def captures_data_path(self) -> Path:
+        return PROJECT_ROOT / self.captures_data_directory
 
     @property
     def frontend_origins(self) -> list[str]:

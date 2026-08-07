@@ -18,7 +18,7 @@ const EXPLORER_ITEMS: Array<{
   { label: 'Camera rig', icon: 'C', view: 'camera-manager' },
   { label: 'Workflow', icon: 'W', view: 'workflow-editor' },
   { label: 'Models', icon: 'M', isExpanded: true },
-  { label: 'Dataset', icon: 'D' },
+  { label: 'Dataset', icon: 'D', view: 'dataset' },
   { label: 'Database', icon: 'DB', view: 'database' },
   { label: 'Plugins', icon: 'PL' },
   { label: 'Logs', icon: 'L' },

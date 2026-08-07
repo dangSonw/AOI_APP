@@ -18,6 +18,7 @@ import type { WorkspaceView } from '../types/workspace';
 import { CameraManagerPage } from './CameraManagerPage';
 import { DashboardPage } from './DashboardPage';
 import { DatabasePage } from './DatabasePage';
+import { DatasetPage } from './DatasetPage';
 import { HardwarePage } from './HardwarePage';
 import { SettingsPage } from './SettingsPage';
 import { WorkflowEditorPage } from './WorkflowEditorPage';
@@ -146,6 +147,7 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
       hardware: 'Hardware',
       'camera-manager': 'Camera manager',
       database: 'Inspection database',
+      dataset: 'Dataset manager',
       'workflow-editor': 'Workflow editor',
     };
     document.title = `${viewTitles[activeView]} | AOI Studio`;
@@ -209,6 +211,7 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
       {activeView === 'hardware' && <HardwarePage accessToken={session.accessToken} snapshot={deviceSnapshot} error={deviceError} isLoading={isLoadingDevices} onRefresh={loadDevices} />}
       {activeView === 'camera-manager' && <CameraManagerPage preferences={draftPreferences} onChange={setDraftPreferences} />}
       {activeView === 'database' && <DatabasePage accessToken={session.accessToken} />}
+      {activeView === 'dataset' && <DatasetPage accessToken={session.accessToken} />}
       {activeView === 'workflow-editor' && (
         <WorkflowEditorPage
           accessToken={session.accessToken}

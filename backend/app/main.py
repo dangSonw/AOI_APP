@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth import router as auth_router
+from app.api.datasets import router as datasets_router
 from app.api.devices import router as devices_router
 from app.api.inspections import router as inspections_router
 from app.api.physical_io import router as physical_io_router
@@ -31,6 +32,7 @@ app.add_middleware(
     allow_headers=['*'],
 )
 app.include_router(auth_router)
+app.include_router(datasets_router)
 app.include_router(devices_router)
 app.include_router(inspections_router)
 app.include_router(physical_io_router)
