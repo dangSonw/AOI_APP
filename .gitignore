@@ -25,7 +25,9 @@ conda-bld/
 core/native/build/
 
 # Local data storage: 
-data/*/*
+data/**/*
+!data/**/
+!data/**/.gitkeep
 
 # Code intelligence cache
 .codegraph/
