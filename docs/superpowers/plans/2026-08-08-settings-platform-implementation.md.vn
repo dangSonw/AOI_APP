@@ -1,0 +1,176 @@
+# Kế hoạch triển khai nền tảng Settings PostgreSQL cho AOI
+
+> **Dành cho tác nhân triển khai:** KỸ NĂNG CON BẮT BUỘC: dùng `superpowers:subagent-driven-development` (khuyến nghị) hoặc `superpowers:executing-plans` để triển khai từng task. Các bước dùng cú pháp checkbox (`- [ ]`).
+
+**Mục tiêu:** Thay preference workstation lưu bằng file bằng nền tảng Settings/version dùng PostgreSQL, có lịch sử bất biến, optimistic concurrency, validation, activation, rollback, migration và import/export portable.
+
+**Kiến trúc:** Alembic trở thành cơ chế migration schema duy nhất; startup xác minh revision DB trước khi seed. `settings_documents` tổng quát, `settings_versions` bất biến và `settings_activations` append-only lưu trạng thái theo scope User, Workstation, Recipe và System; registry schema xác thực từng document key. Contract `/api/workstation-preferences` hiện tại được giữ tương thích qua adapter PostgreSQL; `/api/v1/settings` cung cấp contract tổng quát.
+
+**Tech Stack:** Python 3.12, FastAPI 0.115.2, Pydantic 2.9.2, SQLAlchemy 2.0.36, PostgreSQL 16, psycopg 3.2.3, Alembic 1.14.0, pytest 8.3.4, React 18.3, TypeScript 5.6, Vite 8.2, Vitest 4.1.
+
+## Ràng buộc toàn cục
+
+- Dùng red-green-refactor cho mọi thay đổi hành vi production.
+- Chạy GitNexus upstream impact trước khi sửa mọi function, class hoặc method hiện có; cảnh báo trước thay đổi HIGH hoặc CRITICAL.
+- Chạy GitNexus `detect-changes` trước mọi commit.
+- Giữ code, UI text, API payload, log, test và tài liệu repo bằng tiếng Anh; duy trì companion `.md.vn` đầy đủ.
+- PostgreSQL là nguồn sự thật của Settings. JSON chỉ dùng cho migration/interchange.
+- Dùng transaction và row lock PostgreSQL, không dùng process-local lock, cho concurrency.
+- Không sửa row `settings_versions` hiện có. Rollback phải chèn version mới.
+- Mutation cần actor đã xác thực và expected revision; activation cần idempotency key.
+- Không trả secret, đường dẫn filesystem tùy ý, adapter URL, command hoặc executable code.
+- Giữ Home, Move, Stop, Clear fault, preview, test capture và commissioning trực tiếp ngoài Settings.
+
+## Contract cố định
+
+```python
+SettingsScope = Literal['user', 'workstation', 'recipe', 'system']
+
+# Identity duy nhất; PostgreSQL dùng NULLS NOT DISTINCT.
+(scope, subject_id, document_key, owner_user_id)
+
+# Ánh xạ identity preference hiện có.
+scope = 'workstation'
+subject_id = workstation_id
+document_key = 'workstation-preferences'
+owner_user_id = user_id
+```
+
+- Document chưa tồn tại có revision `0`; revision persisted đầu tiên là `1`.
+- Tạo version khóa document bằng `SELECT ... FOR UPDATE`, kiểm tra `expectedRevision`, chèn `current + 1`, cập nhật `current_version_id` trong một transaction.
+- Input SHA-256: `json.dumps(payload, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8')`.
+- Ghi stale: HTTP `409`, `detail.code == 'settings_revision_conflict'`, current revision/checksum và danh sách khác biệt JSON-path đã sort.
+- Rollback sao chép payload cũ vào version mới và ghi `source_version_id`.
+- Khóa replay activation: `(document_id, idempotency_key)`. Cùng request trả row cũ; request khác trả `409/idempotency_key_reused`.
+- Activation Phase 1 chỉ đổi metadata, không gọi hardware adapter.
+
+---
+
+### Task 1: Alembic baseline và xác minh revision
+
+**File:**
+- Sửa: `backend/requirements.txt`, `backend/app/database/bootstrap.py`, `scripts/install/setup-postgresql.sh`, `scripts/install/verify-environment.sh`
+- Tạo: `alembic.ini`, `database/migrations/env.py`, `database/migrations/script.py.mako`, `database/migrations/versions/0001_existing_schema_baseline.py`, `backend/app/database/migrations.py`
+- Test: `tests/backend/test_database_migrations.py`, `tests/integration/test_database_migrations.py`
+
+**Interface:** Tạo `build_alembic_config`, `upgrade_database`, `verify_database_revision`; giữ `initialize_database()` nhưng chỉ xác minh revision và seed.
+
+- [ ] **Bước 1:** Chạy impact `initialize_database`; ghi caller, startup flow, risk; dừng/cảnh báo nếu HIGH hoặc CRITICAL.
+- [ ] **Bước 2:** Viết test RED bằng PostgreSQL schema tạm; kiểm tra upgrade từ schema trống tạo toàn bộ table baseline.
+- [ ] **Bước 3:** Chạy RED:
+
+```bash
+PYTHONPATH=backend conda run -n aoi-app python -m pytest tests/backend/test_database_migrations.py tests/integration/test_database_migrations.py -v
+```
+
+- [ ] **Bước 4:** Pin `alembic==1.14.0`; cấu hình metadata/runtime URL/online/offline/`compare_type=True`; tạo revision `0001` tương đương chính xác SQL `001` đến `006` và có downgrade.
+- [ ] **Bước 5:** `upgrade_database` chạy head; `verify_database_revision` so sánh current/head. Xóa `Base.metadata.create_all()`; startup không tự stamp/upgrade.
+- [ ] **Bước 6:** Installer dùng migration command. `baseline-existing` inspect table/column, từ chối schema lệch, rồi mới stamp `0001` và upgrade.
+- [ ] **Bước 7:** Verify shell/test, chạy `detect-changes`, commit `build(database): add managed schema migrations`.
+
+---
+
+### Task 2: Table Settings, model và schema registry
+
+**File:** tạo revision `0002`, ba model Settings, `schemas/settings.py`, `settings_schema_registry.py`; sửa audit model, preference schema, bootstrap; thêm test schema/migration.
+
+**Interface:** Tạo `SettingsDocument`, `SettingsVersion`, `SettingsActivation`, schema request/response tổng quát, `WorkstationPreferenceContentSchema`, `validate_settings_payload`.
+
+- [ ] **Bước 1:** Impact `AuditEvent` và `WorkstationPreferencesSchema`.
+- [ ] **Bước 2:** Viết test RED cho camelCase normalization, metadata exclusion, key/version lạ, column, JSONB, unique, FK, check và audit metadata.
+- [ ] **Bước 3:** Tạo `settings_documents` với identity/current revision/current-active pointer và unique NULLS NOT DISTINCT; `settings_versions` với JSONB payload/checksum/actor/reason/source; `settings_activations` với idempotency/status/diagnostics. Mở rộng audit bằng checksum trước/sau, reason, client metadata an toàn.
+- [ ] **Bước 4:** Registry ánh xạ `('workstation-preferences', 1)` tới content schema; giữ envelope cũ để tương thích.
+- [ ] **Bước 5:** Verify startup fail tại `0001`, pass tại head; downgrade giữ baseline; chạy `detect-changes`, commit `feat(settings): add versioned persistence model`.
+
+---
+
+### Task 3: Service transaction cho version, history, conflict và rollback
+
+**File:** tạo `settings_service.py`, `settings_diff.py`; sửa `audit_service.py`; thêm test diff/service.
+
+**Interface:** Tạo frozen `SettingsIdentity`; `get_current_settings`, `create_settings_version`, `list_settings_history`, `rollback_settings`; `SettingsRevisionConflict`; thêm tùy chọn không commit cho `record_audit_event`.
+
+- [ ] **Bước 1:** Impact `record_audit_event`.
+- [ ] **Bước 2:** Viết test RED cho canonical checksum và JSON-path diff đã sort.
+- [ ] **Bước 3:** Viết test DB cho version đầu, version hai bất biến, race hai session, schema sai không ghi, history newest-first, rollback tạo source-linked row mới, settings/audit cùng commit và cùng rollback khi audit lỗi.
+- [ ] **Bước 4:** Dùng `SELECT ... FOR UPDATE`; xử lý race tạo document bằng nested transaction; validate trước insert; service chỉ flush, API commit/rollback; không dùng `RLock`.
+- [ ] **Bước 5:** Verify, `detect-changes`, commit `feat(settings): create immutable transactional versions`.
+
+---
+
+### Task 4: API Settings versioned và JSON portable
+
+**File:** tạo `backend/app/api/settings.py`; sửa main/schema; thêm `test_settings_api.py`.
+
+**Route:** `GET` document; `POST /validate`; `POST /versions`; `GET /history`; `POST /rollback`; `GET /export`; `POST /import` dưới `/api/v1/settings/{scope}/{subject_id}`, dùng query `documentKey`. User đã xác thực là owner workstation authoritative.
+
+- [ ] **Bước 1:** Impact `app` trước đăng ký router.
+- [ ] **Bước 2:** Viết test RED cho auth, scope/key, validate không ghi, create/read/history, conflict có cấu trúc, rollback, owner isolation, export checksum, import revision mới, tamper rejection, không activate ngầm.
+- [ ] **Bước 3:** Commit một lần sau success; rollback khi lỗi. Dùng `404/settings_document_not_found`, `422/settings_validation_failed`, `409/settings_revision_conflict`. Export đủ identity/revision/schema/payload/checksum; import xác minh rồi tạo revision đích mới, không activate.
+- [ ] **Bước 4:** Verify, `detect-changes`, commit `feat(settings): expose versioned settings API`.
+
+---
+
+### Task 5: Activation idempotent và audit cùng transaction
+
+**File:** sửa settings service/API/schema và audit middleware/service/schema; tạo test activation; sửa test audit.
+
+**Interface:** Tạo `activate_settings`; thêm `POST/GET .../activations`; route đặt `request.state.audit_recorded` sau audit flush cùng transaction, middleware bỏ success duplicate nhưng vẫn audit failure.
+
+- [ ] **Bước 1:** Impact `AuditMiddleware`, `record_audit_event`.
+- [ ] **Bước 2:** Test RED cho key thiếu/sai, version lạ/không sở hữu, activation đầu, exact replay, reused key khác request, active pointer, history, audit checksum/reason, duplicate suppression và rollback khi audit lỗi.
+- [ ] **Bước 3:** Validate key bằng `[A-Za-z0-9][A-Za-z0-9._-]{0,127}`. Checksum request gồm document/version/reason. Lock, insert activation, cập nhật active pointer, flush audit, commit một lần. Unique-race loser load/compare row cũ. Không copy header tùy ý.
+- [ ] **Bước 4:** Verify, `detect-changes`, commit `feat(settings): activate versions idempotently`.
+
+---
+
+### Task 6: Migration file preference hiện có
+
+**File:** tạo `settings_file_migration.py`, `scripts/database/migrate-preferences.py`, test backend/integration.
+
+**Interface:** `discover_preference_files(root)`, `migrate_preference_files(session, root, actor_id, apply=False)`; CLI bắt buộc actor, mặc định dry-run, `--apply` mới ghi; không sửa source.
+
+- [ ] **Bước 1:** Test RED cho discovery sort, mapping identity, default file cũ, JSON/schema invalid, identity mismatch, user thiếu, dry-run/apply, checksum no-op, destination conflict, batch all-or-nothing.
+- [ ] **Bước 2:** Chỉ nhận `users/<positive-user-id>/<valid-workstation-id>.json`; xác minh identity embedded và registry. Tạo report trước khi ghi. Invalid/conflict làm không ghi cả batch. Destination thiếu tạo revision 1; checksum bằng là unchanged; khác là conflict. Chỉ báo relative path.
+- [ ] **Bước 3:** Verify dry-run local, `detect-changes`, commit `feat(settings): migrate legacy preference files`.
+
+---
+
+### Task 7: Chuyển API workstation preference cũ sang PostgreSQL
+
+**File:** sửa repository/API preference và test repository/API/audit.
+
+**Interface:** Giữ payload `WorkstationPreferencesSchema`; repository nhận `Session`; missing read trả default revision 0 chưa persist; save tạo một settings version và audit cùng transaction; xóa filesystem write và `_write_lock`.
+
+- [ ] **Bước 1:** Impact `WorkstationPreferenceRepository`, `get_preference_repository`, `update_preferences`. Risk hiện biết LOW; phải chạy lại trước sửa.
+- [ ] **Bước 2:** Giữ test default/save/locale/photometric/stale/unsafe ID/identity mismatch; thêm không tạo file và đúng một success audit.
+- [ ] **Bước 3:** Map generic version về envelope cũ; API dùng request ID middleware, commit một lần, đặt audit flag, map conflict sang message cũ an toàn.
+- [ ] **Bước 4:** Verify backend/frontend, `detect-changes`, commit `refactor(settings): store workstation preferences in PostgreSQL`.
+
+---
+
+### Task 8: Export backup, xác minh và tài liệu
+
+**File:** tạo `export-settings.py`, `verify-settings-export.py`, test backup; sửa README và memory Anh/Việt.
+
+**Interface:** Export JSON xác định cùng SHA-256 manifest, không secret; verifier offline kiểm tra format/count/checksum/manifest/schema mà không đổi DB; sort scope/subject/key/owner/revision.
+
+- [ ] **Bước 1:** Test RED cho deterministic bytes, metadata version/history/activation, không password/token/secret, manifest, tamper một byte, schema lạ, DB trống.
+- [ ] **Bước 2:** Ghi sibling temp, flush, `fsync`, `os.replace`; từ chối symlink và traversal. Nêu portable export không thay PostgreSQL disaster-recovery backup.
+- [ ] **Bước 3:** Tài liệu hóa Alembic upgrade/current/check, startup refusal, baseline một lần, migration dry-run/apply, PostgreSQL source of truth, conflict/rollback/activation, giới hạn export, workaround GitNexus WSL.
+- [ ] **Bước 4:** Chạy full test/build/shell/npm audit/migration check/diff check; acceptance race hai session, rollback row mới, activation replay/reuse, hai worker, migration dry-run/apply/rerun.
+- [ ] **Bước 5:** Chạy `detect-changes`, CodeGraph sync/status, commit `docs(settings): record version platform operations`.
+
+## Exit gate Phase 1
+
+- Alembic sở hữu schema evolution; startup từ chối DB stale/unversioned.
+- Settings document, version bất biến, activation append-only và audit enriched nằm trong PostgreSQL.
+- Contract scope bao phủ User, Workstation, Recipe, System.
+- Concurrent edit không overwrite im lặng giữa các worker.
+- Rollback tạo version mới liên kết source.
+- Activation idempotent; key lỗi/tái dùng không đổi active pointer.
+- Metadata Settings và success audit commit atomically; request lỗi vẫn được middleware audit.
+- Migration file cũ giữ identity, có dry-run, apply all-or-nothing, conflict report và no-op rerun.
+- Frontend preference cũ vẫn tương thích trong khi PostgreSQL là source of truth.
+- JSON portable xác minh schema/SHA-256 và không thay thế DB backup.
+- Toàn bộ test, build, security audit, migration, GitNexus, CodeGraph và diff check pass.
