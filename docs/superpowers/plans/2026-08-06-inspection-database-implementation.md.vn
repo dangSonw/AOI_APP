@@ -1,0 +1,101 @@
+# Kế hoạch triển khai Inspection Database
+
+**Ngày:** 2026-08-06
+**Spec:** `specs/2026-08-06-inspection-database-design.md`
+**Mục tiêu:** Cung cấp persistence inspection đầy đủ gồm schema PostgreSQL, model/service/API backend, `DatabasePage` frontend, test và script.
+
+---
+
+## Phase 1: Schema và script database
+
+### Task 1.1: Tạo schema SQL trong `database/schema/`
+
+- `002_create_recipes.sql`
+- `003_create_inspection_results.sql`
+- `004_create_defects.sql`
+- `005_create_inspection_images.sql`
+
+### Task 1.2: Tạo query trong `database/queries/`
+
+- `get_inspection_metrics.sql`: aggregate metric.
+- `list_inspections.sql`: danh sách phân trang có filter.
+- `search_inspections.sql`: full-text search.
+- `get_inspection_detail.sql`: một result cùng defect và image.
+
+### Task 1.3: Tạo seed data trong `database/seed/`
+
+- `seed_recipes.sql`: recipe mẫu.
+- `seed_sample_inspections.sql`: inspection mẫu.
+
+### Task 1.4: Tạo script database
+
+- `database/scripts/reset_database.sql`: drop rồi tạo lại mọi table.
+- Cập nhật `scripts/install/setup-postgresql.sh` để chạy mọi schema file.
+
+## Phase 2: Model backend
+
+### Task 2.1: Model SQLAlchemy trong `backend/app/models/`
+
+- `recipe.py`: model `Recipe`.
+- `inspection_result.py`: model `InspectionResult`.
+- `defect.py`: model `Defect`.
+- `inspection_image.py`: model `InspectionImage`.
+
+### Task 2.2: Cập nhật `bootstrap.py`
+
+- Import mọi model mới để `Base.metadata.create_all()` tạo table.
+- Seed các recipe mặc định.
+
+## Phase 3: Schema và service backend
+
+### Task 3.1: Schema Pydantic trong `backend/app/schemas/`
+
+- `inspection.py`: schema request/response inspection.
+- `recipe.py`: schema request/response recipe.
+
+### Task 3.2: Service trong `backend/app/services/`
+
+- `inspection_service.py`: CRUD, filter và metric.
+- `recipe_service.py`: CRUD recipe.
+
+## Phase 4: API backend
+
+### Task 4.1: Route trong `backend/app/api/`
+
+- `inspections.py`: mọi endpoint inspection.
+- `recipes.py`: endpoint recipe.
+
+### Task 4.2: Đăng ký router trong `main.py`
+
+Import và include router inspection cùng recipe vào ứng dụng FastAPI.
+
+## Phase 5: Frontend
+
+### Task 5.1: Type trong `frontend/src/types/`
+
+- `inspection.ts`: interface TypeScript khớp schema API.
+
+### Task 5.2: Service trong `frontend/src/services/`
+
+- `inspection-service.ts`: hàm API client.
+
+### Task 5.3: Viết lại `DatabasePage.tsx`
+
+- Thay mock data hard-coded bằng API thật.
+- Thêm pagination, filter và metric từ backend.
+- Giữ CSS class cùng cấu trúc layout hiện có.
+
+### Task 5.4: Cập nhật `WorkspacePage.tsx`
+
+Truyền `accessToken` vào `DatabasePage`.
+
+## Phase 6: Test và verification
+
+### Task 6.1: Test backend
+
+- Service test cho `inspection_service`.
+- Integration test API.
+
+### Task 6.2: Verification cuối
+
+Chạy test suite hiện có và xác nhận không có regression.

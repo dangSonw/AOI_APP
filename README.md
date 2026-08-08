@@ -4,7 +4,7 @@ AOI Studio is an industrial automated optical inspection web application. The cu
 
 ## Implemented milestone
 
-- Pixel-aligned sign-in UI from the connected Figma `AOI Studio` page, including sign-up and password-reset demo states.
+- Pixel-aligned sign-in UI from the connected Figma `AOI Studio` page, with single-Administrator sign-in and a password-reset demo state. Public account registration is disabled by default.
 - Figma-aligned industrial workstation shell with Dashboard, Settings, Camera Manager, and Inspection Database views.
 - Responsive desktop and mobile layouts with keyboard focus, validation, loading, success, error, and empty states.
 - FastAPI authentication API with Argon2 password hashing and JWT bearer tokens.
@@ -16,6 +16,11 @@ AOI Studio is an industrial automated optical inspection web application. The cu
 - Versioned camera and three-axis motion contracts shared by hardware and simulator adapters.
 - Standalone virtual camera and MCU console with image-folder/webcam input, XYZ controls, interlocks, emergency stop, and fault injection.
 - Authenticated backend device gateway with protocol validation, bounded timeouts, typed responses, normalized errors, and inspection-image SHA-256 verification.
+- Inspection detail responses include persisted defect and image evidence instead of empty placeholder arrays.
+- Camera and motion snapshots load independently, so one unavailable adapter does not hide the other adapter's usable state.
+- Workstation preferences persist language, region, timezone, measurement system, and clock format; station profiles load explicitly before editing.
+- Dataset service and API safety coverage includes validation, upload limits, magic bytes, traversal rejection, rename, move, delete, capture import, and ZIP export.
+- PostgreSQL-backed audit events record authenticated and failed mutations without storing request bodies, credentials, bearer tokens, secrets, or image bytes.
 
 ## Architecture
 
@@ -29,7 +34,7 @@ FastAPI control plane :8000
    |          | HTTP loopback   `-- HTTP loopback --> Motion adapter :9102
    |          `--------------------> Camera adapter :9101
    |
-   |-- PostgreSQL: users
+   |-- PostgreSQL: users, inspections, audit events
    |-- data/projects: workflow recipes
    |-- data/preferences: workstation preferences
    `-- io/*.json: legacy physical I/O simulation
@@ -156,6 +161,8 @@ Only loopback HTTP origins with explicit ports are accepted. Device URLs never c
 
 ### Sign-in troubleshooting
 
+AOI Studio currently operates in single-Administrator mode. The bootstrap account is created from `SEED_ADMIN_EMAIL`, `SEED_ADMIN_FULL_NAME`, and `SEED_ADMIN_PASSWORD`; defaults identify it as `AOI Administrator`. `POST /api/auth/register` returns HTTP `403` unless `ALLOW_PUBLIC_REGISTRATION=true` is set explicitly. Keep registration disabled for the approved baseline.
+
 If the sign-in form displays `The AOI service is unavailable. Check the backend connection.`, the browser could not complete the API request. This is a service-availability, network, CORS, or frontend API configuration issue rather than an invalid-password response.
 
 1. Start the application with one of the supported launchers above.
@@ -178,7 +185,7 @@ bash scripts/test/test.sh
 bash scripts/build/build.sh
 ```
 
-The latest complete run passed 114 Python tests across backend, core, integration, adapter contract, and simulator suites; all 24 frontend tests and TypeScript checking also passed.
+The latest complete run passed 134 Python tests across backend, core, integration, adapter contract, and simulator suites; all 31 frontend tests and TypeScript checking also passed.
 
 Direct frontend commands are also available:
 
@@ -206,7 +213,7 @@ The current JSON interface is a simulation boundary. A future hardware adapter c
 |---|---|---|---|
 | `GET` | `/health` | Service health | No |
 | `POST` | `/api/auth/login` | Sign in | No |
-| `POST` | `/api/auth/register` | Create an account | No |
+| `POST` | `/api/auth/register` | Public registration endpoint; disabled by default | No |
 | `POST` | `/api/auth/password-reset` | Return a non-enumerating reset response | No |
 | `GET` | `/api/io/inputs` | Read simulated inputs | Bearer token |
 | `GET` | `/api/io/outputs` | Read simulated outputs | Bearer token |
@@ -239,6 +246,16 @@ Password-reset email delivery is intentionally not implemented in this milestone
 - Hardware mode never silently falls back to simulation. The current hardware camera and MCU adapters expose health/version/capabilities but intentionally report `unavailable`; Jetson CSI capture and UART transport remain future hardware-commissioning tasks.
 - The simulator MCU currently completes home and move commands deterministically rather than reproducing a real acceleration timeline. The next inspection-runtime milestone must add persisted run orchestration and confirm in-position state before capture.
 - The 58 workflow nodes remain configuration-only runtime placeholders. This gateway enables device communication but does not yet execute the AOI vision workflow or persist inspection results.
+
+## Foundation repair behavior
+
+- Inspection detail and create responses use the same response builder and return stored defects and image metadata.
+- Camera and motion readiness are evaluated independently. An unavailable camera leaves motion state usable, and unavailable motion leaves camera configuration usable.
+- Settings locale controls are part of `WorkstationPreferences`; every visible locale value participates in dirty detection and round-trips through persistence.
+- Workstation ID entry selects a destination profile. `Load station profile` reads destination state before replacing saved and draft state, and Camera Manager displays the loaded workstation ID as read-only.
+- Dataset operations reject unsafe names, traversal, invalid image magic bytes, files over 50 MiB, and batches over 100 files. Backend and authenticated API tests cover lifecycle, capture import, duplicate naming, and ZIP paths.
+- `POST`, `PUT`, `PATCH`, and `DELETE` requests receive an `X-Request-ID` and durable audit metadata. A verified bearer JWT supplies actor ID; failed mutations are recorded as failures. Audit persistence errors are logged without replacing the original API response.
+- `GET /api/audit-events` requires authentication and provides newest-first pagination with page size limited to 100.
 
 ## Workflow editor and storage
 

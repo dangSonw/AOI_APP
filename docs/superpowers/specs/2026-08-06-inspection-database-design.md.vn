@@ -1,0 +1,114 @@
+# Đặc tả thiết kế Inspection Database
+
+**Ngày:** 2026-08-06
+**Tác giả:** AI Agent
+**Trạng thái:** Được duyệt để triển khai
+**Phạm vi:** Persistence inspection đầy đủ gồm schema PostgreSQL, API backend và tab Database frontend.
+
+---
+
+## 1. Tổng quan
+
+Hệ thống AOI cần database inspection hoàn chỉnh để lưu kết quả kiểm tra board, defect và metadata ảnh đã chụp. PostgreSQL lưu metadata có cấu trúc cùng reference; artifact ảnh lớn vẫn là file trên disk. Column ảnh chỉ lưu **relative path**, không lưu binary hoặc blob nén.
+
+## 2. Table
+
+### `users` (đã có)
+
+Table xác thực đã triển khai.
+
+### `recipes`
+
+| Column | Type | Constraint | Mô tả |
+|---|---|---|---|
+| `id` | BIGSERIAL | PK | ID tự tăng |
+| `slug` | VARCHAR(128) | UNIQUE NOT NULL | Identifier an toàn cho URL |
+| `name` | VARCHAR(255) | NOT NULL | Tên hiển thị |
+| `description` | TEXT | DEFAULT '' | Mô tả tùy chọn |
+| `is_active` | BOOLEAN | NOT NULL DEFAULT TRUE | Cờ soft-delete |
+| `created_at` | TIMESTAMPTZ | NOT NULL DEFAULT NOW | Thời điểm tạo |
+| `updated_at` | TIMESTAMPTZ | NOT NULL DEFAULT NOW | Thời điểm cập nhật |
+
+### `inspection_results`
+
+Mỗi board đã kiểm tra có một row.
+
+| Column | Type | Constraint | Mô tả |
+|---|---|---|---|
+| `id` | BIGSERIAL | PK | ID |
+| `board_serial` | VARCHAR(128) | NOT NULL | Ví dụ `PCB-24-08192` |
+| `lot` | VARCHAR(128) | DEFAULT '' | Lot sản xuất |
+| `recipe_id` | BIGINT | FK `recipes.id` NOT NULL | Recipe đã dùng |
+| `recipe_name` | VARCHAR(255) | NOT NULL | Snapshot tên recipe |
+| `operator_id` | BIGINT | FK `users.id` NOT NULL | Operator |
+| `result` | VARCHAR(10) | NOT NULL, CHECK PASS/FAIL/REVIEW | Quyết định |
+| `defect_count` | INTEGER | DEFAULT 0 | Số defect |
+| `score` | REAL | NULL | Anomaly score 0–1 |
+| `cycle_time_ms` | INTEGER | NULL | Cycle time theo ms |
+| `camera_config` | JSONB | NULL | Snapshot cấu hình camera |
+| `review_decision` | VARCHAR(10) | NULL | Override của operator |
+| `reviewed_by` | BIGINT | FK `users.id`, NULL | Reviewer |
+| `reviewed_at` | TIMESTAMPTZ | NULL | Thời điểm review |
+| `inspected_at` | TIMESTAMPTZ | NOT NULL DEFAULT NOW | Thời điểm inspection |
+
+### `defects`
+
+| Column | Type | Constraint | Mô tả |
+|---|---|---|---|
+| `id` | BIGSERIAL | PK | ID |
+| `result_id` | BIGINT | FK `inspection_results.id` NOT NULL | Result cha |
+| `defect_type` | VARCHAR(64) | NOT NULL | Ví dụ `missing_component` |
+| `severity` | VARCHAR(20) | DEFAULT 'medium' | low/medium/high/critical |
+| `location_x`, `location_y` | REAL | NULL | Vị trí pixel trên board |
+| `width`, `height` | REAL | NULL | Kích thước bounding box |
+| `confidence` | REAL | NULL | Confidence 0–1 |
+| `description` | TEXT | DEFAULT '' | Mô tả tùy chọn |
+| `detected_at` | TIMESTAMPTZ | NOT NULL DEFAULT NOW | Thời điểm phát hiện |
+
+### `inspection_images`
+
+Không bao giờ lưu ảnh thành blob; chỉ lưu relative path.
+
+| Column | Type | Constraint | Mô tả |
+|---|---|---|---|
+| `id` | BIGSERIAL | PK | ID |
+| `result_id` | BIGINT | FK `inspection_results.id` NOT NULL | Result cha |
+| `defect_id` | BIGINT | FK `defects.id`, NULL | Defect tùy chọn |
+| `image_type` | VARCHAR(32) | NOT NULL | original/annotated/evidence/thumbnail |
+| `relative_path` | VARCHAR(512) | NOT NULL | Path từ project root |
+| `file_size_bytes` | BIGINT | NULL | Dung lượng byte |
+| `width_px`, `height_px` | INTEGER | NULL | Kích thước pixel |
+| `sha256_hash` | VARCHAR(64) | NULL | Checksum integrity |
+| `media_type` | VARCHAR(64) | DEFAULT 'image/png' | MIME type |
+| `captured_at` | TIMESTAMPTZ | NOT NULL DEFAULT NOW | Thời điểm chụp |
+
+## 3. Lưu ảnh
+
+- Lưu dưới `data/captures/{YYYY}/{MM}/{DD}/{board_serial}/`.
+- `inspection_images.relative_path` là path tương đối từ project root.
+- Ví dụ: `data/captures/2026/08/06/PCB-24-08192/original.png`.
+- Lưu SHA-256 để xác minh integrity.
+
+## 4. Endpoint API
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/api/inspections` | Danh sách có filter và pagination |
+| GET | `/api/inspections/{id}` | Chi tiết gồm defect và image |
+| GET | `/api/inspections/metrics` | Metric dashboard |
+| POST | `/api/inspections` | Tạo result |
+| PATCH | `/api/inspections/{id}/review` | Gửi review |
+| GET | `/api/inspections/export` | Export CSV |
+| GET | `/api/recipes` | Danh sách recipe |
+| POST | `/api/recipes` | Tạo recipe |
+
+## 5. Query parameter cho `GET /api/inspections`
+
+`page`, `page_size`, `result`, `recipe_slug`, `lot`, `search`, `date_from`, `date_to`, `sort_by`, `sort_order`.
+
+## 6. Tab Database frontend
+
+- Header gồm title, search và filter.
+- Metric gồm total, yield %, flagged và storage.
+- Layout hai column: records table bên trái, detail panel bên phải.
+- Hỗ trợ pagination, export CSV và review action.

@@ -150,3 +150,14 @@ Baseline hiện tại gồm 15 backend test, 14 core test, 12 integration test, 
 - Polling tuyệt đối không được ghi đè draft chưa lưu của operator. Đánh dấu form cấu hình là dirty tại input event đầu tiên, tạm dừng thay thế draft khi dirty và chỉ tiếp tục đồng bộ sau khi Apply thành công.
 - Hardware mode phải khởi động HMI khi adapter CSI/UART phản hồi protocol hợp lệ nhưng báo `unavailable`. Hiển thị chẩn đoán, không request trạng thái/cấu hình vận hành, vô hiệu hóa command và không bao giờ thay bằng simulator adapter.
 - Trong simulation mode, `run_dev.sh` quản lý console như process group thứ năm. Các lần kiểm tra `status` sau phải đọc runtime mode từ PID file được bảo vệ; nếu không, lệnh status sẽ áp dụng sai ngữ nghĩa health của hardware cho simulation stack đang chạy.
+
+## 19. Sửa Foundation và Audit Baseline
+
+- Chế độ một Administrator mặc định vô hiệu hóa public registration nhưng vẫn giữ bootstrap local idempotent. Giữ tên identity seed là `AOI Administrator`; không thêm lại sign-up UI khi chưa có thiết kế authorization được duyệt.
+- Response Inspection API phải được tạo từ relationship đã load. Không bao giờ thay defect hoặc image evidence đã lưu bằng mảng placeholder rỗng.
+- Xử lý availability camera và motion độc lập. Chỉ fetch configuration hoặc operational state cho adapter báo ready; một adapter degraded không được xóa snapshot của adapter còn lại.
+- Mọi field locale hiển thị thuộc `WorkstationPreferences` đã lưu và phải đi qua callback thay đổi preference dùng chung để revision cùng dirty check vẫn authoritative.
+- Field workstation ID là selector đích, không phải quyền mutation identity của profile đang load. Load state đích trước khi thay saved/draft state hiện tại.
+- Contract an toàn Dataset gồm giới hạn batch/dung lượng file, validation magic byte ảnh, tên theo allowlist, từ chối traversal, đặt tên capture trùng an toàn và member path ZIP an toàn. Giữ characterization test kể cả khi production behavior đã pass sẵn.
+- Chỉ audit security metadata có giới hạn: actor ID đã xác minh, action, method, path, resource identity, request ID, status, result và timestamp. Không bao giờ đọc hoặc lưu request body, credential, bearer token, secret hay image byte. Lỗi audit phải được log và không được thay response route gốc.
+- GitNexus resolve repository qua global registry, không nhất thiết theo worktree hiện tại. Khi worktree và main checkout cùng tên repository, index worktree rõ ràng rồi truyền path của nó vào `detect-changes --repo ...`; nếu không, change detection có thể đọc main checkout sạch và báo sai `No changes detected.`

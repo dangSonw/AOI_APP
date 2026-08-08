@@ -1,0 +1,537 @@
+# Thiết kế Settings, Node Plugin và vòng đời nghiên cứu AOI
+
+## 1. Mục tiêu
+
+Định nghĩa kiến trúc cấu hình an toàn, có khả năng mở rộng cho AOI Studio: bắt đầu từ nền tảng nghiên cứu, phát triển thành bản pilot công nghiệp PCB/PCBA, sau đó có thể trở thành sản phẩm thương mại đa site.
+
+Thiết kế này hoàn thiện kiến trúc thông tin của Settings, tách cấu hình bền vững khỏi điều khiển máy trực tiếp, định nghĩa khả năng mở rộng inspector theo từng node và thiết lập ranh giới truy xuất nguồn gốc cho thí nghiệm, model, recipe, calibration và kết quả inspection.
+
+## 2. Hướng sản phẩm đã duyệt
+
+- Đi theo lộ trình: nền tảng nghiên cứu, pilot công nghiệp, rồi mở rộng thương mại.
+- Giữ kiến trúc domain tổng quát, nhưng dùng PCB/PCBA làm recipe tham chiếu đầu tiên.
+- Giữ lệnh camera, motion và commissioning trực tiếp trong workspace Hardware.
+- Dùng Settings cho profile, policy, giá trị mặc định, validation, lịch sử phiên bản, apply và rollback.
+- Mỗi workflow node sở hữu runtime contract và contract cấu hình riêng.
+- Dùng inspector hybrid: control sinh từ schema cho tham số phổ biến và React panel riêng cho node phức tạp.
+- Dùng workspace Research để quản lý experiment/model xuyên node; custom panel của node mở đúng ngữ cảnh experiment hoặc model liên quan.
+- Giai đoạn đầu dùng một tài khoản Administrator. Không xây UI quản lý role trong milestone Settings đầu tiên.
+- Lưu setting, version, audit và metadata lineage trong PostgreSQL. Lưu ảnh, dataset, model và artifact lớn trên filesystem hoặc object storage với hash bất biến.
+
+## 3. Review hiện trạng
+
+### 3.1 Baseline đã kiểm chứng
+
+- CodeGraph: 250 file, 1.918 node và 4.565 edge; index mới.
+- GitNexus: mới tại commit `9435c9a`.
+- Backend: 34 test pass.
+- Core: 21 test pass.
+- Integration: 24 test pass.
+- Device contract: 16 test pass.
+- Simulator: 19 test pass.
+- Frontend: 22 test pass.
+- TypeScript frontend pass.
+- Production build frontend pass.
+- Audit dependency production báo không có lỗ hổng npm.
+
+### 3.2 Điểm mạnh hiện có
+
+- React chỉ giao tiếp với FastAPI control plane đã xác thực.
+- Device adapter dùng contract camera/motion chung và có phiên bản.
+- Hardware mode không âm thầm chuyển sang simulation.
+- Camera artifact được kiểm tra media type, kích thước, số byte và SHA-256.
+- Ghi workflow và workstation file dùng revision check và atomic replacement.
+- Draft Hardware không bị polling một giây ghi đè khi đang dirty.
+- Workflow đã có typed port, cycle validation, stable ordering và runtime package rõ ràng.
+- User preference và workflow recipe đã có khái niệm optimistic concurrency có thể giữ lại khi chuyển sang PostgreSQL.
+
+### 3.3 Khoảng trống nghiêm trọng
+
+#### P0: Tính toàn vẹn sản phẩm và truy xuất nguồn gốc
+
+1. Public registration tạo thêm tài khoản có quyền mutation thực tế tương đương tài khoản seed. Điều này xung đột với MVP một Administrator đã duyệt.
+2. Mutation dataset, workflow, cấu hình thiết bị, inspection review và mutation khác chưa có audit bền vững.
+3. Cả 58 node runtime vẫn là placeholder cấu hình; chưa có inspection orchestrator bền vững thực thi workflow.
+4. Inspection detail tải relation defect và image nhưng trả mảng `defects` và `images` rỗng.
+5. Kết quả inspection chưa ghi đủ lineage: workflow revision, node package version, model version/hash, calibration revision, workstation profile revision và snapshot tham số.
+
+#### P1: Settings và độ tin cậy vận hành
+
+1. Sáu trong bảy mục Settings đang bị vô hiệu hóa.
+2. Language, region, units và clock chỉ tồn tại trong React state. Chúng không được lưu và không làm form dirty.
+3. Đổi Workstation ID sửa identity của draft hiện tại thay vì tải profile station đích. Revision của station ban đầu có thể gây conflict hoặc save sai.
+4. Cấu hình camera và motion adapter chỉ nằm trong RAM và mất sau khi adapter restart.
+5. Polling thiết bị chạy mỗi giây bất kể workspace đang hoạt động.
+6. `readDeviceSnapshot` không trả cấu hình camera khi motion unavailable và ngược lại. Một adapter lỗi che mất adapter còn dùng được.
+7. `SettingsPage` chưa có component test trực tiếp.
+8. Dataset API và filesystem service gần như chưa được bao phủ trong test runner chính dù có nhiều mutation và upload behavior.
+9. Giá trị tham số node chỉ hỗ trợ boolean, number và string scalar. Chưa hỗ trợ ROI phức tạp, model reference, dataset selector, matrix, hyperparameter lồng nhau và artifact policy.
+
+#### P2: Khả năng mở rộng và bảo trì
+
+1. Active recipe và workstation bị hardcode.
+2. Password reset chỉ là phản hồi demo, chưa có vòng đời delivery/reset token.
+3. File lock chỉ bảo vệ trong một Python process, không đủ cho deployment nhiều worker.
+4. API route chưa có version.
+5. Chưa có backup, restore, enforcement retention, integration health, signed update và drift monitoring.
+6. Một số file Markdown hiện có thiếu companion `.md.vn` bắt buộc.
+
+## 4. Ranh giới domain
+
+AOI Studio không được dùng một Settings document cho các scope có owner khác nhau.
+
+| Scope | Owner | Ví dụ | Hành vi thay đổi |
+|---|---|---|---|
+| User preference | User | locale, units, time format, UI behavior, notification preference | Lưu ngay hoặc lưu theo một user draft |
+| Workstation profile | Station administrator | station identity, acquisition profile, calibration reference, motion limit, storage/compute limit | Validate, version, apply, audit, rollback |
+| Recipe configuration | Process/research owner | workflow graph, node parameter, threshold, approved model alias, defect taxonomy | Draft, validate, publish, approve, activate |
+| System policy | System administrator | runtime mode, integration, backup, update, audit, global retention | Validate, version, privileged apply, audit |
+
+Binary artifact lớn không nằm trong row setting. Database record chỉ lưu artifact ID, immutable hash, media metadata và storage location.
+
+## 5. Ranh giới workspace
+
+### 5.1 Settings
+
+Settings quản lý desired state bền vững. Nó hỗ trợ draft, validation, version history, apply, conflict detection và rollback.
+
+### 5.2 Hardware
+
+Hardware quản lý observed live state và thao tác commissioning:
+
+- health và capability;
+- live preview;
+- connection diagnostic;
+- Home, Move, Stop và Clear fault;
+- test capture;
+- calibration acquisition run;
+- xác minh apply profile.
+
+Settings có thể link sang Hardware nhưng không được nhúng lệnh trực tiếp liên quan an toàn.
+
+### 5.3 Workflow Editor
+
+Workflow Editor sở hữu topology recipe, node instance, port connection, execution order và tham số riêng từng node. Global Settings không được lặp lại tham số node.
+
+### 5.4 Research
+
+Research sở hữu experiment, training/fine-tuning job, evaluation, comparison, dataset, model registry và promotion decision. Settings chỉ định nghĩa mặc định compute, storage, retention và registry policy.
+
+### 5.5 Inspection Database
+
+Inspection Database sở hữu run evidence bất biến, tìm kiếm kết quả, review defect, review override và hiển thị lineage đầy đủ.
+
+## 6. Kiến trúc thông tin Settings
+
+### 6.1 Overview và Station
+
+- Station ID và display name.
+- Deployment mode: research, simulation, hardware pilot hoặc production.
+- Workstation profile và revision đang active.
+- Recipe và published revision đang active.
+- Tổng hợp health camera, motion, calibration, storage, database và integration.
+- Thay đổi chưa apply và lần apply thành công gần nhất.
+- Link sang Hardware diagnostics và audit event liên quan.
+
+### 6.2 Appearance và Locale
+
+- Display language.
+- Region và timezone.
+- Metric hoặc imperial units.
+- Date/time format.
+- Độ chính xác numeric formatting.
+- Reduced motion và density preference.
+
+English vẫn là UI locale hoàn chỉnh đầu tiên. Thêm locale yêu cầu translation catalog đầy đủ, không dùng string hardcode rời rạc.
+
+### 6.3 Acquisition và Calibration
+
+- Chọn camera profile và profile version.
+- Camera ID, sensor mode, pixel format, ROI, trigger source, exposure, gain, frame rate, white-balance policy và synchronization khi capability hỗ trợ.
+- Light-controller profile, channel mapping, intensity limit, sequence timing và photometric geometry.
+- Lens/geometric calibration reference.
+- Calibration date, operator, method, residual/error metric, validity interval, environment và artifact hash.
+- Cảnh báo hết hạn và policy chặn production khi calibration thiếu hoặc không hợp lệ.
+- Link sang Hardware để live preview, test capture và calibration acquisition.
+
+Settings phải capability-gate field. Control không được hỗ trợ phải bị ẩn hoặc read-only kèm giải thích; không gửi chúng tới adapter.
+
+### 6.4 Motion và I/O Profile
+
+- Motion profile name và revision.
+- Maximum velocity, acceleration, settle time, pose tolerance và axis limit.
+- Home policy và safe inspection position.
+- Mapping input/output signal.
+- Trigger handshake và timeout policy.
+- Door, emergency-stop, communication và interlock policy khác.
+- Link sang Hardware cho Home, Move, Stop và profile verification.
+
+An toàn vật lý vẫn do MCU và hardware layer enforce. Browser setting không thể vô hiệu hóa physical safety control.
+
+### 6.5 Inspection Default
+
+- Default active recipe policy.
+- Yêu cầu nhập serial và lot.
+- Run timeout và retry policy.
+- PASS, REVIEW và FAIL decision policy.
+- Review queue behavior và yêu cầu evidence.
+- Result export default.
+- Chọn defect taxonomy.
+
+Algorithm threshold và model-specific hyperparameter nằm trong node configuration.
+
+### 6.6 Compute và Performance
+
+- Default execution target theo capability: CPU, CUDA GPU, Jetson hoặc remote worker.
+- Số inspection và research job tối đa chạy đồng thời.
+- Memory và GPU-memory limit.
+- Cache location, quota và eviction policy.
+- Worker health và queue limit.
+- Determinism policy, random seed policy và timeout default.
+
+Mỗi node khai báo execution target được hỗ trợ. Recipe không thể publish khi target đã chọn không được hỗ trợ.
+
+### 6.7 Research và Model Default
+
+- Dataset storage root và artifact storage policy.
+- Experiment tracking backend.
+- Model registry backend.
+- Default metric và acceptance template.
+- Checkpoint retention.
+- Quy tắc alias `candidate`, `champion` và `rollback`.
+- Validation evidence bắt buộc trước production promotion.
+- Model signature và input/output contract policy.
+
+Mục này cấu hình hạ tầng và default. Nó không khởi chạy job.
+
+### 6.8 Data, Retention, Backup và Restore
+
+- Retention theo artifact class: preview, raw capture, canonical image, intermediate evidence, result evidence, dataset, model và audit.
+- Storage quota và disk-pressure threshold.
+- Export format và checksum manifest.
+- Scheduled backup target và trạng thái.
+- Restore validation và dry-run report.
+- Legal/quality hold ngăn xóa.
+
+Xóa production phải bất đồng bộ, có audit, có giới hạn và bị chặn với artifact đang được inspection/model lineage cần giữ tham chiếu.
+
+### 6.9 Integration
+
+- PLC transport và signal mapping.
+- MES endpoint và mapping work-order/serial/lot.
+- IPC-CFX connection setting cho trao đổi manufacturing chuẩn trong tương lai.
+- OPC UA endpoint, identity, certificate, namespace và mapping khi được triển khai.
+- Time synchronization health.
+- Connection test không mutation machine state.
+- Secret reference; không trả plaintext secret cho browser.
+
+### 6.10 Notification
+
+- Machine fault và interlock event.
+- Camera hoặc motion degradation.
+- Calibration expiry.
+- Storage pressure và backup failure.
+- Research job completion/failure.
+- Model drift và quality threshold breach.
+- Delivery channel policy và rate limit.
+
+### 6.11 Security, Audit và Update
+
+- Tóm tắt một Administrator identity trong MVP.
+- Session expiry và forced sign-out control.
+- Audit event viewer và export.
+- Configuration history, diff, actor, reason và rollback.
+- Signed application/model update policy.
+- Maintenance window và rollback status.
+
+Role-management UI được hoãn. Database và service interface phải để chỗ cho permission check sau này mà không phải đổi mọi domain service.
+
+## 7. Contract UX của Settings
+
+### 7.1 Layout
+
+Dùng layout hai vùng responsive:
+
+```text
+container rộng
++----------------------+-----------------------------------------+
+| điều hướng section   | title, status, version                  |
+| nhận biết scope      | field group và validation               |
+|                      |                                         |
+| dirty/apply summary  | action summary sticky trong container   |
++----------------------+-----------------------------------------+
+
+container hẹp
++---------------------------------------------------------------+
+| section selector scroll ngang                                 |
++---------------------------------------------------------------+
+| title, status, version                                         |
+| field group                                                    |
+| validation và action trong normal flow                         |
++---------------------------------------------------------------+
+```
+
+Không có document-level horizontal overflow. Kiểm tra tại 390, 768, 1280 và 1920 pixel.
+
+### 7.2 Vòng đời thay đổi
+
+```text
+stored version -> draft -> client validation -> server validation
+               -> dry-run/apply precheck -> applied version
+               -> observed verification -> active
+```
+
+- Mọi draft hiển thị scope, revision hiện tại, dirty state và validation state.
+- Rời section dirty cần chọn discard hoặc save rõ ràng.
+- Server conflict trả latest revision và structured diff summary.
+- Setting ảnh hưởng hardware hỗ trợ dry-run và apply verification.
+- Apply thất bại không đánh dấu desired version là active.
+- Rollback tạo version mới tham chiếu version cũ; không sửa lại history.
+- Restore, retention, update và integration action có tính phá hủy cần confirmation và reason.
+
+### 7.3 Ngôn ngữ trạng thái
+
+Dùng label rõ ràng kèm icon hoặc shape: Draft, Valid, Invalid, Applying, Active, Degraded, Failed, Superseded. Không truyền trạng thái chỉ bằng màu.
+
+## 8. Mô hình persistence
+
+### 8.1 Bảng logic cốt lõi
+
+- `settings_documents`: identity hiện tại theo scope và subject.
+- `settings_versions`: JSONB payload bất biến, schema version, revision, status, checksum, creator, reason và timestamp.
+- `settings_activations`: requested version, apply status, observed target revision, diagnostic và timestamp.
+- `audit_events`: actor, action, resource type/ID, request ID, before/after checksum, result, reason, client metadata và timestamp.
+- `recipes`: identity recipe và lifecycle state.
+- `recipe_versions`: snapshot workflow và node parameter bất biến.
+- `calibrations`: metadata, validity, quality metric và artifact reference.
+- `artifacts`: immutable hash, media type, byte length, storage URI, category và lifecycle state.
+- `experiments`, `experiment_runs`, `run_metrics`, `run_parameters` và `run_artifacts`.
+- `registered_models`, `model_versions` và `model_aliases`.
+- `inspection_runs`, `inspection_node_runs`, `defects`, `inspection_images` và `review_events`.
+
+### 8.2 Concurrency
+
+- Mutation yêu cầu expected revision hoặc ETag.
+- PostgreSQL transaction và row-level concurrency thay process-local file lock.
+- Immutable version row được insert; mutable identity row trỏ tới draft, published và active version.
+- Apply operation dùng idempotency key.
+- Audit write nằm cùng transaction với metadata mutation khi có thể.
+
+### 8.3 Toàn vẹn artifact
+
+- Content-address hoặc định danh artifact duy nhất và ghi SHA-256.
+- Kiểm tra size, media type và checksum trước khi đánh dấu ready.
+- Không ghi đè ready immutable artifact.
+- Lưu reference trước retention cleanup.
+- Export gồm metadata và checksum manifest.
+
+## 9. Ranh giới API
+
+Dùng route có version cho contract mới:
+
+```text
+GET    /api/v1/settings/{scope}/{subjectId}
+POST   /api/v1/settings/{scope}/{subjectId}/versions
+POST   /api/v1/settings/{scope}/{subjectId}/validate
+POST   /api/v1/settings/{scope}/{subjectId}/activations
+GET    /api/v1/settings/{scope}/{subjectId}/history
+POST   /api/v1/settings/{scope}/{subjectId}/rollback
+
+GET    /api/v1/audit-events
+GET    /api/v1/calibrations
+POST   /api/v1/calibrations
+
+GET    /api/v1/experiments
+POST   /api/v1/experiments/{experimentId}/runs
+GET    /api/v1/models
+POST   /api/v1/models/{modelId}/versions/{versionId}/promotions
+```
+
+API response dùng schema rõ ràng và structured error code. Frontend không gửi adapter URL tùy ý, filesystem path, command hoặc executable code.
+
+## 10. Kiến trúc Hybrid Node Plugin
+
+### 10.1 Ownership
+
+Mỗi node package sở hữu runtime và configuration metadata:
+
+```text
+core/nodes/<category>/<node-id>/
+  __init__.py
+  node.py
+  manifest.py hoặc manifest.json
+  optional validation.py
+  optional migrations.py
+
+frontend/src/node-plugins/<node-id>/
+  inspector.tsx
+  inspector.test.tsx
+  optional preview.tsx
+```
+
+Hai cây dùng cùng `nodeId` ổn định. Colocation mang tính logic thay vì trộn JSX vào Python runtime tree. Cách này giữ Python packaging, Vite boundary, frontend layering và khả năng test độc lập.
+
+### 10.2 Node Manifest
+
+Manifest khai báo:
+
+- node ID, name, category, package version và schema version;
+- input/output port;
+- parameter schema và default;
+- execution capability: configure, infer, train, evaluate, visualize hoặc export;
+- execution target được hỗ trợ;
+- determinism và resource hint;
+- artifact input/output type;
+- custom inspector key tùy chọn;
+- migration hook cho persisted parameter cũ.
+
+Central catalog trở thành registry projection được ghép từ node manifest thay vì owner chính của mọi node definition.
+
+### 10.3 Generic Inspector
+
+Generic control hỗ trợ:
+
+- boolean, integer, number, text, select;
+- multiline text và expression không chứa code;
+- range và paired range;
+- file artifact reference và dataset reference;
+- model/version/alias reference;
+- ROI và geometry reference;
+- color, matrix và structured object editor khi schema hỗ trợ;
+- conditional visibility và read-only derived value.
+
+Backend validation vẫn là authoritative. Generic frontend validation chỉ dùng cho phản hồi nhanh.
+
+### 10.4 Custom Inspector
+
+Node phức tạp có thể đăng ký custom React panel cho ROI drawing, image comparison, training curve, checkpoint selection, feature visualization hoặc calibration view.
+
+Custom panel:
+
+- nhận typed node draft, manifest, capability, validation và context props;
+- chỉ cập nhật node configuration đã khai báo qua callback được cung cấp;
+- chỉ gọi authenticated backend service;
+- không mở local file trực tiếp bằng path;
+- không điều khiển hardware trực tiếp;
+- không chạy Python hoặc shell command tùy ý;
+- giữ generic display-name và port management bên ngoài custom algorithm content.
+
+Nếu node không khai báo parameter schema lẫn custom inspector, content area của inspector để trống đúng yêu cầu. Selection metadata có thể giữ trong shared inspector header.
+
+### 10.5 Toàn vẹn registry
+
+Build và test gate enforce:
+
+- một runtime package cho mỗi manifest;
+- node ID duy nhất;
+- port parity giữa manifest và runtime;
+- parameter key parity giữa persisted schema và runtime validation;
+- custom inspector registration tham chiếu manifest tồn tại;
+- schema migration bao phủ persisted version cũ;
+- production recipe không dùng runtime `test` hoặc unsupported;
+- node không thể publish nếu thiếu artifact/execution contract.
+
+## 11. Vòng đời Research và Model
+
+### 11.1 Research Workspace
+
+Research workspace cung cấp:
+
+- tạo và tag experiment;
+- chọn dataset/version;
+- parent run và child run;
+- log parameter, metric, system metric và artifact;
+- so sánh và lọc run;
+- checkpoint/model evaluation;
+- export reproducibility manifest;
+- model registration, versioning, alias, note và lineage;
+- candidate validation và controlled promotion.
+
+### 11.2 Tích hợp node
+
+Inspector của node trainable có thể:
+
+- chọn hoặc tạo experiment context;
+- tạo run configuration từ node parameter;
+- hiển thị job đang chạy và lịch sử của loại node đó;
+- so sánh candidate metric;
+- bind recipe node với model alias hoặc immutable model version;
+- mở full run trong Research.
+
+Node inspector không phải nơi duy nhất quản lý experiment. Research cung cấp khả năng nhìn xuyên node và recipe.
+
+### 11.3 Promotion
+
+```text
+experiment run -> evaluated model version -> candidate
+               -> validation gates -> champion
+               -> monitored deployment -> rollback khi cần
+```
+
+Promotion ghi dataset version, code/node version, parameter, metric, model signature, artifact hash, approver, reason và target. Recipe production resolve mutable alias thành immutable model version khi publish để inspection cũ vẫn tái lập được.
+
+## 12. Contract truy xuất inspection
+
+Mỗi inspection hoàn tất ghi:
+
+- station và workstation profile version;
+- recipe và workflow version;
+- node manifest/package version;
+- toàn bộ effective node parameter;
+- calibration ID và hash;
+- camera, light, motion và I/O profile revision;
+- model version, alias tại lúc chạy và artifact hash;
+- hash input, canonical, intermediate evidence được giữ và output;
+- start/end time, target, status, metric và error theo từng node;
+- initial decision, review override, actor, reason và timestamp.
+
+Evidence cũ bất biến. Review append event; không xóa initial decision.
+
+## 13. Ràng buộc security và công nghiệp
+
+- Vô hiệu hóa public registration cho MVP một Administrator; bootstrap hoặc local administration rõ ràng tạo account.
+- Giữ authentication trên mọi protected read và mutation.
+- Audit mọi mutation configuration, recipe, model promotion, review, integration, backup, restore và update.
+- Dùng service credential least-privilege và secret reference.
+- Giữ adapter loopback-only trừ khi thiết kế authenticated transport sau này thay đổi boundary rõ ràng.
+- Giữ physical interlock ngoài quyền điều khiển của browser.
+- Yêu cầu reason và confirmation cho apply, rollback, restore, retention và update ảnh hưởng an toàn.
+- Hỗ trợ vận hành công nghiệp offline; cloud service không được là điều kiện cho machine safety hoặc basic inspection trừ khi deployment chọn rõ như vậy.
+
+## 14. Phân rã delivery
+
+Thiết kế này gồm nhiều subsystem độc lập và không được triển khai trong một thay đổi lớn. Tạo implementation plan riêng theo thứ tự:
+
+1. Sửa foundation và audit baseline.
+2. Nền tảng settings/version trên PostgreSQL.
+3. Hoàn thiện Settings UI và apply workstation profile.
+4. Nền tảng hybrid node manifest và inspector plugin.
+5. Research experiment tracking và model registry.
+6. Persistent inspection orchestrator và node execution.
+7. Industrial calibration, integration, retention, backup và recovery.
+8. Commercial fleet, permission, SSO, licensing, update và remote support.
+
+Mỗi plan phải dùng test-driven changes, chạy GitNexus impact analysis trước khi sửa symbol và kết thúc bằng CodeGraph/GitNexus change detection cùng full verification.
+
+## 15. Tiêu chí nghiệm thu
+
+- Mọi section Settings hoạt động hoặc bị loại có chủ ý; không còn milestone navigation disabled.
+- Mọi setting hiển thị được lưu đúng scope và làm draft dirty.
+- Hardware command nằm ngoài Settings.
+- PostgreSQL cung cấp immutable version, concurrency check, audit, activation status và rollback.
+- Một adapter unavailable không che state dùng được của adapter còn lại.
+- Node definition do node manifest sở hữu và được kiểm tra với runtime.
+- Generic/custom inspector cùng tồn tại; node không có inspector contract hiển thị content area trống.
+- Research run ghi parameter, metric, artifact, dataset, code/node version và lineage.
+- Published recipe resolve đủ profile, calibration và model version bắt buộc.
+- Inspection hoàn tất tái lập được từ immutable version và hash.
+- Settings/inspector responsive pass tại 390, 768, 1280 và 1920 pixel, không document overflow.
+- Backend, core, integration, contract, simulator, frontend, typecheck, build và security check pass.
+
+## 16. Tài liệu tham chiếu thiết kế
+
+- NIST SP 800-82 Rev. 3 cho OT security tôn trọng safety, reliability và performance.
+- Khái niệm role/permission của OPC UA cho resource-level authorization sau này.
+- IPC-2591 CFX cho trao đổi dữ liệu manufacturing tương thích bằng message chuẩn.
+- Khái niệm MLflow Tracking cho experiment, run, parameter, metric, model, dataset và artifact.
+- Khái niệm MLflow Model Registry cho model version, alias, lineage, tag, promotion và rollback.

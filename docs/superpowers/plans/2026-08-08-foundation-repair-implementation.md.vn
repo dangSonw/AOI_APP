@@ -1,0 +1,105 @@
+# Kế hoạch triển khai sửa Foundation AOI
+
+> **Dành cho agent thực thi:** BẮT BUỘC dùng `superpowers:subagent-driven-development` hoặc `superpowers:executing-plans` theo từng task. Mỗi bước dùng checkbox (`- [ ]`) để theo dõi.
+
+**Mục tiêu:** Làm baseline AOI Studio trung thực và an toàn bằng cách enforce một Administrator, trả inspection evidence, giữ partial device availability, lưu field Settings đang hiển thị, kiểm thử filesystem Dataset và ghi durable audit event.
+
+**Kiến trúc:** Giữ boundary React/FastAPI/PostgreSQL hiện tại. Không thêm hệ thống quản lý role. Chỉ mở rộng workstation preference hiện tại cho field locale đang hiển thị; Phase 1 sẽ migrate sang PostgreSQL. Thêm PostgreSQL audit model và request middleware để protected mutation có actor/action/result mà không gắn audit logic vào từng route.
+
+**Tech Stack:** Python 3.12, FastAPI 0.115.2, Pydantic 2.9.2, SQLAlchemy 2.0.36, PostgreSQL 16, pytest 8.3.4, React 18.3, TypeScript 5.6, Vite 8.2, Vitest 4.1.
+
+## Ràng buộc toàn cục
+
+- Mọi production change theo test-first red-green-refactor.
+- Code, UI text, API payload key, log và test name giữ English.
+- Mọi thay đổi Markdown có companion `.md.vn`.
+- Path trong code và docs dùng tương đối.
+- Browser chỉ gọi authenticated FastAPI route; adapter giữ loopback-only.
+- Home, Move, Stop, Clear fault và preview trực tiếp nằm ngoài Settings.
+- Chạy GitNexus impact analysis trước khi sửa mỗi existing symbol.
+- Chạy GitNexus `detect_changes` trước mỗi commit. Nếu GitNexus local còn bị chặn, không commit; báo blocker cùng output chính xác.
+- Giữ light theme, WCAG AA, normal flow và responsive rules.
+
+## Task 1: Chế độ xác thực một Administrator
+
+- Thêm `Settings.allow_public_registration: bool = False`.
+- Viết test đỏ chứng minh default bị tắt và `/api/auth/register` trả `403` với `Public account registration is disabled.`.
+- Thêm guard backend tối thiểu.
+- Viết test frontend đỏ chứng minh không còn `Create account`.
+- Loại sign-up UI, registration client/type không dùng.
+- Đổi default seed thành `admin@aoi.local` và `AOI Administrator`; không tự sửa `.env` local bị ignore.
+- Chạy backend target test, frontend AuthPage test và typecheck.
+- Chạy `detect_changes` trước commit `fix(auth): enforce single administrator mode`.
+
+## Task 2: Trả Inspection Evidence thật
+
+- Tạo test đỏ cho `build_inspection_detail_response` với một defect và một image.
+- Helper trả `DefectResponse` và `InspectionImageResponse` từ relationship đã load.
+- Dùng một helper cho GET detail và POST create, loại construction lặp.
+- Chạy inspection target/regression tests.
+- Chạy `detect_changes` trước commit `fix(inspections): return stored evidence`.
+
+## Task 3: Load Device Snapshot độc lập
+
+- Viết hai test đỏ: camera ready/motion unavailable và trường hợp ngược lại.
+- Chỉ fetch camera configuration khi camera ready.
+- Chỉ fetch motion configuration/state khi motion ready.
+- Adapter unavailable chỉ làm field của adapter đó thành null.
+- Chạy service test, typecheck và `detect_changes` trước commit.
+
+## Task 4: Lưu Visible Locale Settings
+
+- Thêm backend/frontend `locale` gồm language, region, timezone, measurement system và clock format với value giới hạn.
+- Viết backend default/round-trip tests đỏ.
+- Viết frontend default/render/change tests đỏ.
+- Xóa local state của bốn select; bind chúng vào `WorkstationPreferences.locale`.
+- Dùng `onPreferencesChange` để dirty detection hiện tại nhận thay đổi.
+- Chạy preference/Settings tests, typecheck và `detect_changes` trước commit.
+
+## Task 5: Chọn Workstation Profile rõ ràng
+
+- Thay `onWorkstationIdChange` bằng async `onWorkstationSelect`.
+- Input chỉ là selector draft, không mutation profile đang load.
+- Nút `Load station profile` đọc destination profile trước khi thay saved/draft state.
+- Camera Manager hiển thị Workstation ID read-only.
+- Viết test đỏ cho selector behavior, sau đó verify xanh và typecheck.
+- Chạy `detect_changes` trước commit.
+
+## Task 6: Characterization và Safety Test cho Dataset
+
+- Tạo `tests/backend/test_dataset_service.py`.
+- Tạo `tests/integration/test_dataset_api.py`.
+- Bao phủ CRUD dataset/category/image, upload batch/size/magic byte, filename/path traversal, capture import, duplicate naming và ZIP export.
+- Chỉ sửa production code khi test safety đỏ chứng minh defect; không refactor rộng nếu characterization đã pass.
+- Chạy hai Dataset suite và `detect_changes` trước commit.
+
+## Task 7: Durable Audit Baseline
+
+- Tạo `AuditEvent` model và `database/schema/006_create_audit_events.sql`.
+- Tạo `record_audit_event` service.
+- Tạo middleware audit `POST`, `PUT`, `PATCH`, `DELETE`.
+- Xác minh JWT trước khi gán actor; không lưu body, credential, bearer token, secret hoặc image byte.
+- Tạo protected `GET /api/audit-events` có pagination giới hạn.
+- Viết model/service và integration tests đỏ trước implementation.
+- Audit mutation thành công/thất bại; audit persistence failure không thay response gốc.
+- Chạy integration regression và `detect_changes` trước commit.
+
+## Task 8: Documentation, Memory và Phase Verification
+
+- Kiểm kê deterministic mọi Markdown thiếu `.md.vn`, bỏ qua cache/generated directory.
+- Thêm bản dịch đầy đủ, không placeholder.
+- Cập nhật README và memory song ngữ.
+- Chạy full tests, build, shell syntax, npm production audit, CodeGraph sync/status, GitNexus detect changes và diff check.
+- Browser verify sign-in, Settings locale/station, Hardware partial diagnostic và audit visibility tại 390, 768, 1280, 1920 pixel.
+- Chỉ commit docs sau change detection.
+
+## Exit Gate Phase 0
+
+- Public registration bị tắt; bootstrap Administrator đăng nhập được.
+- Protected mutation sinh durable audit record.
+- Inspection detail trả persisted defect/image.
+- Một adapter degraded không che adapter còn lại.
+- Locale setting round-trip qua persistence và dirty detection.
+- Workstation selection tải state đích trước khi edit.
+- Dataset filesystem safety có coverage backend/API.
+- Full test, build, audit, CodeGraph, GitNexus, diff và responsive browser check pass.

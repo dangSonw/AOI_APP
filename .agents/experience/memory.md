@@ -150,3 +150,14 @@ The current baseline is 15 backend tests, 14 core tests, 12 integration tests, 1
 - Polling must never overwrite an unsaved operator draft. Mark a configuration form dirty on its first input event, suspend draft replacement while dirty, and resume synchronization only after a successful Apply.
 - Hardware mode must start the HMI when CSI/UART adapters respond with a valid protocol but report `unavailable`. Show diagnostics, omit operational state/configuration requests, disable commands, and never substitute simulator adapters.
 - In simulation mode, `run_dev.sh` owns the console as a fifth process group. Runtime mode must be read from the protected PID file for later `status` checks, otherwise a status invocation incorrectly applies hardware health semantics to a running simulation stack.
+
+## 19. Foundation Repair and Audit Baseline
+
+- Single-Administrator mode disables public registration by default while retaining idempotent local bootstrap. Keep the seed identity named `AOI Administrator`; do not reintroduce sign-up UI without an approved authorization design.
+- Inspection API responses must be built from loaded relationships. Never replace persisted defects or image evidence with empty placeholder arrays.
+- Treat camera and motion availability independently. Fetch configuration or operational state only for the adapter that reports ready; degradation of one adapter must not erase the other adapter's snapshot.
+- Every visible locale field belongs to persisted `WorkstationPreferences` and must flow through the shared preference-change callback so revision and dirty checks remain authoritative.
+- A workstation ID field is a destination selector, not permission to mutate the loaded profile's identity. Load destination state before replacing current saved and draft state.
+- Dataset safety contracts include bounded batch and file size, image magic-byte validation, allowlisted names, traversal rejection, duplicate capture naming, and safe ZIP member paths. Preserve characterization tests even when production behavior already passes.
+- Audit only bounded security metadata: verified actor ID, action, method, path, resource identity, request ID, status, result, and timestamp. Never read or store request bodies, credentials, bearer tokens, secrets, or image bytes. Audit failures must be logged and must not replace original route responses.
+- GitNexus resolves repositories through its global registry, not necessarily current worktree. When a worktree and main checkout share repository name, index worktree explicitly and pass its path to `detect-changes --repo ...`; otherwise change detection can inspect clean main checkout and incorrectly report `No changes detected.`

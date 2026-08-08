@@ -4,7 +4,7 @@ AOI Studio là ứng dụng web kiểm tra quang học tự động trong công 
 
 ## Mốc đã triển khai
 
-- Giao diện đăng nhập căn chỉnh theo pixel từ trang Figma `AOI Studio`, bao gồm trạng thái đăng ký và đặt lại mật khẩu dạng demo.
+- Giao diện đăng nhập căn chỉnh theo pixel từ trang Figma `AOI Studio`, gồm đăng nhập một Administrator và trạng thái đặt lại mật khẩu dạng demo. Đăng ký tài khoản công khai mặc định bị vô hiệu hóa.
 - Shell workstation công nghiệp bám theo Figma với các view Dashboard, Settings, Camera Manager và Inspection Database.
 - Bố cục responsive cho desktop và mobile, có focus bàn phím, validation, loading, thành công, lỗi và trạng thái rỗng.
 - API xác thực FastAPI dùng Argon2 để băm mật khẩu và JWT bearer token.
@@ -16,6 +16,11 @@ AOI Studio là ứng dụng web kiểm tra quang học tự động trong công 
 - Contract camera và chuyển động ba trục có version dùng chung cho hardware adapter và simulator adapter.
 - Console camera và MCU ảo độc lập với đầu vào folder ảnh/webcam, điều khiển XYZ, interlock, emergency stop và fault injection.
 - Gateway thiết bị backend có xác thực với kiểm tra protocol, timeout giới hạn, response có kiểu, chuẩn hóa lỗi và xác minh SHA-256 của ảnh inspection.
+- Response chi tiết inspection chứa defect và image evidence đã lưu thay vì các mảng placeholder rỗng.
+- Snapshot camera và motion được tải độc lập, vì vậy một adapter unavailable không che trạng thái dùng được của adapter còn lại.
+- Workstation preference lưu language, region, timezone, measurement system và clock format; station profile được load rõ ràng trước khi chỉnh sửa.
+- Coverage an toàn service/API Dataset gồm validation, upload limit, magic byte, từ chối traversal, rename, move, delete, import capture và export ZIP.
+- Audit event lưu trên PostgreSQL ghi mutation đã xác thực và mutation thất bại mà không lưu request body, credential, bearer token, secret hoặc image byte.
 
 ## Kiến trúc
 
@@ -29,7 +34,7 @@ FastAPI control plane :8000
    |          | HTTP loopback   `-- HTTP loopback --> Motion adapter :9102
    |          `--------------------> Camera adapter :9101
    |
-   |-- PostgreSQL: người dùng
+   |-- PostgreSQL: người dùng, inspection, audit event
    |-- data/projects: workflow recipe
    |-- data/preferences: tùy chọn workstation
    `-- io/*.json: mô phỏng I/O vật lý cũ
@@ -156,6 +161,8 @@ Chỉ origin HTTP loopback có cổng rõ ràng được chấp nhận. URL thi�
 
 ### Xử lý sự cố đăng nhập
 
+AOI Studio hiện vận hành ở chế độ một Administrator. Tài khoản bootstrap được tạo từ `SEED_ADMIN_EMAIL`, `SEED_ADMIN_FULL_NAME` và `SEED_ADMIN_PASSWORD`; giá trị mặc định định danh tài khoản là `AOI Administrator`. `POST /api/auth/register` trả HTTP `403` trừ khi `ALLOW_PUBLIC_REGISTRATION=true` được cấu hình rõ ràng. Giữ registration bị tắt cho baseline đã duyệt.
+
 Nếu form đăng nhập hiển thị `The AOI service is unavailable. Check the backend connection.`, trình duyệt không thể hoàn tất request API. Đây là vấn đề về trạng thái dịch vụ, mạng, CORS hoặc cấu hình API frontend, không phải phản hồi mật khẩu không hợp lệ.
 
 1. Khởi động ứng dụng bằng một trong các launcher được hỗ trợ ở trên.
@@ -178,7 +185,7 @@ bash scripts/test/test.sh
 bash scripts/build/build.sh
 ```
 
-Lần chạy đầy đủ mới nhất đã vượt qua 114 Python test trong các suite backend, core, integration, adapter contract và simulator; toàn bộ 24 frontend test cùng bước kiểm tra TypeScript cũng pass.
+Lần chạy đầy đủ mới nhất đã vượt qua 134 Python test trong các suite backend, core, integration, adapter contract và simulator; toàn bộ 31 frontend test cùng bước kiểm tra TypeScript cũng pass.
 
 Các lệnh frontend trực tiếp:
 
@@ -206,7 +213,7 @@ Giao diện JSON hiện tại là ranh giới mô phỏng. Adapter phần cứng
 |---|---|---|---|
 | `GET` | `/health` | Sức khỏe dịch vụ | Không |
 | `POST` | `/api/auth/login` | Đăng nhập | Không |
-| `POST` | `/api/auth/register` | Tạo tài khoản | Không |
+| `POST` | `/api/auth/register` | Endpoint đăng ký công khai; mặc định bị vô hiệu hóa | Không |
 | `POST` | `/api/auth/password-reset` | Trả phản hồi reset không tiết lộ tài khoản | Không |
 | `GET` | `/api/io/inputs` | Đọc input mô phỏng | Bearer token |
 | `GET` | `/api/io/outputs` | Đọc output mô phỏng | Bearer token |
@@ -239,6 +246,16 @@ Gửi email đặt lại mật khẩu chưa được triển khai trong mốc n�
 - Hardware mode không bao giờ âm thầm fallback sang simulation. Hardware camera và MCU adapter hiện cung cấp health/version/capabilities nhưng chủ động báo `unavailable`; capture Jetson CSI và transport UART vẫn là tác vụ commissioning phần cứng tương lai.
 - MCU simulator hiện hoàn tất lệnh home và move theo cách xác định thay vì tái tạo timeline acceleration thật. Mốc inspection runtime tiếp theo phải thêm orchestration run có persistence và xác nhận trạng thái in-position trước khi capture.
 - 58 workflow node vẫn là runtime placeholder chỉ dành cho cấu hình. Gateway này cho phép giao tiếp thiết bị nhưng chưa thực thi workflow thị giác AOI hoặc lưu kết quả inspection.
+
+## Hành vi sửa foundation
+
+- Response chi tiết và tạo inspection dùng cùng response builder, trả defect cùng metadata ảnh đã lưu.
+- Readiness camera và motion được đánh giá độc lập. Camera unavailable vẫn để motion state dùng được; motion unavailable vẫn để cấu hình camera dùng được.
+- Control locale trong Settings thuộc `WorkstationPreferences`; mọi giá trị locale hiển thị tham gia dirty detection và round-trip qua persistence.
+- Nhập Workstation ID dùng để chọn profile đích. `Load station profile` đọc state đích trước khi thay saved/draft state, còn Camera Manager hiển thị workstation ID đã load ở chế độ read-only.
+- Dataset operation từ chối tên không an toàn, traversal, magic byte ảnh không hợp lệ, file lớn hơn 50 MiB và batch lớn hơn 100 file. Test backend và API có xác thực bao phủ lifecycle, import capture, duplicate naming và đường dẫn ZIP.
+- Request `POST`, `PUT`, `PATCH`, `DELETE` nhận `X-Request-ID` và audit metadata bền vững. Bearer JWT đã xác minh cung cấp actor ID; mutation thất bại được ghi với kết quả failure. Lỗi persistence audit được log mà không thay response API gốc.
+- `GET /api/audit-events` yêu cầu xác thực và cung cấp pagination mới nhất trước, với page size giới hạn 100.
 
 ## Workflow editor và lưu trữ
 

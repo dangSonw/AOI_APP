@@ -1,0 +1,256 @@
+# Lộ trình hoàn thiện sản phẩm AOI Studio
+
+> **Dành cho agent thực thi:** Mỗi phase cần implementation plan chi tiết riêng. Dùng `superpowers:writing-plans` sau khi scope thiết kế tương ứng được duyệt, rồi dùng `superpowers:subagent-driven-development` hoặc `superpowers:executing-plans` theo từng task. Mọi behavior change theo red-green-refactor.
+
+**Mục tiêu:** Chuyển prototype AOI đã xác thực hiện tại thành nền tảng nghiên cứu có truy xuất nguồn gốc, sau đó thành pilot công nghiệp PCB/PCBA an toàn, rồi thành sản phẩm có thể mở rộng thương mại.
+
+**Kiến trúc:** PostgreSQL trở thành nguồn dữ liệu chính cho cấu hình có phiên bản, recipe, experiment, model, audit và inspection lineage. Filesystem hoặc object storage giữ artifact lớn bất biến. Hardware, Settings, Workflow, Research và Inspection Database vẫn là các workspace riêng với ranh giới ownership rõ ràng.
+
+**Tech Stack:** Python 3.12, FastAPI, Pydantic 2, SQLAlchemy 2, PostgreSQL 16, HTTPX, pytest, React 18, TypeScript 5.6, Vite 8, Vitest, shared device contract và dependency computer-vision/ML riêng cho node chỉ được thêm theo plan đã duyệt.
+
+## Ràng buộc toàn cục
+
+- Giữ toàn bộ code, UI text, API payload, log, test và tài liệu repository bằng English; duy trì companion `.md.vn` cho mọi file Markdown.
+- Chỉ dùng project path tương đối.
+- Giữ Home, Move, Stop, Clear fault, preview và commissioning trực tiếp trong Hardware, không nằm trong Settings.
+- Giữ browser access sau authenticated FastAPI control plane.
+- Giữ hardware adapter loopback-only và không âm thầm fallback sang simulation.
+- Lưu metadata setting/version/audit/lineage trong PostgreSQL; lưu artifact lớn ngoài database row và kiểm tra SHA-256.
+- Giai đoạn đầu dùng một Administrator; hoãn UI quản lý role.
+- Chạy GitNexus impact analysis trước khi sửa mọi existing symbol và cảnh báo trước thay đổi HIGH hoặc CRITICAL.
+- Chạy GitNexus `detect_changes` trước mỗi commit và đồng bộ CodeGraph sau mỗi milestone.
+- Kiểm tra UI responsive tại 390, 768, 1280 và 1920 pixel, không document-level horizontal overflow.
+
+---
+
+## Phase 0: Sửa foundation và baseline trung thực
+
+**Kết quả:** Loại bỏ khoảng trống integrity tức thời trước khi xây thêm bề mặt cấu hình.
+
+**Scope:**
+
+1. Vô hiệu hóa public registration trong chế độ một Administrator nhưng giữ bootstrap path có test.
+2. Sửa naming và documentation của seeded account theo nghĩa Administrator.
+3. Trả defect/image evidence thật trong inspection detail.
+4. Tách việc load camera và motion snapshot để một adapter unavailable không che adapter còn lại.
+5. Sửa field vùng miền của Settings để mọi giá trị hiển thị được lưu và tham gia dirty detection.
+6. Thay mutation draft Workstation ID bằng station-profile selection và load behavior rõ ràng.
+7. Thêm test trực tiếp cho `SettingsPage`.
+8. Thêm test Dataset API/service cho validation, upload limit, magic byte, traversal, rename, move, delete, import và export.
+9. Thêm nền tảng audit event và instrument mọi mutation endpoint hiện có.
+10. Kiểm kê và thêm companion `.md.vn` còn thiếu trong thay đổi chỉ liên quan documentation.
+
+**Exit gate:**
+
+- Chế độ một Administrator không có public account creation path.
+- Mutation API hiện có phát durable audit event gồm actor/action/result.
+- Settings control hiển thị cho user round-trip qua backend persistence.
+- Inspection detail hiển thị evidence đã lưu.
+- Một adapter degraded vẫn để adapter còn lại hoạt động.
+- Toàn bộ test/build/security suite hiện có vẫn pass.
+
+**Tài liệu tiếp theo bắt buộc:** `docs/superpowers/plans/2026-08-08-foundation-repair-implementation.md`.
+
+---
+
+## Phase 1: Nền tảng Settings và Version trên PostgreSQL
+
+**Kết quả:** Cung cấp một nền tảng transactional tái sử dụng cho scope User, Workstation, Recipe và System.
+
+**Scope:**
+
+1. Thêm migration tooling tương thích schema bootstrap hiện tại.
+2. Tạo bảng `settings_documents`, `settings_versions`, `settings_activations` và `audit_events`.
+3. Định nghĩa Pydantic schema nhận biết scope với schema version rõ ràng.
+4. Triển khai immutable version creation, expected-revision conflict, validation, history, activation và rollback.
+5. Migrate workstation preference hiện tại khỏi file storage mà không mất identity user/station.
+6. Giữ JSON import/export làm interchange format portable, không làm nguồn dữ liệu chính.
+7. Thêm structured conflict response và idempotency key cho apply action.
+8. Thêm backup/export và migration verification test.
+
+**Exit gate:**
+
+- Concurrent edit không âm thầm ghi đè nhau.
+- Rollback tạo immutable version mới.
+- Audit và metadata mutation nhất quán transaction khi có thể.
+- Backend nhiều worker không phụ thuộc process-local lock.
+- Saved preference hiện có có migration path được tài liệu hóa.
+
+**Tài liệu tiếp theo bắt buộc:** `docs/superpowers/plans/2026-08-08-settings-platform-implementation.md`.
+
+---
+
+## Phase 2: Hoàn thiện Settings Workspace
+
+**Kết quả:** Cung cấp mọi section Settings đã duyệt với safe apply semantic và UX responsive.
+
+**Scope:**
+
+1. Chia `SettingsPage` thành section component tập trung và hook/service nhận biết scope.
+2. Xây Overview/Station, Appearance/Locale, Acquisition/Calibration, Motion/I/O Profiles, Inspection Defaults, Compute/Performance, Research/Model Defaults, Data/Retention, Integrations, Notifications và Security/Audit/Updates.
+3. Capability-gate field camera và motion.
+4. Thêm server validation, dry-run, apply, observed verification, conflict diff, history và rollback UI.
+5. Lưu adapter desired profile và reapply/verify sau restart.
+6. Chỉ poll observed status liên quan và bảo vệ mọi dirty draft.
+7. Link live diagnostics và commissioning sang Hardware.
+8. Thêm state keyboard, accessibility, reduced-motion, loading, empty, error, degraded và conflict.
+
+**Exit gate:**
+
+- Không còn Settings navigation disabled do milestone.
+- Mọi setting hiển thị có scope, persistence contract, validation và test rõ ràng.
+- Hardware apply thất bại không đánh dấu version active.
+- Settings không chứa live motion command.
+- Browser verification responsive pass tại mọi width bắt buộc.
+
+**Tài liệu tiếp theo bắt buộc:** `docs/superpowers/plans/2026-08-08-settings-workspace-implementation.md`.
+
+---
+
+## Phase 3: Nền tảng Hybrid Node Manifest và Inspector Plugin
+
+**Kết quả:** Mỗi node sở hữu runtime/configuration contract và hỗ trợ UI inspector generic/chuyên biệt.
+
+**Scope:**
+
+1. Định nghĩa node manifest có version, capability, resource hint, execution target, artifact contract, parameter schema và migration hook.
+2. Chuyển catalog ownership khỏi monolithic catalog vào node package; sinh catalog projection từ registry.
+3. Mở rộng parameter value ngoài scalar bằng schema JSON-compatible có giới hạn.
+4. Xây generic inspector control cho field/reference phổ biến.
+5. Thêm typed custom inspector registry dưới `frontend/src/node-plugins`.
+6. Định nghĩa custom inspector props và safe authenticated service boundary.
+7. Giữ shared display-name và port management ngoài custom algorithm panel.
+8. Render content area trống cho node không có schema và custom panel.
+9. Thêm test registry integrity, migration, backend validation và frontend plugin.
+
+**Exit gate:**
+
+- Mỗi registered node có đúng một manifest và runtime.
+- Drift manifest/runtime về port và parameter bị phát hiện.
+- Generic/custom inspector cùng tồn tại.
+- Custom panel không truy cập trực tiếp filesystem path, adapter, Python hoặc shell execution.
+- Production recipe từ chối runtime `test` hoặc unsupported.
+
+**Tài liệu tiếp theo bắt buộc:** `docs/superpowers/plans/2026-08-08-node-plugin-platform-implementation.md`.
+
+---
+
+## Phase 4: Research Workspace và Model Registry
+
+**Kết quả:** Làm experiment AOI có thể tái lập và model promotion có kiểm soát.
+
+**Scope:**
+
+1. Định nghĩa record experiment, run, parameter, metric, dataset version, artifact, model, model version và alias.
+2. Xây background job boundary mà không ép mọi node dùng một execution location.
+3. Ghi code revision, node package version, environment, random seed, resource, input dataset hash, parameter, metric và output.
+4. Xây Research workspace cho run search, comparison, chart, artifact browsing và failure diagnostic.
+5. Thêm model registration cùng alias `candidate`, `champion` và `rollback`.
+6. Thêm validation gate và immutable promotion event.
+7. Cho custom inspector của trainable node tạo/mở node-context run và bind model version.
+8. Export reproducibility manifest.
+
+**Exit gate:**
+
+- Run tái lập được từ code/node version, environment, data hash, parameter và seed đã ghi.
+- Model version có đầy đủ experiment/artifact lineage.
+- Promotion có audit và rollback được.
+- Publish production recipe resolve mutable alias thành immutable model version.
+
+**Tài liệu tiếp theo bắt buộc:** `docs/superpowers/plans/2026-08-08-research-model-lifecycle-implementation.md`.
+
+---
+
+## Phase 5: Persistent Inspection Orchestrator và Node Execution
+
+**Kết quả:** Thực thi workflow đã validate an toàn và lưu evidence đầy đủ theo từng node.
+
+**Scope:**
+
+1. Triển khai persisted inspection state machine từ precheck tới completion/fault/cancel.
+2. Xác nhận motion in-position trước capture và kiểm tra camera artifact.
+3. Triển khai typed node execution context, artifact store, cancellation, timeout, resource allocation và error contract.
+4. Đưa deterministic PCB/PCBA reference vertical slice lên hoạt động trước các ML node rộng hơn.
+5. Lưu `inspection_runs` và `inspection_node_runs` với effective version, parameter, timing, output và error.
+6. Lưu defect, image, evidence, initial decision thật và append-only review event.
+7. Kết nối Run control, progress, cancellation và restart recovery.
+8. Thêm deterministic replay, fault matrix và soak test.
+
+**Exit gate:**
+
+- Restart không tự động resume physical motion.
+- Mọi inspection hoàn tất tái lập được từ immutable version/hash.
+- Input corrupt, blur, unregistered, stale-pose hoặc checksum-invalid không tạo PASS.
+- Một nghìn simulated run deterministic hoàn tất không deadlock hoặc artifact mismatch.
+
+**Tài liệu tiếp theo bắt buộc:** cập nhật hoặc thay phần inspection-runtime chưa hoàn tất trong `docs/superpowers/plans/2026-08-06-device-adapter-runtime-implementation.md` bằng plan riêng hiện hành.
+
+---
+
+## Phase 6: Gia cố Industrial Pilot
+
+**Kết quả:** Vận hành một máy hoặc line PCB/PCBA thật với commissioning, traceability, integration và recovery control.
+
+**Scope:**
+
+1. Triển khai hardware CSI/UART transport và acceptance tooling.
+2. Triển khai calibration acquisition, quality metric, validity, expiry và production blocking policy.
+3. Thêm PLC handshake và signal mapping.
+4. Thêm trao đổi MES work-order, serial, lot, recipe và result.
+5. Thêm IPC-CFX/OPC UA tùy chọn sau versioned adapter.
+6. Enforce retention, quota, disk preflight, backup, restore dry-run và disaster recovery.
+7. Thêm time synchronization, health monitoring, notification và maintenance window.
+8. Thực hiện acceptance performance, reliability, safety và recovery trên target hardware.
+
+**Exit gate:**
+
+- Hardware interlock và MCU safety vẫn authoritative.
+- Calibration/profile lineage xuất hiện trong mọi inspection.
+- Integration outage theo queue/fail-safe policy đã tài liệu hóa.
+- Backup restore được test, không chỉ cấu hình.
+- Pilot acceptance gồm cycle time, false-call rate, escape rate, uptime và recovery time đã đo.
+
+**Tài liệu tiếp theo bắt buộc:** `docs/superpowers/plans/2026-08-08-industrial-pilot-implementation.md` sau khi biết hardware/factory contract.
+
+---
+
+## Phase 7: Commercial Scale
+
+**Kết quả:** Mở rộng pilot đã chứng minh thành sản phẩm đa site có thể support.
+
+**Scope:**
+
+1. Thêm Operator, Quality Reviewer, Process Engineer, Administrator và service identity với resource-level permission.
+2. Thêm SSO và enterprise identity integration khi cần.
+3. Thêm inventory fleet/site/workstation và centralized health.
+4. Thêm signed application/node/model/configuration bundle với staged rollout và rollback.
+5. Thêm licensing/entitlement boundary không chặn machine safety.
+6. Thêm remote-support session an toàn, explicit và có audit.
+7. Thêm tenant/site isolation, centralized backup policy và regional retention.
+8. Thêm commercial observability, service-level objective, support bundle và upgrade compatibility test.
+
+**Exit gate:**
+
+- Permission theo least privilege và được test tại API boundary.
+- Update được ký, staged, observable và reversible.
+- Central service outage không làm local station an toàn mất khả năng hoạt động.
+- Dữ liệu và secret từng site được cô lập.
+- Upgrade test bao phủ database, settings schema, node manifest, recipe, model và artifact.
+
+**Tài liệu tiếp theo bắt buộc:** Thiết kế thương mại chỉ bắt đầu sau khi có dữ liệu acceptance industrial pilot.
+
+---
+
+## Verification bắt buộc sau mỗi phase
+
+```bash
+bash scripts/test/test.sh
+bash scripts/build/build.sh
+bash -n scripts/run_dev.sh
+codegraph sync .
+codegraph status .
+node .gitnexus/run.cjs detect-changes
+git diff --check
+```
+
+Chạy browser verification cho workspace đã đổi tại 390, 768, 1280 và 1920 pixel. Chạy security check phù hợp với dependency/service mới. Không tuyên bố phase hoàn tất chỉ từ unit test; kiểm chứng exit gate bằng end-to-end evidence.

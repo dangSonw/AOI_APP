@@ -1,0 +1,310 @@
+# Đặc tả thiết kế Dataset Manager
+
+**Ngày:** 2026-08-07
+**Tác giả:** AI Agent
+**Trạng thái:** Được duyệt để triển khai
+**Phạm vi:** Quản lý dataset đầy đủ bằng file trong `data/datasets/`, API backend và tab Dataset frontend có image viewer.
+
+---
+
+## 1. Tổng quan
+
+Hệ thống AOI cần Dataset Manager để tổ chức ảnh tham chiếu (golden sample), ảnh capture và dataset training tùy chỉnh. Khác Inspection Database dùng record PostgreSQL, dataset **dựa trên file**: các folder dưới `data/datasets/` cùng descriptor `metadata.json`. Backend cung cấp REST API cho các folder; frontend cung cấp file manager trực quan cùng image viewer.
+
+**Quyết định thiết kế chính:**
+
+- Không có table database; dataset là directory filesystem cùng metadata JSON.
+- Ảnh lưu thành file trên disk; backend tự tạo/cập nhật `metadata.json`.
+- Backend dùng `pathlib` với path tương đối từ `PROJECT_ROOT`, portable trên WSL, Jetson Nano và Linux.
+- Frontend chỉ gọi API backend, không truy cập filesystem trực tiếp.
+- Upload dùng `multipart/form-data`; download/export dùng ZIP streaming.
+
+## 2. Cấu trúc folder
+
+```text
+data/datasets/
+├── golden-samples/
+│   ├── metadata.json
+│   ├── top-view/
+│   │   ├── img001.png
+│   │   └── img002.png
+│   └── bottom-view/
+│       └── img003.png
+├── defect-training-v1/
+│   ├── metadata.json
+│   ├── good/
+│   │   └── sample-01.png
+│   └── missing-solder/
+│       └── defect-01.png
+```
+
+### 2.1 Schema `metadata.json`
+
+```json
+{
+  "name": "golden-samples",
+  "description": "Golden reference images for Rev C mainboard",
+  "createdAt": "2026-08-07T10:30:00Z",
+  "updatedAt": "2026-08-07T14:22:00Z",
+  "categories": [
+    { "name": "top-view", "imageCount": 2, "totalSizeBytes": 2156800 },
+    { "name": "bottom-view", "imageCount": 1, "totalSizeBytes": 1078400 }
+  ],
+  "totalImages": 3,
+  "totalSizeBytes": 3235200
+}
+```
+
+- Regenerate `metadata.json` bằng cách scan nội dung directory thật sau mỗi mutation.
+- Frontend đọc metadata qua API, không đọc trực tiếp.
+
+### 2.2 Ràng buộc naming
+
+| Entity | Rule | Ví dụ |
+|---|---|---|
+| Dataset name | kebab-case, 1–64 ký tự, `[a-z0-9][a-z0-9-]*[a-z0-9]` | `golden-samples` |
+| Category name | kebab-case, 1–64 ký tự, cùng pattern | `top-view` |
+| Image filename | `[a-zA-Z0-9_-]+\.(png|jpg|jpeg|bmp|tiff)`, tối đa 128 ký tự | `img001.png` |
+
+Tên không được chứa `..`, `/`, `\`, null byte hoặc prefix hidden-file. Backend validate và trả 422 cho tên không an toàn.
+
+### 2.3 Format ảnh hỗ trợ
+
+PNG (ưu tiên, lossless), JPEG/JPG, BMP, TIFF/TIF. File đơn tối đa **50 MB**; mỗi request upload tối đa **100 file**.
+
+## 3. Endpoint API
+
+Mọi endpoint yêu cầu `Authorization: Bearer <token>`. Prefix: `/api/datasets`.
+
+### 3.1 CRUD dataset
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/api/datasets` | Liệt kê dataset cùng metadata |
+| POST | `/api/datasets` | Tạo dataset, body JSON gồm name và description |
+| GET | `/api/datasets/{name}` | Đọc metadata và category của một dataset |
+| PUT | `/api/datasets/{name}` | Cập nhật rename hoặc description |
+| DELETE | `/api/datasets/{name}` | Xóa toàn bộ folder và ảnh dataset |
+
+### 3.2 CRUD category
+
+| Method | Path | Mô tả |
+|---|---|---|
+| POST | `/api/datasets/{name}/categories` | Tạo category subfolder |
+| PUT | `/api/datasets/{name}/categories/{category}` | Rename category |
+| DELETE | `/api/datasets/{name}/categories/{category}` | Xóa category cùng ảnh |
+
+### 3.3 Image operation
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/api/datasets/{name}/categories/{category}/images` | Liệt kê ảnh trong category |
+| POST | `/api/datasets/{name}/categories/{category}/images` | Upload ảnh multipart |
+| GET | `/api/datasets/{name}/categories/{category}/images/{filename}` | Serve file ảnh |
+| DELETE | `/api/datasets/{name}/categories/{category}/images/{filename}` | Xóa một ảnh |
+| PATCH | `/api/datasets/{name}/categories/{category}/images/{filename}` | Rename ảnh |
+| POST | `/api/datasets/{name}/categories/{category}/images/{filename}/move` | Move sang category khác |
+
+### 3.4 Bulk, import và export
+
+| Method | Path | Mô tả |
+|---|---|---|
+| POST | `/api/datasets/{name}/import-captures` | Copy ảnh từ `data/captures/` vào dataset |
+| GET | `/api/datasets/{name}/export` | Download dataset thành ZIP streaming |
+
+### 3.5 Browser capture
+
+| Method | Path | Mô tả |
+|---|---|---|
+| GET | `/api/captures` | Liệt kê ảnh capture có thể import |
+
+## 4. Schema request và response
+
+### 4.1 `DatasetSummary`
+
+```json
+{
+  "name": "golden-samples",
+  "description": "Golden reference images",
+  "totalImages": 3,
+  "totalSizeBytes": 3235200,
+  "categoryCount": 2,
+  "createdAt": "2026-08-07T10:30:00Z",
+  "updatedAt": "2026-08-07T14:22:00Z"
+}
+```
+
+### 4.2 `DatasetDetail`
+
+```json
+{
+  "name": "golden-samples",
+  "description": "Golden reference images",
+  "totalImages": 3,
+  "totalSizeBytes": 3235200,
+  "createdAt": "2026-08-07T10:30:00Z",
+  "updatedAt": "2026-08-07T14:22:00Z",
+  "categories": [
+    { "name": "top-view", "imageCount": 2, "totalSizeBytes": 2156800 }
+  ]
+}
+```
+
+### 4.3 `ImageInfo`
+
+```json
+{
+  "filename": "img001.png",
+  "sizeBytes": 1078400,
+  "mediaType": "image/png",
+  "widthPx": 1920,
+  "heightPx": 1080,
+  "createdAt": "2026-08-07T10:30:00Z"
+}
+```
+
+### 4.4 `CreateDatasetRequest`
+
+```json
+{ "name": "golden-samples", "description": "Optional description" }
+```
+
+### 4.5 `ImportCapturesRequest`
+
+```json
+{
+  "filenames": [
+    "simulator/console-capture-xxx.png",
+    "simulator/sources/webcam-xxx.png"
+  ],
+  "targetCategory": "top-view"
+}
+```
+
+## 5. Kiến trúc backend
+
+### 5.1 File cần tạo
+
+| File | Trách nhiệm |
+|---|---|
+| `backend/app/api/datasets.py` | Router API và mọi endpoint dataset |
+| `backend/app/services/dataset_service.py` | Operation filesystem và quản lý metadata |
+| `backend/app/schemas/dataset.py` | Schema request/response Pydantic |
+
+### 5.2 Rule service layer
+
+- Resolve mọi path bằng `pathlib.Path` tương đối với `PROJECT_ROOT / 'data' / 'datasets'`.
+- Chống traversal bằng cách validate mọi segment với `^[a-z0-9][a-z0-9-]*[a-z0-9]$`, từ chối `..` và absolute path.
+- Regenerate `metadata.json` bằng directory thật sau mỗi mutation.
+- Đọc dimension ảnh bằng module `struct` từ header PNG/JPEG, không phụ thuộc PIL. Parse lỗi thì `widthPx`/`heightPx` là null.
+- Export bằng `zipfile.ZipFile`, `ZIP_DEFLATED` và `StreamingResponse`.
+- Ghi file qua temp file rồi `os.replace()` nguyên tử.
+- Kiểm `Content-Length` và từ chối upload quá lớn trước khi ghi.
+
+### 5.3 Bổ sung Settings
+
+Thêm vào `backend/app/config/settings.py`:
+
+```python
+datasets_data_directory: str = 'data/datasets'
+
+@property
+def datasets_data_path(self) -> Path:
+    return PROJECT_ROOT / self.datasets_data_directory
+```
+
+## 6. Kiến trúc frontend
+
+### 6.1 File mới
+
+| File | Trách nhiệm |
+|---|---|
+| `frontend/src/pages/DatasetPage.tsx` | Trang Dataset Manager chính |
+| `frontend/src/services/dataset-service.ts` | API client endpoint dataset |
+| `frontend/src/types/dataset.ts` | Interface TypeScript |
+| `frontend/src/components/dataset/DatasetBrowser.tsx` | Panel trái: tree dataset/category |
+| `frontend/src/components/dataset/ImageGrid.tsx` | Trung tâm: grid thumbnail |
+| `frontend/src/components/dataset/ImageViewer.tsx` | Modal ảnh full-size có zoom/pan |
+| `frontend/src/components/dataset/DatasetToolbar.tsx` | Toolbar create/upload/import/export/delete |
+
+### 6.2 Thay đổi file hiện có
+
+| File | Thay đổi |
+|---|---|
+| `frontend/src/types/workspace.ts` | Thêm `'dataset'` vào union `WorkspaceView` |
+| `frontend/src/components/ProjectExplorer.tsx` | Thêm `view: 'dataset'` cho item Dataset |
+| `frontend/src/pages/WorkspacePage.tsx` | Import và render `DatasetPage` khi `activeView === 'dataset'` |
+
+### 6.3 Layout trang
+
+```text
++-----------------------------------------------------------+
+|  Dataset Manager                        [+New] [Import]    |
++----------------+------------------------------------------+
+| Datasets       |  golden-samples / top-view   [Upload]     |
+|                |                                           |
+| > golden-      |  [thumb1] [thumb2] [thumb3] [thumb4]      |
+|   samples      |                                           |
+|   +- top-view  |  [thumb5] [thumb6]                        |
+|   +- bottom-   |  Showing 6 images - 3.2 MB                |
+|     view       |                                           |
+| > defect-      |                                           |
+|   training     |                                           |
+|   +- good      |                                           |
+|   +- missing-  |                                           |
+|     solder     |                                           |
+| [+Dataset]     |                                           |
++----------------+------------------------------------------+
+|  Status: 2 datasets - 6 images - 3.2 MB total             |
++-----------------------------------------------------------+
+```
+
+Image Viewer modal mở khi click thumbnail:
+
+- Ảnh full-size có zoom bằng scroll wheel, từ 10% đến 500%.
+- Pan bằng click-drag khi đã zoom.
+- Arrow key hoặc Prev/Next chuyển ảnh trong category.
+- Info bar hiển thị dimension, file size và format.
+- Action Download và Delete.
+- Escape đóng; arrow điều hướng; `+`/`-` zoom.
+
+### 6.4 Tương tác UI
+
+| Action | Trigger | API call |
+|---|---|---|
+| Tạo dataset | Click [+New], dialog | `POST /api/datasets` |
+| Tạo category | Right-click hoặc nút [+] | `POST .../categories` |
+| Upload ảnh | Click [Upload] hoặc drag-drop | `POST .../images` multipart |
+| Import capture | Click [Import], picker | `POST .../import-captures` |
+| Xem ảnh | Click thumbnail | Mở ImageViewer modal |
+| Xóa ảnh | Select + Delete hoặc context menu | `DELETE .../images/{filename}` |
+| Move ảnh | Drag sang category khác | `POST .../images/{filename}/move` |
+| Rename | Double-click tên | Endpoint rename `PUT` |
+| Export ZIP | Click [Export] trên dataset | `GET .../export` |
+| Xóa dataset | Context menu có confirmation | `DELETE /api/datasets/{name}` |
+
+## 7. Security
+
+- Validate mọi path segment bằng allowlist regex trước filesystem access.
+- Từ chối traversal `../` trước mọi operation.
+- Kiểm magic byte: PNG `89 50 4E 47`, JPEG `FF D8 FF`, BMP `42 4D`, TIFF `49 49` hoặc `4D 4D`.
+- Enforce file tối đa 50 MB ở server.
+- Backend serve ảnh qua API, không static mount, để enforce auth.
+- Delete operation yêu cầu confirmation dialog frontend.
+
+## 8. Ghi chú compatibility
+
+- **WSL:** Dùng `pathlib` và forward slash; không xử lý Windows path riêng.
+- **Jetson Nano:** Không cần PIL/Pillow cho operation cơ bản; parse dimension bằng `struct`, fallback an toàn khi lỗi.
+- **Atomic write:** Temp file cùng directory rồi `os.replace()` cho `metadata.json`.
+- **File permission:** Directory `0o755`, file `0o644`.
+
+## 9. Ngoài phạm vi
+
+- Annotation ảnh bằng bounding box.
+- Tích hợp pipeline train AI.
+- Auto labeling hoặc classification.
+- Preprocessing ảnh như resize, augment, normalize.
+- Version control dataset.
+- Lock chỉnh sửa đồng thời nhiều user.
+- Metadata trong database; thiết kế chủ ý dùng file để portable.

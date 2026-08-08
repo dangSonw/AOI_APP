@@ -1,0 +1,350 @@
+# Kế hoạch triển khai Dataset Manager
+
+**Ngày:** 2026-08-07
+**Spec:** `specs/2026-08-07-dataset-manager-design.md`
+**Mục tiêu:** Cung cấp quản lý dataset đầy đủ gồm storage dựa trên file, API backend và `DatasetPage` frontend có image viewer.
+
+---
+
+## Phase 1: Foundation backend
+
+### Task 1.1: Thêm Settings và tạo data directory
+
+**File:** `backend/app/config/settings.py`
+**Action:** Thêm field `datasets_data_directory` và property `datasets_data_path`.
+
+```python
+datasets_data_directory: str = 'data/datasets'
+
+@property
+def datasets_data_path(self) -> Path:
+    return PROJECT_ROOT / self.datasets_data_directory
+```
+
+**Pitfall WSL:** Bảo đảm `data/datasets/` tồn tại bằng `mkdir -p` trong setup hoặc auto-create ở service layer. Không dùng absolute path.
+
+**Verification:** Import Settings và xác nhận `datasets_data_path` resolve tương đối đúng với `PROJECT_ROOT`.
+
+---
+
+### Task 1.2: Tạo schema Pydantic
+
+**File:** `backend/app/schemas/dataset.py`
+
+Tạo:
+
+- `DatasetCreateRequest`: name đã validate kebab-case, description.
+- `DatasetUpdateRequest`: `new_name` và description tùy chọn.
+- `CategoryCreateRequest`: name.
+- `CategoryRenameRequest`: `new_name`.
+- `ImageRenameRequest`: `new_filename`.
+- `ImageMoveRequest`: `target_category`.
+- `ImportCapturesRequest`: danh sách filename và `target_category`.
+- `CategorySummary`: name, image count, tổng byte.
+- `DatasetSummary`: name, description, tổng ảnh/byte, category count, created/updated time.
+- `DatasetDetail`: mở rộng summary bằng category list.
+- `ImageInfo`: filename, byte, media type, dimension, created time.
+- `ImageListResponse`: image list.
+
+**Validation:**
+
+- Field tên: `Field(min_length=1, max_length=64, pattern=r'^[a-z0-9]([a-z0-9-]*[a-z0-9])?$')`.
+- Filename tối đa 128 ký tự, custom validator cho ký tự và extension an toàn.
+- Pydantic v2 dùng `pattern`, không dùng `regex`.
+
+---
+
+### Task 1.3: Tạo dataset service
+
+**File:** `backend/app/services/dataset_service.py`
+
+Triển khai theo thứ tự:
+
+1. `_validate_name(name: str) -> None`: kiểm regex, từ chối input không an toàn.
+2. `_validate_filename(filename: str) -> None`: kiểm extension và ký tự an toàn.
+3. `_get_datasets_root() -> Path`: trả `settings.datasets_data_path`, tạo nếu thiếu.
+4. `_get_dataset_path(name: str) -> Path`: validate rồi resolve.
+5. `_read_image_dimensions(file_path: Path) -> tuple[int | None, int | None]`: parse header PNG/JPEG bằng `struct`.
+6. `_regenerate_metadata(dataset_path: Path) -> dict`: scan folder, đếm file, ghi `metadata.json` nguyên tử.
+7. `list_datasets() -> list[dict]`: scan root và đọc metadata.
+8. `create_dataset(name, description)`: tạo folder và metadata.
+9. `get_dataset(name)`: đọc metadata.
+10. `update_dataset(name, new_name, description)`: rename folder khi cần.
+11. `delete_dataset(name)`: xóa tree.
+12. `create_category(dataset_name, category_name)`.
+13. `rename_category(dataset_name, old_name, new_name)`.
+14. `delete_category(dataset_name, category_name)`.
+15. `list_images(dataset_name, category_name)`.
+16. `upload_images(dataset_name, category_name, files)`.
+17. `get_image_path(dataset_name, category_name, filename)`.
+18. `delete_image(dataset_name, category_name, filename)`.
+19. `rename_image(dataset_name, category_name, old_filename, new_filename)`.
+20. `move_image(dataset_name, source_category, filename, target_category)`.
+21. `list_captures()`: scan `data/captures/` đệ quy.
+22. `import_captures(dataset_name, filenames, target_category)`.
+23. `export_dataset(dataset_name) -> Iterator[bytes]`: tạo ZIP streaming.
+
+**Rule quan trọng:**
+
+- Mỗi mutation phải gọi `_regenerate_metadata` sau khi operation thành công.
+- Mọi path phải resolve và được kiểm tra vẫn nằm trong root dự kiến.
+- Dùng temp file rồi `os.replace()` cho `metadata.json`.
+- Giới hạn upload 50 MB mỗi file và 100 file mỗi batch.
+- Đọc upload theo chunk, không nạp file lớn không giới hạn vào memory.
+- Import capture dùng `shutil.copy2`, xác minh source nằm trong captures root.
+- Parse dimension lỗi thì trả `None`, không làm operation ảnh thất bại.
+- Dùng `pathlib.Path`, không dùng `os.path.sep`.
+
+---
+
+### Task 1.4: Tạo API router
+
+**File:** `backend/app/api/datasets.py`
+
+```python
+router = APIRouter(prefix='/api/datasets', tags=['datasets'])
+```
+
+Endpoint:
+
+1. `GET /api/datasets`: list dataset.
+2. `POST /api/datasets`: tạo dataset.
+3. `GET /api/datasets/{name}`: đọc dataset.
+4. `PUT /api/datasets/{name}`: cập nhật dataset.
+5. `DELETE /api/datasets/{name}`: xóa dataset.
+6. `POST /api/datasets/{name}/categories`: tạo category.
+7. `PUT /api/datasets/{name}/categories/{category}`: rename category.
+8. `DELETE /api/datasets/{name}/categories/{category}`: xóa category.
+9. `GET /api/datasets/{name}/categories/{category}/images`: list ảnh.
+10. `POST /api/datasets/{name}/categories/{category}/images`: upload multipart.
+11. `GET /api/datasets/{name}/categories/{category}/images/{filename}`: `FileResponse`.
+12. `DELETE /api/datasets/{name}/categories/{category}/images/{filename}`: xóa ảnh.
+13. `PATCH /api/datasets/{name}/categories/{category}/images/{filename}`: rename ảnh.
+14. `POST /api/datasets/{name}/categories/{category}/images/{filename}/move`: move ảnh.
+15. `POST /api/datasets/{name}/import-captures`: import capture.
+16. `GET /api/datasets/{name}/export`: ZIP bằng `StreamingResponse`.
+
+Router capture riêng:
+
+```python
+captures_router = APIRouter(prefix='/api/captures', tags=['captures'])
+```
+
+17. `GET /api/captures`: liệt kê file capture.
+
+Serve ảnh với media type theo extension và `Cache-Control: private, max-age=3600`. Validate extension, dung lượng và magic byte trước ghi. Không set toàn bộ ZIP hoặc file upload lớn vào memory.
+
+---
+
+### Task 1.5: Đăng ký router trong `main.py`
+
+**File:** `backend/app/main.py`
+
+```python
+from app.api.datasets import router as datasets_router
+from app.api.datasets import captures_router
+
+app.include_router(datasets_router)
+app.include_router(captures_router)
+```
+
+**Verification:** Start backend và xác nhận `/docs` có endpoint mới.
+
+---
+
+## Phase 2: Foundation frontend
+
+### Task 2.1: Tạo type TypeScript
+
+**File:** `frontend/src/types/dataset.ts`
+
+Định nghĩa `CategorySummary`, `DatasetSummary`, `DatasetDetail`, `ImageInfo` và `CaptureFile` khớp camelCase response backend. Dimension ảnh là `number | null`; timestamp là string ISO.
+
+---
+
+### Task 2.2: Tạo API service
+
+**File:** `frontend/src/services/dataset-service.ts`
+
+Dùng pattern `apiRequest` và `apiBlobRequest` hiện có để tạo:
+
+- `readDatasets`, `createDataset`, `readDataset`, `updateDataset`, `deleteDataset`.
+- `createCategory`, `renameCategory`, `deleteCategory`.
+- `readImages`, `uploadImages`, `deleteImage`, `renameImage`, `moveImage`.
+- `importCaptures`, `exportDataset`, `readCaptures`.
+- Helper tải ảnh đã xác thực thành blob URL.
+
+Upload phải dùng `FormData`; không set `Content-Type` thủ công vì browser tạo multipart boundary.
+
+```typescript
+const formData = new FormData();
+for (const file of files) formData.append('files', file);
+const headers = new Headers({ Authorization: `Bearer ${accessToken}` });
+```
+
+`<img src>` không gửi bearer header. Chọn fetch blob rồi `URL.createObjectURL()`, cache URL và revoke khi unmount hoặc ảnh thay đổi.
+
+---
+
+### Task 2.3: Cập nhật workspace type
+
+**File:** `frontend/src/types/workspace.ts`
+
+Thêm `'dataset'` vào union `WorkspaceView`:
+
+```typescript
+export type WorkspaceView = 'dashboard' | 'workflow-editor' | 'settings' | 'hardware' | 'camera-manager' | 'database' | 'dataset';
+```
+
+---
+
+### Task 2.4: Cập nhật `ProjectExplorer`
+
+**File:** `frontend/src/components/ProjectExplorer.tsx`
+
+Đổi item Dataset thành:
+
+```typescript
+{ label: 'Dataset', icon: 'D', view: 'dataset' },
+```
+
+---
+
+### Task 2.5: Cập nhật `WorkspacePage`
+
+**File:** `frontend/src/pages/WorkspacePage.tsx`
+
+1. Import `DatasetPage`.
+2. Thêm title `'dataset': 'Dataset manager'`.
+3. Render `<DatasetPage accessToken={session.accessToken} />` khi `activeView === 'dataset'`.
+
+---
+
+## Phase 3: Component frontend
+
+### Task 3.1: Tạo `DatasetPage.tsx`
+
+**File:** `frontend/src/pages/DatasetPage.tsx`
+
+State gồm dataset list, dataset/category đang chọn, detail, image list, loading/error và image viewer đang mở. Layout flex row với `DatasetBrowser` bên trái 240 px; main content gồm toolbar, grid và status bar. Sau mutation nhỏ chỉ refetch detail và image list bị ảnh hưởng, không refetch toàn bộ dataset không cần thiết.
+
+### Task 3.2: Tạo `DatasetBrowser.tsx`
+
+**File:** `frontend/src/components/dataset/DatasetBrowser.tsx`
+
+Nhận dataset, selection, detail và callback select/create/rename/delete. Render tree collapse/expand; mỗi dataset mở ra category. Context menu hỗ trợ rename, delete và category mới. Dùng style `project-tree` làm reference, light theme và normal flow; không dùng absolute positioning cho layout.
+
+### Task 3.3: Tạo `ImageGrid.tsx`
+
+**File:** `frontend/src/components/dataset/ImageGrid.tsx`
+
+Nhận image list, dataset/category, token và callback click/delete/rename. Mỗi thumbnail tải blob có auth, hiển thị filename cùng file size, mở viewer khi click và có context menu rename/delete/move.
+
+```css
+grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+```
+
+Revoke blob URL trong cleanup `useEffect`. Thêm `onDragOver` và `onDrop` để upload file từ `DataTransfer`.
+
+### Task 3.4: Tạo `ImageViewer.tsx`
+
+**File:** `frontend/src/components/dataset/ImageViewer.tsx`
+
+Modal full-screen có backdrop, ảnh blob, zoom bằng CSS transform, pan bằng drag, reset khi đổi ảnh và Prev/Next trong image list. Keyboard:
+
+- `Escape`: đóng.
+- `ArrowLeft`/`ArrowRight`: ảnh trước/sau.
+- `+` hoặc `=`: zoom in.
+- `-`: zoom out.
+- `0`: reset zoom.
+
+Khóa body scroll khi modal mount và khôi phục khi unmount.
+
+### Task 3.5: Tạo `DatasetToolbar.tsx`
+
+**File:** `frontend/src/components/dataset/DatasetToolbar.tsx`
+
+Button:
+
+- `+ New Dataset`: luôn enable.
+- `Upload`: enable khi chọn category, mở file picker.
+- `Import from Captures`: enable khi chọn category.
+- `Export ZIP`: enable khi chọn dataset.
+- Breadcrumb hiển thị `dataset-name / category-name`.
+
+File input ẩn:
+
+```html
+<input type="file" multiple accept=".png,.jpg,.jpeg,.bmp,.tiff,.tif" />
+```
+
+---
+
+## Phase 4: Styling
+
+### Task 4.1: Thêm CSS dataset
+
+Thêm class cho page flex, browser 240 px có scroll, content flex column, toolbar, responsive CSS Grid, thumbnail, label truncate và overlay/viewer. Theo light theme, WCAG AA và responsive từ 320 px. Không gây document-level horizontal overflow.
+
+---
+
+## Phase 5: Integration và test
+
+### Task 5.1: Test backend
+
+**File:** `tests/backend/test_dataset_service.py`
+
+Bao phủ:
+
+- CRUD dataset và category.
+- Upload/list/delete/rename/move ảnh.
+- Từ chối path traversal.
+- File size limit và tên không hợp lệ.
+- Regenerate `metadata.json` chính xác.
+
+### Task 5.2: Integration test API
+
+**File:** `tests/backend/test_dataset_api.py`
+
+Bao phủ mọi endpoint có auth, anonymous `401`, missing resource `404`, invalid name `422`, multipart upload và ZIP export.
+
+### Task 5.3: Checklist verification cuối
+
+- [ ] Tạo dataset và category từ UI.
+- [ ] Upload qua file picker và drag-drop.
+- [ ] Thumbnail load qua auth; click mở viewer.
+- [ ] Zoom, pan và arrow navigation hoạt động.
+- [ ] Rename dataset, category và image.
+- [ ] Delete image, category và dataset có confirmation.
+- [ ] Move ảnh giữa category.
+- [ ] Import capture và export ZIP.
+- [ ] `metadata.json` cập nhật sau mỗi mutation.
+- [ ] Responsive tại 390, 768, 1280 và 1920 px.
+- [ ] Không absolute path hoặc horizontal overflow.
+- [ ] Hoạt động trên Ubuntu WSL.
+
+---
+
+## Tóm tắt thứ tự thực thi
+
+| Bước | Phase | Task | File |
+|---|---|---|---|
+| 1 | 1.1 | Settings | `backend/app/config/settings.py` |
+| 2 | 1.2 | Schema | `backend/app/schemas/dataset.py` |
+| 3 | 1.3 | Service | `backend/app/services/dataset_service.py` |
+| 4 | 1.4 | API router | `backend/app/api/datasets.py` |
+| 5 | 1.5 | Register | `backend/app/main.py` |
+| 6 | 2.1 | Type TS | `frontend/src/types/dataset.ts` |
+| 7 | 2.2 | Service TS | `frontend/src/services/dataset-service.ts` |
+| 8 | 2.3 | Workspace type | `frontend/src/types/workspace.ts` |
+| 9 | 2.4 | Explorer | `frontend/src/components/ProjectExplorer.tsx` |
+| 10 | 2.5 | WorkspacePage | `frontend/src/pages/WorkspacePage.tsx` |
+| 11 | 3.1 | DatasetPage | `frontend/src/pages/DatasetPage.tsx` |
+| 12 | 3.2 | Browser | `frontend/src/components/dataset/DatasetBrowser.tsx` |
+| 13 | 3.3 | Grid | `frontend/src/components/dataset/ImageGrid.tsx` |
+| 14 | 3.4 | Viewer | `frontend/src/components/dataset/ImageViewer.tsx` |
+| 15 | 3.5 | Toolbar | `frontend/src/components/dataset/DatasetToolbar.tsx` |
+| 16 | 4.1 | CSS | Stylesheet chính |
+| 17 | 5.1–5.3 | Test | `tests/backend/` |
+
+Mỗi bước phụ thuộc bước trước. Không bỏ qua thứ tự; verify compile hoặc runtime sau từng bước.
