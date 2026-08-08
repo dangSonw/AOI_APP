@@ -1,20 +1,15 @@
-from pathlib import Path
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import delete
 
-from app.api.workstation_preferences import get_preference_repository
 from app.config.settings import get_settings
 from app.database.session import SessionLocal
 from app.main import app
 from app.models.audit_event import AuditEvent
-from app.services.workstation_preference_repository import WorkstationPreferenceRepository
 
 
 @pytest.fixture
-def client(tmp_path: Path):
-    app.dependency_overrides[get_preference_repository] = lambda: WorkstationPreferenceRepository(tmp_path)
+def client():
     try:
         with TestClient(app) as test_client:
             yield test_client

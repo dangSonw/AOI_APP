@@ -1,13 +1,9 @@
-import json
-import os
 import re
-from datetime import datetime, timezone
-from pathlib import Path
-from threading import RLock
-
-from pydantic import ValidationError
-
-from app.schemas.workstation_preferences import WorkstationPreferencesSchema
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+from app.models.audit_event import AuditEvent
+from app.schemas.workstation_preferences import WorkstationPreferenceContentSchema, WorkstationPreferencesSchema
+from app.services.settings_service import SettingsIdentity, SettingsRevisionConflict, create_settings_version, get_current_settings
 
 
 WORKSTATION_ID_PATTERN = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
@@ -26,10 +22,8 @@ class StalePreferenceRevision(RuntimeError):
 
 
 class WorkstationPreferenceRepository:
-    _write_lock = RLock()
-
-    def __init__(self, root: Path) -> None:
-        self.root = root
+    def __init__(self, session: Session) -> None:
+        self.session = session
 
     @staticmethod
     def validate_workstation_id(workstation_id: str) -> str:
@@ -37,55 +31,59 @@ class WorkstationPreferenceRepository:
             raise InvalidWorkstationId('The workstation ID is invalid.')
         return workstation_id
 
-    def _path(self, user_id: int, workstation_id: str) -> Path:
+    def _identity(self, user_id: int, workstation_id: str) -> SettingsIdentity:
         if user_id < 1:
             raise ValueError('The user ID is invalid.')
-        return self.root / 'users' / str(user_id) / f'{self.validate_workstation_id(workstation_id)}.json'
+        return SettingsIdentity('workstation', self.validate_workstation_id(workstation_id), 'workstation-preferences', user_id)
 
     @staticmethod
-    def _read_file(path: Path) -> WorkstationPreferencesSchema:
-        try:
-            return WorkstationPreferencesSchema.model_validate_json(path.read_text(encoding='utf-8'))
-        except (OSError, ValidationError, ValueError) as error:
-            raise PreferenceStorageError('The workstation contains invalid persisted preferences.') from error
+    def _response(user_id: int, workstation_id: str, version) -> WorkstationPreferencesSchema:
+        return WorkstationPreferencesSchema(
+            version=version.schema_version, revision=version.revision, user_id=user_id,
+            workstation_id=workstation_id, updated_at=version.created_at, **version.payload,
+        )
 
     def read(self, user_id: int, workstation_id: str) -> WorkstationPreferencesSchema:
-        path = self._path(user_id, workstation_id)
-        if not path.exists():
+        identity = self._identity(user_id, workstation_id)
+        try:
+            version = get_current_settings(self.session, identity)
+        except SQLAlchemyError as error:
+            raise PreferenceStorageError('The workstation preferences could not be loaded.') from error
+        if version is None:
             return WorkstationPreferencesSchema.create_default(user_id, workstation_id)
-        preferences = self._read_file(path)
-        if preferences.user_id != user_id or preferences.workstation_id != workstation_id:
-            raise PreferenceStorageError('The workstation contains invalid persisted preferences.')
-        return preferences
+        return self._response(user_id, workstation_id, version)
 
     def save(
         self,
         user_id: int,
         workstation_id: str,
         submitted: WorkstationPreferencesSchema,
+        *,
+        actor_id: int,
+        request_id: str,
+        reason: str = 'Updated workstation preferences.',
     ) -> WorkstationPreferencesSchema:
-        path = self._path(user_id, workstation_id)
+        identity = self._identity(user_id, workstation_id)
         if submitted.user_id != user_id or submitted.workstation_id != workstation_id:
             raise InvalidWorkstationId('The preference identity does not match the request.')
-
-        with self._write_lock:
-            stored_revision = self._read_file(path).revision if path.exists() else 0
-            if submitted.revision != stored_revision:
-                raise StalePreferenceRevision('The workstation preferences were updated by another request.')
-            updated = submitted.model_copy(update={
-                'revision': stored_revision + 1,
-                'updated_at': datetime.now(timezone.utc),
-            })
-            temporary_path = path.with_suffix('.json.tmp')
-            path.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                with temporary_path.open('w', encoding='utf-8') as preference_file:
-                    json.dump(updated.model_dump(mode='json', by_alias=True), preference_file, ensure_ascii=False, indent=2)
-                    preference_file.write('\n')
-                    preference_file.flush()
-                    os.fsync(preference_file.fileno())
-                os.replace(temporary_path, path)
-            except OSError as error:
-                temporary_path.unlink(missing_ok=True)
-                raise PreferenceStorageError('The workstation preferences could not be persisted.') from error
-            return updated
+        content = WorkstationPreferenceContentSchema.model_validate(submitted.model_dump()).model_dump(mode='json', by_alias=True)
+        try:
+            previous = get_current_settings(self.session, identity)
+            version = create_settings_version(
+                self.session, identity, submitted.revision, submitted.version,
+                content, actor_id, reason,
+            )
+            self.session.add(AuditEvent(
+                actor_id=actor_id, action='update', method='PUT',
+                path=f'/api/workstation-preferences/{workstation_id}',
+                resource_type='workstation-preferences', resource_id=workstation_id,
+                request_id=request_id, status_code=200, result='success',
+                before_checksum=previous.checksum if previous is not None else None,
+                after_checksum=version.checksum, reason=reason, client_metadata={},
+            ))
+            self.session.flush()
+        except SettingsRevisionConflict as error:
+            raise StalePreferenceRevision('The workstation preferences were updated by another request.') from error
+        except SQLAlchemyError as error:
+            raise PreferenceStorageError('The workstation preferences could not be persisted.') from error
+        return self._response(user_id, workstation_id, version)
