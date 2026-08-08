@@ -52,31 +52,14 @@ Sửa launcher/config để hỗ trợ hardware mặc định, `start --mode sim
 
 Tạo HTTPX client typed, timeout riêng, protocol/hash check, lỗi chuẩn hóa và endpoint gateway bảo vệ trong backend chính.
 
-## Task 9: Inspection Orchestrator Được Lưu
+## Task 9–12: Kế hoạch Runtime Đã Được Thay thế
 
-Tạo state machine move-settle-capture-inspect-persist, cancellation, fault persistence và recovery không tự tiếp tục motion; thêm migration và API.
+Đề xuất inspection runtime ban đầu sau phần adapter đã được thay thế khi node-manifest
+platform và research registry trở thành nguồn chuẩn. Kiến trúc, schema, API contract,
+hành vi an toàn, replay policy và bằng chứng nghiệm thu hiện tại nằm tại:
 
-## Task 10: Baseline Thị giác Deterministic
+- `docs/superpowers/plans/2026-08-08-persistent-inspection-runtime.md.vn`
 
-Thêm OpenCV/NumPy và chỉ promote các runtime cần thiết: quality gate, undistortion, registration, median/MAD, absolute/gradient, connected components, normalization và quyết định ba trạng thái.
-
-## Task 11: Inspection Record và Evidence UI
-
-Thay record hard-code bằng API thật; kết nối Run với inspection API; hỗ trợ tìm kiếm, evidence, review override có actor/time và metrics trung thực.
-
-## Task 12: Vận hành, Tài liệu và Nghiệm thu
-
-Cập nhật `README.md`, `README.md.vn`, script docs/setup/test/deploy, memory song ngữ và script nghiệm thu Jetson/simulator soak.
-
-## Xác minh Cuối
-
-```bash
-bash scripts/test/test.sh
-bash scripts/build/build.sh
-bash -n scripts/run_dev.sh
-codegraph sync .
-codegraph status .
-git diff --check
-```
-
-Chạy simulation end-to-end, fault matrix, restart recovery và soak deterministic 1.000 run trước khi tuyên bố sẵn sàng trước phần cứng.
+Không triển khai đề xuất OpenCV/NumPy hoặc `core/vision` từ bản lịch sử. Phase 5 chủ ý
+phát hành một PCB reference slice deterministic nhỏ; promotion release-node rộng hơn chỉ
+thực hiện trong phase sau khi có validation.

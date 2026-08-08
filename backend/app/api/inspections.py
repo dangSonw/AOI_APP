@@ -138,7 +138,7 @@ def review_result(
     session: DatabaseSession,
 ) -> dict:
     inspection = submit_review(
-        session, result_id, current_user.id, request.decision,
+        session, result_id, current_user.id, request.decision, request.reason,
     )
     if inspection is None:
         raise HTTPException(

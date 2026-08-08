@@ -7,10 +7,18 @@ import {
 } from '../services/physical-io-service';
 import { readAlgorithmCatalog, readWorkflow } from '../services/workflow-service';
 import { readDeviceSnapshot } from '../services/device-service';
+import {
+  cancelInspectionRun,
+  readLatestInspectionRun,
+  readInspectionRun,
+  readRecipes,
+  startInspectionRun,
+} from '../services/inspection-service';
 import { readWorkstationPreferences, saveWorkstationPreferences } from '../services/workstation-preference-service';
 import type { AuthSession } from '../types/auth';
 import type { PhysicalInputState, PhysicalOutputState } from '../types/physical-io';
 import type { DeviceSnapshot } from '../types/devices';
+import type { InspectionRun } from '../types/inspection';
 import type { AlgorithmDefinition, Workflow } from '../types/workflow';
 import type { WorkstationPreferences } from '../types/workstation-preferences';
 import { createDefaultPreferences } from '../utils/workstation-preferences';
@@ -40,6 +48,9 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
+  const [inspectionRun, setInspectionRun] = useState<InspectionRun | null>(null);
+  const [runError, setRunError] = useState('');
+  const [isRunControlBusy, setIsRunControlBusy] = useState(false);
   const [savedWorkflow, setSavedWorkflow] = useState<Workflow | null>(null);
   const [workflowError, setWorkflowError] = useState('');
   const [isWorkflowDirty, setIsWorkflowDirty] = useState(false);
@@ -111,6 +122,34 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
   useEffect(() => {
     void loadSavedWorkflow();
   }, [loadSavedWorkflow]);
+
+  useEffect(() => {
+    const restoreActiveRun = async () => {
+      try {
+        const run = await readLatestInspectionRun(session.accessToken);
+        setInspectionRun(run);
+        setIsRunning(Boolean(run && ['queued', 'precheck', 'capturing', 'executing'].includes(run.status)));
+      } catch (loadError) {
+        setRunError(loadError instanceof Error ? loadError.message : 'Inspection runtime state could not be restored.');
+      }
+    };
+    void restoreActiveRun();
+  }, [session.accessToken]);
+
+  useEffect(() => {
+    if (!inspectionRun || !['queued', 'precheck', 'capturing', 'executing'].includes(inspectionRun.status)) return;
+    const interval = window.setInterval(async () => {
+      try {
+        const nextRun = await readInspectionRun(session.accessToken, inspectionRun.id);
+        setInspectionRun(nextRun);
+        setIsRunning(['queued', 'precheck', 'capturing', 'executing'].includes(nextRun.status));
+        if (['completed', 'faulted', 'cancelled'].includes(nextRun.status)) window.clearInterval(interval);
+      } catch (loadError) {
+        setRunError(loadError instanceof Error ? loadError.message : 'Inspection progress could not be refreshed.');
+      }
+    }, 500);
+    return () => window.clearInterval(interval);
+  }, [inspectionRun?.id, inspectionRun?.status, session.accessToken]);
 
   useEffect(() => {
     const loadPreferences = async () => {
@@ -185,6 +224,36 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
 
   const isMachineReady = Boolean(inputs && !inputs.machine.emergencyStop && inputs.machine.doorClosed);
 
+  const toggleInspectionRun = async () => {
+    setRunError('');
+    setIsRunControlBusy(true);
+    try {
+      if (isRunning && inspectionRun) {
+        const cancelled = await cancelInspectionRun(session.accessToken, inspectionRun.id);
+        setInspectionRun(cancelled);
+        setIsRunning(!['completed', 'faulted', 'cancelled'].includes(cancelled.status));
+        return;
+      }
+      if (!isMachineReady) throw new Error('Machine safety inputs must be ready before inspection starts.');
+      const recipes = await readRecipes(session.accessToken);
+      const recipe = recipes.find((item) => item.slug === ACTIVE_RECIPE_SLUG);
+      if (!recipe) throw new Error('Active Rev C mainboard recipe is unavailable.');
+      const timestamp = new Date().toISOString().replace(/\D/g, '').slice(0, 17);
+      const started = await startInspectionRun(session.accessToken, {
+        boardSerial: `AUTO-${timestamp}`,
+        lot: '',
+        recipeId: recipe.id,
+        threshold: 0.5,
+      });
+      setInspectionRun(started);
+      setIsRunning(true);
+    } catch (runFailure) {
+      setRunError(runFailure instanceof Error ? runFailure.message : 'Inspection run control failed.');
+    } finally {
+      setIsRunControlBusy(false);
+    }
+  };
+
   const requestViewChange = useCallback((nextView: WorkspaceView) => {
     if (nextView === activeView) return;
     if (activeView === 'workflow-editor' && isWorkflowDirty
@@ -200,8 +269,9 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
       activeView={activeView}
       isMachineReady={isMachineReady}
       isRunning={isRunning}
+      isRunControlBusy={isRunControlBusy}
       onViewChange={requestViewChange}
-      onRunToggle={() => setIsRunning((currentValue) => !currentValue)}
+      onRunToggle={() => void toggleInspectionRun()}
       onRefresh={() => void loadPhysicalState()}
       onSignOut={onSignOut}
     >
@@ -212,6 +282,8 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
           isLoading={isLoading}
           error={error}
           isRunning={isRunning}
+          inspectionRun={inspectionRun}
+          runError={runError}
           workflow={savedWorkflow}
           workflowError={workflowError}
           onConfigureWorkflow={() => requestViewChange('workflow-editor')}

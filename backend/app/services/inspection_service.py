@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.defect import Defect
 from app.models.inspection_image import InspectionImage
 from app.models.inspection_result import InspectionResult
+from app.models.inspection_run import InspectionReviewEvent
 from app.models.recipe import Recipe
 from app.models.user import User
 
@@ -174,6 +175,7 @@ def submit_review(
     result_id: int,
     reviewer_id: int,
     decision: str,
+    reason: str = '',
 ) -> InspectionResult | None:
     inspection = session.get(InspectionResult, result_id)
     if inspection is None:
@@ -181,6 +183,12 @@ def submit_review(
     inspection.review_decision = decision
     inspection.reviewed_by = reviewer_id
     inspection.reviewed_at = datetime.now(timezone.utc)
+    session.add(InspectionReviewEvent(
+        result_id=result_id,
+        actor_id=reviewer_id,
+        decision=decision,
+        reason=reason,
+    ))
     session.commit()
     session.refresh(inspection)
     return inspection

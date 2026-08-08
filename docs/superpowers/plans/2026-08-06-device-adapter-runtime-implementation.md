@@ -117,61 +117,14 @@
 
 **Deliverable:** Typed HTTPX clients with separate connect/read/write timeouts, protocol checks, hash verification, normalized errors, and protected gateway endpoints.
 
-## Task 9: Persistent Inspection Orchestrator
+## Tasks 9–12: Superseded Runtime Plan
 
-**Files:**
-- Create: `core/inspection/models.py`
-- Create: `core/inspection/state_machine.py`
-- Create: `backend/app/models/inspection.py`
-- Create: `backend/app/services/inspection_service.py`
-- Create: `backend/app/api/inspections.py`
-- Add database migration tooling and first migration.
-- Test: `tests/core/test_inspection_state_machine.py`
-- Test: `tests/integration/test_inspection_api.py`
+The original inspection-runtime proposal below this adapter work was replaced after the
+node-manifest platform and research registry became authoritative. Current architecture,
+schema, API contracts, safety behavior, replay policy, and acceptance evidence live in:
 
-**Deliverable:** Move-settle-capture-inspect-persist lifecycle, cancellation, fault persistence, restart-safe recovery that never resumes motion, and status/event APIs.
+- `docs/superpowers/plans/2026-08-08-persistent-inspection-runtime.md`
 
-## Task 10: Deterministic Vision Baseline
-
-**Files:**
-- Create focused modules under `core/vision` and `core/inspection`.
-- Promote only selected acquisition, undistortion, registration, golden, evidence, and decision node runtimes.
-- Add OpenCV/NumPy dependencies.
-- Test: `tests/core/vision/*`
-- Test: `tests/integration/test_replay_inspection.py`
-
-**Deliverable:** Quality gate, optional undistortion, registration, median/MAD golden model, absolute/gradient evidence, connected components, score normalization, and three-state decision with versioned artifacts.
-
-**Verification:** golden fixture images produce deterministic scores and hashes; corrupted/blurred/unregistered images never produce PASS.
-
-## Task 11: Inspection Records and Evidence UI
-
-**Files:**
-- Create backend schemas/services/API for records, evidence, review, and metrics.
-- Replace hard-coded `INSPECTION_RECORDS` usage in `DatabasePage` with a frontend service.
-- Connect Run control to inspection API and stream status.
-- Test backend APIs and frontend service/utilities/components.
-
-**Deliverable:** Searchable real records, evidence metadata/download, review override with actor/timestamp, and truthful metrics.
-
-## Task 12: Operations, Documentation, and Acceptance
-
-**Files:**
-- Modify: `README.md`, `README.md.vn`, script docs, setup/test/deploy scripts.
-- Update experience memory in both languages.
-- Add Jetson hardware acceptance and simulator soak scripts.
-
-**Deliverable:** Current architecture, modes, ports, data layout, Jetson setup, CSI/UART acceptance, backups, retention, diagnostics, and limitations documented accurately.
-
-**Final Verification:**
-
-```bash
-bash scripts/test/test.sh
-bash scripts/build/build.sh
-bash -n scripts/run_dev.sh
-codegraph sync .
-codegraph status .
-git diff --check
-```
-
-Run simulation end-to-end, fault matrix, restart recovery, and a 1,000-run deterministic soak before declaring pre-hardware readiness.
+Do not implement the former OpenCV/NumPy or `core/vision` proposal from historical copies.
+Phase 5 deliberately ships a small deterministic PCB reference slice and preserves broader
+release-node promotion for later validated phases.

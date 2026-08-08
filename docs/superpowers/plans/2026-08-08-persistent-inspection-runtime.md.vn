@@ -1,0 +1,76 @@
+# Runtime Kiểm tra Được Lưu — Biên bản Phase 5
+
+**Trạng thái:** đã triển khai và nghiệm thu bằng simulator ngày 2026-08-08.
+
+## Phạm vi và Ràng buộc
+
+- PostgreSQL là nguồn chuẩn trạng thái run; worker thread chỉ là cơ chế thực thi.
+- Khi ứng dụng restart, physical motion không bao giờ tự tiếp tục. Startup chuyển mọi run chưa kết
+  thúc thành `faulted` hoặc `cancelled` mà không gọi device adapter.
+- Chỉ capture sau khi motion state mới, đã home, đúng vị trí và safety interlock đóng.
+- Artifact inspection lossless, được kiểm SHA-256, ghi atomic và lưu content-addressed.
+- Input corrupt, blurred, unregistered, stale-pose, sai interlock hoặc checksum không thể PASS.
+- Manifest node hiện có vẫn configuration-only nếu chưa được promote riêng. Phase 5 chỉ chạy một
+  PCB reference node deterministic có giới hạn sau camera/motion boundary đã kiểm chứng.
+
+## Data Model
+
+Migration `0004_create_inspection_runtime` thêm:
+
+- `inspection_runs`: state, workflow snapshot/hash, effective version, parameter, artifact manifest,
+  decision, evidence hash, error, timing, cancel intent và result link.
+- `inspection_node_runs`: thứ tự node, version/target, parameter, resource, input, output, evidence,
+  status, timing và error chuẩn hóa.
+- `inspection_review_events`: lịch sử append-only gồm actor, decision, reason và timestamp.
+
+`inspection_results`, `defects`, `inspection_images` cũ vẫn tương thích truy vấn.
+
+## State và Recovery
+
+```text
+queued → precheck → capturing → executing → completed
+   │         │           │           │
+   └─────────┴───────────┴───────────┴→ cancelled | faulted
+```
+
+Mỗi transition commit trước external work. Cancellation lưu intent và có hiệu lực tại safe checkpoint
+kế tiếp. Adapter timeout không được ghi đè cancel intent đã lưu. Startup recovery chuyển
+`queued/precheck` thành cancelled và `capturing/executing` thành faulted.
+
+## API và UI
+
+- `POST /api/inspection-runs`
+- `GET /api/inspection-runs/active`
+- `GET /api/inspection-runs/latest`
+- `GET /api/inspection-runs/{run_id}`
+- `POST /api/inspection-runs/{run_id}/cancel`
+- `POST /api/inspection-runs/{run_id}/replay`
+
+Run/Stop của AOI Studio dùng các endpoint persisted này. Dashboard hiển thị run ID, board serial,
+physical stage, progress, terminal decision, fault detail và immutable evidence hash.
+
+## Replay Có Version
+
+- `deterministic-reference@1.0.0`: score từ digest cũ, được giữ để replay run cũ chính xác.
+- `deterministic-reference@2.0.0`: score từ pixel đã decode và ghi algorithm version vào evidence.
+
+Mỗi run pin effective version. Replay dispatch đúng implementation immutable đó và kiểm SHA-256,
+byte length artifact trước execution. Version không hỗ trợ bị fail closed.
+
+## Bằng chứng Nghiệm thu
+
+- 1.000 run deterministic trong process: cùng decision/evidence hash, không deadlock.
+- Safety matrix: corrupt, blurred, unregistered, stale pose, checksum sai, motion sai vị trí.
+- PostgreSQL integration: completed evidence, review append-only, cancellation, restart recovery, replay.
+- Simulator live:
+  - stale pose tạo FAULT trước capture;
+  - run thường tạo PASS và node evidence;
+  - cancel tạo terminal `cancelled`, không có result/node execution;
+  - cả hai reference version replay đúng evidence hash ban đầu.
+- AOI Studio responsive: không horizontal document overflow tại CSS width 390, 768, 1280, 1920.
+
+## Phần Hoãn lại
+
+- Broad release-node execution và ML inference đã validation thuộc phase sau.
+- Nghiệm thu Jetson CSI/UART phụ thuộc thiết bị thật.
+- Distributed scheduling nhiều station cần external worker/lease bền vững; scope hiện tại là một AOI workstation.

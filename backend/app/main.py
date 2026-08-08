@@ -9,6 +9,7 @@ from app.api.auth import router as auth_router
 from app.api.datasets import router as datasets_router
 from app.api.devices import router as devices_router
 from app.api.inspections import router as inspections_router
+from app.api.inspection_runs import router as inspection_runs_router
 from app.api.physical_io import router as physical_io_router
 from app.api.recipes import router as recipes_router
 from app.api.research import router as research_router
@@ -41,6 +42,7 @@ app.include_router(auth_router)
 app.include_router(datasets_router)
 app.include_router(devices_router)
 app.include_router(inspections_router)
+app.include_router(inspection_runs_router)
 app.include_router(physical_io_router)
 app.include_router(recipes_router)
 app.include_router(research_router)

@@ -8,6 +8,7 @@ from app.models.user import User  # noqa: F401
 from app.models.recipe import Recipe  # noqa: F401
 from app.models.research import ModelAlias, ModelPromotionEvent, ModelRegistryEntry, ModelVersion, ResearchArtifact, ResearchExperiment, ResearchRun  # noqa: F401
 from app.models.inspection_result import InspectionResult  # noqa: F401
+from app.models.inspection_run import InspectionNodeRun, InspectionReviewEvent, InspectionRun  # noqa: F401
 from app.models.defect import Defect  # noqa: F401
 from app.models.inspection_image import InspectionImage  # noqa: F401
 from app.models.audit_event import AuditEvent  # noqa: F401
@@ -15,6 +16,7 @@ from app.models.settings_activation import SettingsActivation  # noqa: F401
 from app.models.settings_document import SettingsDocument  # noqa: F401
 from app.models.settings_version import SettingsVersion  # noqa: F401
 from app.services.auth_service import create_user, get_user_by_email
+from app.services.inspection_runtime_service import recover_interrupted_runs
 
 
 DEFAULT_RECIPES = [
@@ -29,6 +31,7 @@ def initialize_database() -> None:
         verify_database_revision(connection)
 
     with SessionLocal() as session:
+        recover_interrupted_runs(session)
         seed_default_operator(session)
         seed_default_recipes(session)
 

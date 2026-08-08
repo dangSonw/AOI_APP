@@ -4,6 +4,8 @@ import type {
   InspectionFilters,
   InspectionListResponse,
   InspectionMetrics,
+  InspectionRun,
+  InspectionRunCreate,
   RecipeItem,
 } from '../types/inspection';
 
@@ -45,4 +47,28 @@ export async function submitReview(
 
 export async function readRecipes(accessToken: string): Promise<RecipeItem[]> {
   return apiRequest<RecipeItem[]>('/api/recipes', {}, accessToken);
+}
+
+export async function readLatestInspectionRun(accessToken: string): Promise<InspectionRun | null> {
+  return apiRequest<InspectionRun | null>('/api/inspection-runs/latest', {}, accessToken);
+}
+
+export async function readInspectionRun(accessToken: string, runId: string): Promise<InspectionRun> {
+  return apiRequest<InspectionRun>(`/api/inspection-runs/${runId}`, {}, accessToken);
+}
+
+export async function startInspectionRun(
+  accessToken: string,
+  request: InspectionRunCreate,
+): Promise<InspectionRun> {
+  return apiRequest<InspectionRun>('/api/inspection-runs', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  }, accessToken);
+}
+
+export async function cancelInspectionRun(accessToken: string, runId: string): Promise<InspectionRun> {
+  return apiRequest<InspectionRun>(`/api/inspection-runs/${runId}/cancel`, {
+    method: 'POST',
+  }, accessToken);
 }

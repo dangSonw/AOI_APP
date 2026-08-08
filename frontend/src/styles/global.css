@@ -802,6 +802,37 @@ button:disabled {
   min-width: 0;
 }
 
+.inspection-runtime {
+  margin: 0 12px 12px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: minmax(150px, .7fr) minmax(260px, 1.6fr) minmax(150px, .7fr);
+  align-items: center;
+  gap: 14px;
+  background: #f8fafc;
+  border: 1px solid var(--studio-border);
+  border-left: 4px solid var(--studio-blue);
+  border-radius: 7px;
+}
+
+.inspection-runtime--completed { border-left-color: var(--studio-green); }
+.inspection-runtime--faulted,
+.inspection-runtime--cancelled { border-left-color: var(--studio-red); }
+.inspection-runtime__identity,
+.inspection-runtime__evidence { min-width: 0; display: grid; gap: 3px; }
+.inspection-runtime__identity strong,
+.inspection-runtime__evidence strong { color: var(--studio-text); font-family: 'Space Grotesk', sans-serif; }
+.inspection-runtime code { overflow: hidden; color: var(--studio-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.inspection-runtime__stage { min-width: 0; display: grid; gap: 5px; }
+.inspection-runtime__stage > span { display: flex; justify-content: space-between; gap: 12px; color: var(--studio-muted); font-size: 11px; }
+.inspection-runtime__stage b { color: var(--studio-blue); font-variant-numeric: tabular-nums; }
+.inspection-runtime__track { height: 6px; overflow: hidden; background: #dfe7ef; border-radius: 1px; }
+.inspection-runtime__track i { height: 100%; display: block; background: var(--studio-blue); transition: width 180ms linear; }
+.inspection-runtime--completed .inspection-runtime__track i { background: var(--studio-green); }
+.inspection-runtime--faulted .inspection-runtime__track i,
+.inspection-runtime--cancelled .inspection-runtime__track i { background: var(--studio-red); }
+.inspection-runtime__stage small { min-height: 14px; color: var(--studio-faint); font-size: 10px; }
+
 .instrument-rail {
   display: grid;
   grid-template-columns: minmax(430px, 0.95fr) minmax(540px, 1.25fr);
@@ -2392,6 +2423,7 @@ button:disabled {
 }
 
 @media (max-width: 768px) {
+  .inspection-runtime { grid-template-columns: 1fr; }
   .studio-topbar {
     flex-wrap: wrap;
     padding-block: 5px;

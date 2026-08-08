@@ -98,3 +98,4 @@ class InspectionCreateRequest(ApiSchema):
 
 class ReviewRequest(ApiSchema):
     decision: Literal['PASS', 'FAIL']
+    reason: str = Field(default='', max_length=1000)

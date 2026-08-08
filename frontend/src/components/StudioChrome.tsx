@@ -9,6 +9,7 @@ interface StudioChromeProps {
   activeView: WorkspaceView;
   isMachineReady: boolean;
   isRunning: boolean;
+  isRunControlBusy?: boolean;
   children: ReactNode;
   onViewChange: (view: WorkspaceView) => void;
   onRunToggle: () => void;
@@ -29,6 +30,7 @@ export function StudioChrome({
   activeView,
   isMachineReady,
   isRunning,
+  isRunControlBusy = false,
   children,
   onViewChange,
   onRunToggle,
@@ -68,9 +70,15 @@ export function StudioChrome({
       </header>
 
       <section className="studio-toolbar" aria-label="Inspection controls">
-        <button className={`tool-button ${isRunning ? 'tool-button--stop' : 'tool-button--run'}`} type="button" onClick={onRunToggle}>
+        <button
+          className={`tool-button ${isRunning ? 'tool-button--stop' : 'tool-button--run'}`}
+          type="button"
+          disabled={isRunControlBusy}
+          aria-busy={isRunControlBusy}
+          onClick={onRunToggle}
+        >
           <span aria-hidden="true">{isRunning ? '■' : '▶'}</span>
-          {isRunning ? 'Stop' : 'Run'}
+          {isRunControlBusy ? 'Working…' : isRunning ? 'Stop' : 'Run'}
         </button>
         <button className="tool-button" type="button" disabled title="Single-step execution is not available in this milestone"><span aria-hidden="true">▷</span> Single step</button>
         <button className="tool-button" type="button" disabled title="Camera capture is not available in this milestone"><span aria-hidden="true">▣</span> Capture</button>

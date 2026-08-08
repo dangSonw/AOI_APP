@@ -1,5 +1,6 @@
 import type { PhysicalInputState, PhysicalOutputState } from '../types/physical-io';
 import type { InspectionStatus } from '../types/workspace';
+import type { InspectionRun } from '../types/inspection';
 import { StatusBadge } from '../components/StatusBadge';
 import type { Workflow } from '../types/workflow';
 import type { AlgorithmDefinition } from '../types/workflow';
@@ -13,6 +14,8 @@ interface DashboardPageProps {
   isLoading: boolean;
   error: string;
   isRunning: boolean;
+  inspectionRun: InspectionRun | null;
+  runError: string;
   onOutputToggle: (signalName: string, currentValue: boolean) => void;
   workflow: Workflow | null;
   workflowError: string;
@@ -30,7 +33,7 @@ const METRICS = [
   { label: 'Defects', value: '12', unit: 'flagged', delta: '0.96%' },
 ];
 
-export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, onOutputToggle, workflow, workflowError, onConfigureWorkflow, catalog, preferences, onPreferencesChange }: DashboardPageProps) {
+export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, inspectionRun, runError, onOutputToggle, workflow, workflowError, onConfigureWorkflow, catalog, preferences, onPreferencesChange }: DashboardPageProps) {
   const panels = preferences.panels;
   const updatePanel = <K extends keyof typeof panels>(key: K, value: typeof panels[K]) => onPreferencesChange({ panels: { ...panels, [key]: value } });
   const togglePanel = (key: keyof typeof panels) => updatePanel(key, { ...panels[key], isCollapsed: !panels[key].isCollapsed });
@@ -53,10 +56,35 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, on
     <div className="dashboard-layout" aria-busy={isLoading}>
       <div className="dashboard-main">
         {error && <p className="studio-message studio-message--error" role="alert">{error}</p>}
+        {runError && <p className="studio-message studio-message--error" role="alert">{runError}</p>}
 
         <section className={`dashboard-panel dashboard-state ${panels.state.isCollapsed ? 'dashboard-panel--collapsed' : ''}`}>
           <CollapsiblePanelHeader title="State" isCollapsed={panels.state.isCollapsed} onToggle={() => togglePanel('state')} status={<StatusBadge status={lineStatus} label={lineStatusLabel} />} />
-          {!panels.state.isCollapsed && <div className="instrument-rail">
+          {!panels.state.isCollapsed && <>
+          {inspectionRun && (
+            <section className={`inspection-runtime inspection-runtime--${inspectionRun.status}`} aria-label="Persisted inspection runtime" aria-live="polite">
+              <div className="inspection-runtime__identity">
+                <span className="overline">Run evidence</span>
+                <strong>{inspectionRun.boardSerial}</strong>
+                <code title={inspectionRun.id}>{inspectionRun.id}</code>
+              </div>
+              <div className="inspection-runtime__stage">
+                <span><strong>{formatRuntimeStep(inspectionRun.currentStep)}</strong><b>{inspectionRun.progressPercent}%</b></span>
+                <div className="inspection-runtime__track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={inspectionRun.progressPercent}>
+                  <i style={{ width: `${inspectionRun.progressPercent}%` }} />
+                </div>
+                <small>{inspectionRun.errorMessage ?? runtimeMessage(inspectionRun)}</small>
+              </div>
+              <div className="inspection-runtime__evidence">
+                <span className="overline">Immutable evidence</span>
+                <strong>{inspectionRun.decision ?? inspectionRun.status.toUpperCase()}</strong>
+                <code title={inspectionRun.evidenceSha256 ?? inspectionRun.workflowSha256}>
+                  {(inspectionRun.evidenceSha256 ?? inspectionRun.workflowSha256).slice(0, 16)}…
+                </code>
+              </div>
+            </section>
+          )}
+          <div className="instrument-rail">
           <section className="system-strip" aria-label="System status">
             {systemStatuses.map((item) => (
               <article className={`system-status system-status--${item.status}`} key={item.label}>
@@ -75,7 +103,7 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, on
               </article>
             ))}
           </section>
-          </div>}
+          </div></>}
         </section>
 
         <section className="viewer-grid" aria-label="Inspection viewers">
@@ -165,4 +193,16 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, on
 
 function formatSignalName(name: string): string {
   return name.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (character) => character.toUpperCase());
+}
+
+function formatRuntimeStep(step: string): string {
+  return step.replace(/-/g, ' ').replace(/^./, (character: string) => character.toUpperCase());
+}
+
+function runtimeMessage(run: InspectionRun): string {
+  if (run.status === 'completed') return `Persisted ${run.nodeRuns.length} node evidence record${run.nodeRuns.length === 1 ? '' : 's'}.`;
+  if (run.status === 'cancelled') return 'Run cancelled at a persisted safe checkpoint.';
+  if (run.status === 'faulted') return run.errorCode ?? 'Inspection runtime faulted.';
+  if (run.cancelRequested) return 'Cancellation requested. Waiting for safe checkpoint.';
+  return 'Motion, capture, artifact, and node evidence persist at each stage.';
 }

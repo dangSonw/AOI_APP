@@ -81,3 +81,61 @@ export interface RecipeItem {
   description: string;
   isActive: boolean;
 }
+
+export type InspectionRunStatus =
+  | 'queued'
+  | 'precheck'
+  | 'capturing'
+  | 'executing'
+  | 'completed'
+  | 'faulted'
+  | 'cancelled';
+
+export interface InspectionNodeRun {
+  sequence: number;
+  nodeId: string;
+  nodeVersion: string;
+  executionTarget: string;
+  status: string;
+  parameters: Record<string, unknown>;
+  inputs: Record<string, unknown>;
+  outputs: Record<string, unknown>;
+  resources: Record<string, unknown>;
+  evidenceSha256: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  durationMs: number | null;
+}
+
+export interface InspectionRun {
+  id: string;
+  boardSerial: string;
+  lot: string;
+  recipeId: number;
+  resultId: number | null;
+  status: InspectionRunStatus;
+  currentStep: string;
+  progressPercent: number;
+  cancelRequested: boolean;
+  workflowSha256: string;
+  effectiveVersions: Record<string, string>;
+  parameters: Record<string, unknown>;
+  inputArtifact: Record<string, unknown> | null;
+  decision: 'PASS' | 'FAIL' | 'FAULT' | null;
+  evidenceSha256: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  nodeRuns: InspectionNodeRun[];
+}
+
+export interface InspectionRunCreate {
+  boardSerial: string;
+  lot: string;
+  recipeId: number;
+  threshold: number;
+}
