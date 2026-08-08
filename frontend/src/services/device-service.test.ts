@@ -46,6 +46,53 @@ describe('device service', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps camera configuration when motion is unavailable', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        camera: { status: 'ready' },
+        motion: { status: 'unavailable' },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        cameraId: 'top-camera',
+        sensorMode: '3280x2464',
+        exposureMicroseconds: 8000,
+        analogGain: 1,
+      }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const snapshot = await readDeviceSnapshot('token');
+
+    expect(snapshot.cameraConfiguration?.cameraId).toBe('top-camera');
+    expect(snapshot.motionConfiguration).toBeNull();
+    expect(snapshot.motionState).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps motion configuration and state when camera is unavailable', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        camera: { status: 'unavailable' },
+        motion: { status: 'ready' },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        maximumVelocityMillimetersPerSecond: 20,
+        maximumAccelerationMillimetersPerSecondSquared: 40,
+        settleMilliseconds: 250,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        state: 'idle',
+        position: { xMillimeters: 1, yMillimeters: 2, zMillimeters: 3 },
+      }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const snapshot = await readDeviceSnapshot('token');
+
+    expect(snapshot.cameraConfiguration).toBeNull();
+    expect(snapshot.motionConfiguration?.settleMilliseconds).toBe(250);
+    expect(snapshot.motionState?.position.zMillimeters).toBe(3);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it('always reloads camera preview bytes instead of reusing a cached test pattern', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(new Blob(['webcam-frame'], { type: 'image/png' }), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);

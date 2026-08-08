@@ -12,14 +12,25 @@ const commandId = (prefix: string) => `${prefix}-${Date.now()}-${crypto.randomUU
 
 export async function readDeviceSnapshot(accessToken: string): Promise<DeviceSnapshot> {
   const devices = await apiRequest<DeviceOverview>('/api/devices', {}, accessToken);
-  if (devices.camera.status !== 'ready' || devices.motion.status !== 'ready') {
-    return { devices, cameraConfiguration: null, motionConfiguration: null, motionState: null };
+  let cameraConfiguration: CameraConfiguration | null = null;
+  let motionConfiguration: MotionConfiguration | null = null;
+  let motionState: MotionState | null = null;
+
+  if (devices.camera.status === 'ready') {
+    cameraConfiguration = await apiRequest<CameraConfiguration>(
+      '/api/camera/configuration',
+      {},
+      accessToken,
+    );
   }
-  const [cameraConfiguration, motionConfiguration, motionState] = await Promise.all([
-    apiRequest<CameraConfiguration>('/api/camera/configuration', {}, accessToken),
-    apiRequest<MotionConfiguration>('/api/motion/configuration', {}, accessToken),
-    apiRequest<MotionState>('/api/motion/state', {}, accessToken),
-  ]);
+
+  if (devices.motion.status === 'ready') {
+    [motionConfiguration, motionState] = await Promise.all([
+      apiRequest<MotionConfiguration>('/api/motion/configuration', {}, accessToken),
+      apiRequest<MotionState>('/api/motion/state', {}, accessToken),
+    ]);
+  }
+
   return { devices, cameraConfiguration, motionConfiguration, motionState };
 }
 
