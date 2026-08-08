@@ -39,7 +39,7 @@ class BaselineSchemaMismatch(RuntimeError):
 
 def build_alembic_config(database_url: str) -> Config:
     config = Config(str(PROJECT_ROOT / 'alembic.ini'))
-    config.set_main_option('script_location', 'database/migrations')
+    config.set_main_option('script_location', str(PROJECT_ROOT / 'database/migrations'))
     config.set_main_option('sqlalchemy.url', database_url.replace('%', '%%'))
     return config
 
