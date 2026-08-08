@@ -1,9 +1,12 @@
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.auth.dependencies import CurrentUser, DatabaseSession
+from app.models.inspection_result import InspectionResult
 from app.schemas.inspection import (
+    DefectResponse,
     InspectionCreateRequest,
     InspectionDetailResponse,
+    InspectionImageResponse,
     InspectionListResponse,
     InspectionMetricsResponse,
     ReviewRequest,
@@ -18,6 +21,28 @@ from app.services.inspection_service import (
 
 
 router = APIRouter(prefix='/api/inspections', tags=['inspections'])
+
+
+def build_inspection_detail_response(inspection: InspectionResult) -> InspectionDetailResponse:
+    return InspectionDetailResponse(
+        id=inspection.id,
+        board_serial=inspection.board_serial,
+        lot=inspection.lot,
+        recipe_name=inspection.recipe_name,
+        recipe_slug=inspection.recipe.slug,
+        result=inspection.result,
+        defect_count=inspection.defect_count,
+        score=inspection.score,
+        cycle_time_ms=inspection.cycle_time_ms,
+        camera_config=inspection.camera_config,
+        review_decision=inspection.review_decision,
+        reviewed_at=inspection.reviewed_at,
+        reviewer_name=inspection.reviewer.full_name if inspection.reviewer else None,
+        inspected_at=inspection.inspected_at,
+        operator_name=inspection.operator.full_name,
+        defects=[DefectResponse.model_validate(defect) for defect in inspection.defects],
+        images=[InspectionImageResponse.model_validate(image) for image in inspection.images],
+    )
 
 
 @router.get('/metrics', response_model=InspectionMetricsResponse)
@@ -64,28 +89,7 @@ def get_detail(
             status_code=status.HTTP_404_NOT_FOUND,
             detail='Inspection result not found.',
         )
-    return InspectionDetailResponse(
-        id=inspection.id,
-        board_serial=inspection.board_serial,
-        lot=inspection.lot,
-        recipe_name=inspection.recipe_name,
-        recipe_slug=inspection.recipe.slug,
-        result=inspection.result,
-        defect_count=inspection.defect_count,
-        score=inspection.score,
-        cycle_time_ms=inspection.cycle_time_ms,
-        camera_config=inspection.camera_config,
-        review_decision=inspection.review_decision,
-        reviewed_at=inspection.reviewed_at,
-        reviewer_name=(
-            inspection.reviewer.full_name
-            if inspection.reviewer else None
-        ),
-        inspected_at=inspection.inspected_at,
-        operator_name=inspection.operator.full_name,
-        defects=[],
-        images=[],
-    )
+    return build_inspection_detail_response(inspection)
 
 
 @router.post(
@@ -118,25 +122,12 @@ def create_result(
         ) from error
 
     loaded = get_inspection_detail(session, inspection.id)
-    return InspectionDetailResponse(
-        id=loaded.id,
-        board_serial=loaded.board_serial,
-        lot=loaded.lot,
-        recipe_name=loaded.recipe_name,
-        recipe_slug=loaded.recipe.slug,
-        result=loaded.result,
-        defect_count=loaded.defect_count,
-        score=loaded.score,
-        cycle_time_ms=loaded.cycle_time_ms,
-        camera_config=loaded.camera_config,
-        review_decision=loaded.review_decision,
-        reviewed_at=loaded.reviewed_at,
-        reviewer_name=None,
-        inspected_at=loaded.inspected_at,
-        operator_name=loaded.operator.full_name,
-        defects=[],
-        images=[],
-    )
+    if loaded is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail='The created inspection could not be reloaded.',
+        )
+    return build_inspection_detail_response(loaded)
 
 
 @router.patch('/{result_id}/review')
