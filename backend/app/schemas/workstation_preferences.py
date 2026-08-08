@@ -55,18 +55,13 @@ class PhotometricPreferencesSchema(ApiSchema):
         return self
 
 
-class WorkstationPreferencesSchema(ApiSchema):
-    version: int = Field(default=1, ge=1)
-    revision: int = Field(default=0, ge=0)
-    user_id: int = Field(ge=1)
-    workstation_id: str
-    updated_at: datetime
+class WorkstationPreferenceContentSchema(ApiSchema):
     dashboard: DashboardPreferencesSchema = DashboardPreferencesSchema()
     locale: LocalePreferencesSchema = LocalePreferencesSchema()
     photometric: PhotometricPreferencesSchema
 
     @classmethod
-    def create_default(cls, user_id: int, workstation_id: str) -> Self:
+    def create_default(cls) -> Self:
         lights = tuple(
             PhotometricLightSchema(
                 id=index + 1,
@@ -77,8 +72,23 @@ class WorkstationPreferencesSchema(ApiSchema):
             for index in range(4)
         )
         return cls(
+            photometric=PhotometricPreferencesSchema(lights=lights),
+        )
+
+
+class WorkstationPreferencesSchema(WorkstationPreferenceContentSchema):
+    version: int = Field(default=1, ge=1)
+    revision: int = Field(default=0, ge=0)
+    user_id: int = Field(ge=1)
+    workstation_id: str
+    updated_at: datetime
+
+    @classmethod
+    def create_default(cls, user_id: int, workstation_id: str) -> Self:
+        content = WorkstationPreferenceContentSchema.create_default()
+        return cls(
             user_id=user_id,
             workstation_id=workstation_id,
             updated_at=datetime.now(timezone.utc),
-            photometric=PhotometricPreferencesSchema(lights=lights),
+            **content.model_dump(),
         )

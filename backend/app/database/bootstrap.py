@@ -10,6 +10,9 @@ from app.models.inspection_result import InspectionResult  # noqa: F401
 from app.models.defect import Defect  # noqa: F401
 from app.models.inspection_image import InspectionImage  # noqa: F401
 from app.models.audit_event import AuditEvent  # noqa: F401
+from app.models.settings_activation import SettingsActivation  # noqa: F401
+from app.models.settings_document import SettingsDocument  # noqa: F401
+from app.models.settings_version import SettingsVersion  # noqa: F401
 from app.services.auth_service import create_user, get_user_by_email
 
 
