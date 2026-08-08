@@ -11,6 +11,7 @@ from app.api.devices import router as devices_router
 from app.api.inspections import router as inspections_router
 from app.api.physical_io import router as physical_io_router
 from app.api.recipes import router as recipes_router
+from app.api.research import router as research_router
 from app.api.settings import router as settings_router
 from app.api.workflows import router as workflows_router
 from app.api.workstation_preferences import router as workstation_preferences_router
@@ -42,6 +43,7 @@ app.include_router(devices_router)
 app.include_router(inspections_router)
 app.include_router(physical_io_router)
 app.include_router(recipes_router)
+app.include_router(research_router)
 app.include_router(settings_router)
 app.include_router(workflows_router)
 app.include_router(workstation_preferences_router)

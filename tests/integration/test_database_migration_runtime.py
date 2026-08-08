@@ -40,6 +40,13 @@ def test_upgrade_from_empty_schema_creates_baseline_tables() -> None:
                 'defects',
                 'inspection_images',
                 'audit_events',
+                'research_experiments',
+                'research_runs',
+                'research_artifacts',
+                'model_registry_entries',
+                'model_versions',
+                'model_aliases',
+                'model_promotion_events',
             } <= set(inspect(engine).get_table_names())
         finally:
             engine.dispose()

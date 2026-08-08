@@ -9,6 +9,7 @@ from app.models.defect import Defect  # noqa: F401
 from app.models.inspection_image import InspectionImage  # noqa: F401
 from app.models.inspection_result import InspectionResult  # noqa: F401
 from app.models.recipe import Recipe  # noqa: F401
+from app.models.research import ModelAlias, ModelPromotionEvent, ModelRegistryEntry, ModelVersion, ResearchArtifact, ResearchExperiment, ResearchRun  # noqa: F401
 from app.models.settings_activation import SettingsActivation  # noqa: F401
 from app.models.settings_document import SettingsDocument  # noqa: F401
 from app.models.settings_version import SettingsVersion  # noqa: F401

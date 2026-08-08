@@ -1,4 +1,4 @@
-export type WorkspaceView = 'dashboard' | 'workflow-editor' | 'settings' | 'hardware' | 'camera-manager' | 'database' | 'dataset';
+export type WorkspaceView = 'dashboard' | 'workflow-editor' | 'settings' | 'hardware' | 'camera-manager' | 'database' | 'dataset' | 'research';
 
 export type InspectionStatus = 'success' | 'warning' | 'error' | 'idle' | 'running';
 

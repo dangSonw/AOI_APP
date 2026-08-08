@@ -20,6 +20,7 @@ import { DashboardPage } from './DashboardPage';
 import { DatabasePage } from './DatabasePage';
 import { DatasetPage } from './DatasetPage';
 import { HardwarePage } from './HardwarePage';
+import { ResearchPage } from './ResearchPage';
 import { SettingsPage } from './SettingsPage';
 import { WorkflowEditorPage } from './WorkflowEditorPage';
 
@@ -161,6 +162,7 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
       database: 'Inspection database',
       dataset: 'Dataset manager',
       'workflow-editor': 'Workflow editor',
+      research: 'Research workspace',
     };
     document.title = `${viewTitles[activeView]} | AOI Studio`;
   }, [activeView]);
@@ -224,6 +226,7 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
       {activeView === 'camera-manager' && <CameraManagerPage preferences={draftPreferences} onChange={setDraftPreferences} />}
       {activeView === 'database' && <DatabasePage accessToken={session.accessToken} />}
       {activeView === 'dataset' && <DatasetPage accessToken={session.accessToken} />}
+      {activeView === 'research' && <ResearchPage accessToken={session.accessToken} />}
       {activeView === 'workflow-editor' && (
         <WorkflowEditorPage
           accessToken={session.accessToken}
