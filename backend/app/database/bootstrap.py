@@ -2,8 +2,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config.settings import get_settings
-from app.database.base import Base
 from app.database.session import SessionLocal, engine
+from app.database.migrations import verify_database_revision
 from app.models.user import User  # noqa: F401
 from app.models.recipe import Recipe  # noqa: F401
 from app.models.inspection_result import InspectionResult  # noqa: F401
@@ -21,8 +21,8 @@ DEFAULT_RECIPES = [
 
 
 def initialize_database() -> None:
-    Base.metadata.create_all(bind=engine)
-    settings = get_settings()
+    with engine.connect() as connection:
+        verify_database_revision(connection)
 
     with SessionLocal() as session:
         seed_default_operator(session)

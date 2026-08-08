@@ -33,6 +33,8 @@ if [ "$TABLE_NAME" != "users" ]; then
     exit 1
 fi
 
+PYTHONPATH="$PROJECT_ROOT/backend" conda run -n aoi-app python -m app.database.migrations check
+
 if [ "$(stat -c %a .env)" != "600" ]; then
     echo "Error: .env permissions must be 600." >&2
     exit 1
@@ -43,6 +45,6 @@ python3 -m json.tool io/output.json >/dev/null
 
 echo "Environment verification passed."
 echo "PostgreSQL: active"
-echo "Database schema: users table available"
+echo "Database schema: Alembic revision current"
 echo "Environment file: permission 600"
 echo "Physical I/O JSON: valid"

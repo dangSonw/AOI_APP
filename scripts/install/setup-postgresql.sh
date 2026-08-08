@@ -54,18 +54,27 @@ if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${POST
     sudo -u postgres createdb --owner="$POSTGRES_USER" "$POSTGRES_DB"
 fi
 
-SCHEMA_DIR="$PROJECT_ROOT/database/schema"
+MIGRATION_OPERATION=upgrade
+HAS_USERS="$(PGPASSWORD="$POSTGRES_PASSWORD" psql \
+    --host="${POSTGRES_HOST:-127.0.0.1}" \
+    --port="${POSTGRES_PORT:-5432}" \
+    --username="$POSTGRES_USER" \
+    --dbname="$POSTGRES_DB" \
+    --tuples-only --no-align \
+    --command="SELECT to_regclass('public.users') IS NOT NULL;")"
+HAS_ALEMBIC="$(PGPASSWORD="$POSTGRES_PASSWORD" psql \
+    --host="${POSTGRES_HOST:-127.0.0.1}" \
+    --port="${POSTGRES_PORT:-5432}" \
+    --username="$POSTGRES_USER" \
+    --dbname="$POSTGRES_DB" \
+    --tuples-only --no-align \
+    --command="SELECT to_regclass('public.alembic_version') IS NOT NULL;")"
+if [ "$HAS_USERS" = "t" ] && [ "$HAS_ALEMBIC" != "t" ]; then
+    MIGRATION_OPERATION=baseline-existing
+fi
 
-for schema_file in "$SCHEMA_DIR"/*.sql; do
-    echo "Applying schema: $(basename "$schema_file")..."
-    PGPASSWORD="$POSTGRES_PASSWORD" psql \
-        --host="${POSTGRES_HOST:-127.0.0.1}" \
-        --port="${POSTGRES_PORT:-5432}" \
-        --username="$POSTGRES_USER" \
-        --dbname="$POSTGRES_DB" \
-        --set=ON_ERROR_STOP=1 \
-        --file="$schema_file"
-done
+echo "Applying database migrations: $MIGRATION_OPERATION..."
+PYTHONPATH="$PROJECT_ROOT/backend" conda run -n aoi-app python -m app.database.migrations "$MIGRATION_OPERATION"
 
 SEED_DIR="$PROJECT_ROOT/database/seed"
 
