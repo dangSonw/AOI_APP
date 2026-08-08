@@ -14,6 +14,10 @@ class AuditEventResponse(ApiSchema):
     request_id: str
     status_code: int
     result: str
+    before_checksum: str | None = None
+    after_checksum: str | None = None
+    reason: str | None = None
+    client_metadata: dict | None = None
     created_at: datetime
 
 

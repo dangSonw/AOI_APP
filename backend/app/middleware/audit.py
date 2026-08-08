@@ -62,6 +62,7 @@ def _resource_parts(path: str) -> tuple[str, str | None]:
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         request_id = _request_id(request)
+        request.state.request_id = request_id
         actor_id = _verified_actor_id(request)
         status_code = 500
 
@@ -74,7 +75,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             raise
 
         response.headers['X-Request-ID'] = request_id
-        if request.method in AUDITED_METHODS:
+        if request.method in AUDITED_METHODS and not getattr(request.state, 'audit_recorded', False):
             self._record(request, request_id, actor_id, status_code)
         return response
 

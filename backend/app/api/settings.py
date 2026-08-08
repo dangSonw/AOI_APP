@@ -1,14 +1,20 @@
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, status
+import re
+
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, status
 from pydantic import ValidationError
 from sqlalchemy import select
 
 from app.auth.dependencies import CurrentUser, DatabaseSession
 from app.models.settings_document import SettingsDocument
 from app.models.settings_version import SettingsVersion
+from app.models.audit_event import AuditEvent
 from app.schemas.settings import (
     SettingsDocumentResponse,
+    SettingsActivationListResponse,
+    SettingsActivationRequest,
+    SettingsActivationResponse,
     SettingsExportEnvelope,
     SettingsHistoryResponse,
     SettingsRollbackRequest,
@@ -21,15 +27,19 @@ from app.services.settings_diff import settings_checksum
 from app.services.settings_schema_registry import UnknownSettingsSchema, validate_settings_payload
 from app.services.settings_service import (
     SettingsIdentity,
+    IdempotencyKeyReused,
     SettingsRevisionConflict,
+    activate_settings,
     create_settings_version,
     get_current_settings,
     list_settings_history,
+    list_settings_activations,
     rollback_settings,
 )
 
 
 router = APIRouter(prefix='/api/v1/settings', tags=['settings'])
+IDEMPOTENCY_KEY_PATTERN = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$')
 
 
 def _identity(scope: SettingsScope, subject_id: str, document_key: str, user_id: int) -> SettingsIdentity:
@@ -237,3 +247,81 @@ def import_settings(
         session.rollback()
         raise _validation_error(error) from error
     return _version_response(version)
+
+
+@router.post('/{scope}/{subject_id}/activations', response_model=SettingsActivationResponse, status_code=201)
+def activate_version(
+    scope: SettingsScope,
+    subject_id: str,
+    activation_request: SettingsActivationRequest,
+    request: Request,
+    response: Response,
+    current_user: CurrentUser,
+    session: DatabaseSession,
+    idempotency_key: str | None = Header(default=None, alias='Idempotency-Key'),
+) -> SettingsActivationResponse:
+    if idempotency_key is None or IDEMPOTENCY_KEY_PATTERN.fullmatch(idempotency_key) is None:
+        raise HTTPException(status_code=422, detail={
+            'code': 'idempotency_key_required',
+            'message': 'A valid Idempotency-Key header is required.',
+        })
+    identity = _identity(scope, subject_id, activation_request.document_key, current_user.id)
+    try:
+        activation, replayed = activate_settings(
+            session, identity, activation_request.revision, idempotency_key,
+            current_user.id, activation_request.reason,
+        )
+        document = session.get(SettingsDocument, activation.document_id)
+        version = session.get(SettingsVersion, activation.requested_version_id)
+        assert document is not None and version is not None
+        audit_event = AuditEvent(
+            actor_id=current_user.id,
+            action='activate',
+            method='POST',
+            path=request.url.path,
+            resource_type='settings',
+            resource_id=str(document.id),
+            request_id=request.state.request_id,
+            status_code=200 if replayed else 201,
+            result='success',
+            before_checksum=None,
+            after_checksum=version.checksum,
+            reason=activation_request.reason,
+            client_metadata={},
+        )
+        session.add(audit_event)
+        session.commit()
+        session.refresh(activation)
+        request.state.audit_recorded = True
+    except IdempotencyKeyReused as error:
+        session.rollback()
+        raise HTTPException(status_code=409, detail={
+            'code': 'idempotency_key_reused', 'message': str(error),
+        }) from error
+    except ValueError as error:
+        session.rollback()
+        raise HTTPException(status_code=404, detail={
+            'code': 'settings_revision_not_found', 'message': str(error),
+        }) from error
+    if replayed:
+        response.status_code = 200
+    return SettingsActivationResponse.model_validate(activation)
+
+
+@router.get('/{scope}/{subject_id}/activations', response_model=SettingsActivationListResponse)
+def get_activations(
+    scope: SettingsScope,
+    subject_id: str,
+    current_user: CurrentUser,
+    session: DatabaseSession,
+    document_key: str = Query(alias='documentKey', min_length=1, max_length=128),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
+) -> SettingsActivationListResponse:
+    activations, total = list_settings_activations(
+        session, _identity(scope, subject_id, document_key, current_user.id), offset, limit,
+    )
+    return SettingsActivationListResponse(
+        activations=[SettingsActivationResponse.model_validate(item) for item in activations],
+        total=total,
+    )

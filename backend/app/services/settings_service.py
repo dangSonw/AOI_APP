@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.settings_document import SettingsDocument
+from app.models.settings_activation import SettingsActivation
 from app.models.settings_version import SettingsVersion
 from app.services.settings_diff import settings_checksum, settings_diff
 from app.services.settings_schema_registry import validate_settings_payload
@@ -37,6 +38,10 @@ class SettingsRevisionConflict(RuntimeError):
             current.payload if current is not None else {},
         )
         super().__init__('The settings document was updated by another request.')
+
+
+class IdempotencyKeyReused(RuntimeError):
+    pass
 
 
 def _identity_query(identity: SettingsIdentity):
@@ -171,3 +176,75 @@ def rollback_settings(
         reason,
         source_version_id=target.id,
     )
+
+
+def activate_settings(
+    session: Session,
+    identity: SettingsIdentity,
+    version_revision: int,
+    idempotency_key: str,
+    actor_id: int,
+    reason: str,
+) -> tuple[SettingsActivation, bool]:
+    document = _locked_document(session, identity)
+    if document is None:
+        raise ValueError('The settings document does not exist.')
+    version = session.scalar(select(SettingsVersion).where(
+        SettingsVersion.document_id == document.id,
+        SettingsVersion.revision == version_revision,
+    ))
+    if version is None:
+        raise ValueError('The requested settings revision does not exist.')
+    request_payload = {
+        'documentId': document.id,
+        'requestedVersionId': version.id,
+        'reason': reason,
+    }
+    request_checksum = settings_checksum(request_payload)
+    existing = session.scalar(select(SettingsActivation).where(
+        SettingsActivation.document_id == document.id,
+        SettingsActivation.idempotency_key == idempotency_key,
+    ))
+    if existing is not None:
+        if existing.request_checksum != request_checksum:
+            raise IdempotencyKeyReused('The idempotency key was already used for a different activation request.')
+        return existing, True
+    activation = SettingsActivation(
+        document_id=document.id,
+        requested_version_id=version.id,
+        idempotency_key=idempotency_key,
+        request_checksum=request_checksum,
+        status='active',
+        observed_target_revision=str(version.revision),
+        diagnostics={},
+        requested_by=actor_id,
+        reason=reason,
+    )
+    session.add(activation)
+    session.flush()
+    document.active_version_id = version.id
+    document.updated_at = datetime.now(timezone.utc)
+    session.flush()
+    return activation, False
+
+
+def list_settings_activations(
+    session: Session,
+    identity: SettingsIdentity,
+    offset: int = 0,
+    limit: int = 50,
+) -> tuple[list[SettingsActivation], int]:
+    document = session.scalar(_identity_query(identity))
+    if document is None:
+        return [], 0
+    total = session.scalar(
+        select(func.count()).select_from(SettingsActivation).where(SettingsActivation.document_id == document.id)
+    ) or 0
+    activations = list(session.scalars(
+        select(SettingsActivation)
+        .where(SettingsActivation.document_id == document.id)
+        .order_by(SettingsActivation.created_at.desc(), SettingsActivation.id.desc())
+        .offset(max(0, offset))
+        .limit(min(100, max(1, limit)))
+    ))
+    return activations, total

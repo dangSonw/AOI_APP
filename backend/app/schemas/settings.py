@@ -73,3 +73,21 @@ class SettingsExportEnvelope(ApiSchema):
     schema_version: int = Field(ge=1)
     payload: dict[str, Any]
     payload_checksum: str = Field(pattern=r'^[a-f0-9]{64}$')
+
+
+class SettingsActivationResponse(ApiSchema):
+    id: int
+    requested_version_id: int
+    idempotency_key: str
+    status: Literal['active', 'failed']
+    observed_target_revision: str | None
+    diagnostics: dict[str, Any]
+    requested_by: int
+    reason: str
+    created_at: datetime
+    completed_at: datetime
+
+
+class SettingsActivationListResponse(ApiSchema):
+    activations: list[SettingsActivationResponse]
+    total: int
