@@ -79,7 +79,7 @@ export function CameraManagerPage({ preferences, onChange }: CameraManagerPagePr
 
         <aside className="camera-inspector">
           <div className="panel-heading"><span>Capture configuration</span><span>Image count {lights.length}</span></div>
-          <label className="camera-field"><span>Workstation ID</span><input value={preferences.workstationId} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" onChange={(event) => onChange({ ...preferences, revision: 0, workstationId: event.target.value })} /></label>
+          <label className="camera-field"><span>Workstation ID</span><input value={preferences.workstationId} readOnly /></label>
           <label className="camera-field"><span>Number of lights and images</span><input type="number" min="1" max="64" value={lights.length} onChange={(event) => {
             const lightCount = Math.min(64, Math.max(1, Number(event.target.value) || 1));
             updatePhotometric(lightCount, resizePhotometricLights(lights, lightCount));

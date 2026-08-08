@@ -1,7 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { createDefaultPreferences } from '../utils/workstation-preferences';
-import { createLocaleChangeHandlers, SettingsPage } from './SettingsPage';
+import {
+  canLoadWorkstationProfile,
+  createLocaleChangeHandlers,
+  loadWorkstationProfile,
+  SettingsPage,
+} from './SettingsPage';
 
 describe('SettingsPage', () => {
   it('renders persisted locale preferences', () => {
@@ -20,7 +25,7 @@ describe('SettingsPage', () => {
         isDirty={false}
         isSaving={false}
         error=""
-        onWorkstationIdChange={vi.fn()}
+        onWorkstationSelect={vi.fn()}
         onPreferencesChange={vi.fn()}
         onSave={async () => undefined}
       />,
@@ -30,6 +35,41 @@ describe('SettingsPage', () => {
     expect(markup).toContain('<option value="de-DE" selected="">Germany</option>');
     expect(markup).toContain('<option value="imperial" selected="">Imperial (in, mil)</option>');
     expect(markup).toContain('<option value="12-hour" selected="">12-hour clock</option>');
+  });
+
+  it('keeps workstation selector text separate from persisted preferences', () => {
+    const preferences = createDefaultPreferences(1, 'station-01');
+    const markup = renderToStaticMarkup(
+      <SettingsPage
+        preferences={preferences}
+        isDirty={false}
+        isSaving={false}
+        error=""
+        onWorkstationSelect={vi.fn()}
+        onPreferencesChange={vi.fn()}
+        onSave={async () => undefined}
+      />,
+    );
+
+    expect(preferences.workstationId).toBe('station-01');
+    expect(markup).toContain('value="station-01"');
+    expect(markup).toContain('Load station profile');
+    expect(markup).not.toContain('onWorkstationIdChange');
+  });
+
+  it('loads only a different valid workstation profile', async () => {
+    const onWorkstationSelect = vi.fn(async () => undefined);
+
+    expect(canLoadWorkstationProfile('station-01', 'station-02')).toBe(true);
+    expect(canLoadWorkstationProfile('station-01', 'station-01')).toBe(false);
+    expect(canLoadWorkstationProfile('station-01', 'Station_02')).toBe(false);
+    expect(canLoadWorkstationProfile('station-01', '../station-02')).toBe(false);
+
+    await loadWorkstationProfile('station-01', 'station-02', onWorkstationSelect);
+    await loadWorkstationProfile('station-01', 'Station_02', onWorkstationSelect);
+
+    expect(onWorkstationSelect).toHaveBeenCalledOnce();
+    expect(onWorkstationSelect).toHaveBeenCalledWith('station-02');
   });
 
   it('publishes each locale selection as an updated preference document', () => {

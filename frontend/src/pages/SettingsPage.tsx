@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { LocalePreferences, WorkstationPreferences } from '../types/workstation-preferences';
 import { updateLocalePreference } from '../utils/workstation-preferences';
 
@@ -18,14 +18,30 @@ const REGION_TIMEZONES: Record<LocalePreferences['region'], LocalePreferences['t
   'de-DE': 'Europe/Berlin',
 };
 
+const WORKSTATION_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 interface SettingsPageProps {
   preferences: WorkstationPreferences;
   isDirty: boolean;
   isSaving: boolean;
   error: string;
-  onWorkstationIdChange: (workstationId: string) => void;
+  onWorkstationSelect: (workstationId: string) => Promise<void>;
   onPreferencesChange: (preferences: WorkstationPreferences) => void;
   onSave: () => Promise<void>;
+}
+
+export function canLoadWorkstationProfile(currentWorkstationId: string, requestedWorkstationId: string): boolean {
+  return requestedWorkstationId !== currentWorkstationId && WORKSTATION_ID_PATTERN.test(requestedWorkstationId);
+}
+
+export async function loadWorkstationProfile(
+  currentWorkstationId: string,
+  requestedWorkstationId: string,
+  onWorkstationSelect: (workstationId: string) => Promise<void>,
+): Promise<void> {
+  if (canLoadWorkstationProfile(currentWorkstationId, requestedWorkstationId)) {
+    await onWorkstationSelect(requestedWorkstationId);
+  }
 }
 
 export function createLocaleChangeHandlers(
@@ -44,14 +60,30 @@ export function createLocaleChangeHandlers(
   };
 }
 
-export function SettingsPage({ preferences, isDirty, isSaving, error, onWorkstationIdChange, onPreferencesChange, onSave }: SettingsPageProps) {
+export function SettingsPage({ preferences, isDirty, isSaving, error, onWorkstationSelect, onPreferencesChange, onSave }: SettingsPageProps) {
+  const [workstationIdDraft, setWorkstationIdDraft] = useState(preferences.workstationId);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const localeChangeHandlers = createLocaleChangeHandlers(preferences, onPreferencesChange);
+
+  useEffect(() => {
+    setWorkstationIdDraft(preferences.workstationId);
+  }, [preferences.workstationId]);
 
   const handleSave = async () => {
     setSaveMessage('');
     await onSave();
     setSaveMessage('Workspace state saved.');
+  };
+
+  const handleWorkstationLoad = async () => {
+    setIsLoadingProfile(true);
+    setSaveMessage('');
+    try {
+      await loadWorkstationProfile(preferences.workstationId, workstationIdDraft, onWorkstationSelect);
+    } finally {
+      setIsLoadingProfile(false);
+    }
   };
 
   return (
@@ -90,9 +122,17 @@ export function SettingsPage({ preferences, isDirty, isSaving, error, onWorkstat
             <h3>Saved workspace state</h3>
             <label>
               <span>Workstation ID</span>
-              <input value={preferences.workstationId} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" onChange={(event) => onWorkstationIdChange(event.target.value)} />
+              <input value={workstationIdDraft} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" onChange={(event) => setWorkstationIdDraft(event.target.value)} />
               <small>Dashboard layout and Photometric configuration are stored for this user and workstation.</small>
             </label>
+            <button
+              className="studio-secondary-button"
+              type="button"
+              disabled={isLoadingProfile || !canLoadWorkstationProfile(preferences.workstationId, workstationIdDraft)}
+              onClick={() => void handleWorkstationLoad().catch(() => undefined)}
+            >
+              {isLoadingProfile ? 'Loading profile…' : 'Load station profile'}
+            </button>
             <div className="settings-summary">
               <span>Photometric rig</span><strong>{preferences.photometric.lightCount} lights · {preferences.photometric.lightCount} images</strong>
               <span>Preference revision</span><strong>R{preferences.revision}</strong>

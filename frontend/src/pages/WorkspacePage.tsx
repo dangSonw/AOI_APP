@@ -125,6 +125,17 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
   }, [session.accessToken]);
 
   const isPreferencesDirty = JSON.stringify(savedPreferences) !== JSON.stringify(draftPreferences);
+  const selectWorkstation = async (workstationId: string) => {
+    setPreferenceError('');
+    try {
+      const nextPreferences = await readWorkstationPreferences(session.accessToken, workstationId);
+      setSavedPreferences(nextPreferences);
+      setDraftPreferences(structuredClone(nextPreferences));
+    } catch (loadError) {
+      setPreferenceError(loadError instanceof Error ? loadError.message : 'Workstation preferences could not be loaded.');
+      throw loadError;
+    }
+  };
   const savePreferences = async () => {
     setIsSavingPreferences(true);
     setPreferenceError('');
@@ -207,7 +218,7 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
           onOutputToggle={(signalName, currentValue) => void toggleOutput(signalName, currentValue)}
         />
       )}
-      {activeView === 'settings' && <SettingsPage preferences={draftPreferences} isDirty={isPreferencesDirty} isSaving={isSavingPreferences} error={preferenceError} onWorkstationIdChange={(workstationId) => setDraftPreferences((current) => ({ ...current, workstationId }))} onPreferencesChange={setDraftPreferences} onSave={savePreferences} />}
+      {activeView === 'settings' && <SettingsPage preferences={draftPreferences} isDirty={isPreferencesDirty} isSaving={isSavingPreferences} error={preferenceError} onWorkstationSelect={selectWorkstation} onPreferencesChange={setDraftPreferences} onSave={savePreferences} />}
       {activeView === 'hardware' && <HardwarePage accessToken={session.accessToken} snapshot={deviceSnapshot} error={deviceError} isLoading={isLoadingDevices} onRefresh={loadDevices} />}
       {activeView === 'camera-manager' && <CameraManagerPage preferences={draftPreferences} onChange={setDraftPreferences} />}
       {activeView === 'database' && <DatabasePage accessToken={session.accessToken} />}
