@@ -1,16 +1,15 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { AuthField } from '../components/AuthField';
-import { createAccount, requestPasswordReset, signIn } from '../services/auth-service';
+import { requestPasswordReset, signIn } from '../services/auth-service';
 import type { AuthSession } from '../types/auth';
 import {
   type AuthFieldErrors,
   hasValidationErrors,
   validateEmail,
   validateLogin,
-  validateRegistration,
 } from '../utils/auth-validation';
 
-type AuthMode = 'sign-in' | 'sign-up' | 'forgot-password';
+type AuthMode = 'sign-in' | 'forgot-password';
 
 interface AuthPageProps {
   onAuthenticated: (session: AuthSession) => void;
@@ -18,10 +17,8 @@ interface AuthPageProps {
 
 export function AuthPage({ onAuthenticated }: AuthPageProps) {
   const [mode, setMode] = useState<AuthMode>('sign-in');
-  const [email, setEmail] = useState('operator@aoi.local');
-  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('admin@aoi.local');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [errors, setErrors] = useState<AuthFieldErrors>({});
   const [formError, setFormError] = useState('');
@@ -31,7 +28,6 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
   useEffect(() => {
     const modeTitles: Record<AuthMode, string> = {
       'sign-in': 'Sign in',
-      'sign-up': 'Create account',
       'forgot-password': 'Reset password',
     };
     document.title = `${modeTitles[mode]} | AOI Studio`;
@@ -43,7 +39,6 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     setFormError('');
     setSuccessMessage('');
     setPassword('');
-    setConfirmPassword('');
   };
 
   const submitSignIn = async () => {
@@ -54,21 +49,6 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     }
 
     const session = await signIn({ email: email.trim(), password });
-    onAuthenticated(session);
-  };
-
-  const submitSignUp = async () => {
-    const nextErrors = validateRegistration(email, fullName, password, confirmPassword);
-    setErrors(nextErrors);
-    if (hasValidationErrors(nextErrors)) {
-      return;
-    }
-
-    const session = await createAccount({
-      email: email.trim(),
-      fullName: fullName.trim(),
-      password,
-    });
     onAuthenticated(session);
   };
 
@@ -92,8 +72,6 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
     try {
       if (mode === 'sign-in') {
         await submitSignIn();
-      } else if (mode === 'sign-up') {
-        await submitSignUp();
       } else {
         await submitPasswordReset();
       }
@@ -111,30 +89,15 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
           <p className="auth-card__brand">AOI STUDIO</p>
           <h1 id="auth-title">
             {mode === 'sign-in' && 'Welcome back'}
-            {mode === 'sign-up' && 'Create an account'}
             {mode === 'forgot-password' && 'Forgot password?'}
           </h1>
           <p className="auth-card__subtitle">
             {mode === 'sign-in' && 'Sign in to continue to your inspection workspace.'}
-            {mode === 'sign-up' && 'Get started with your inspection workspace.'}
             {mode === 'forgot-password' && 'Enter your work email to receive a password reset link.'}
           </p>
         </header>
 
         <form className="auth-form" noValidate onSubmit={handleSubmit}>
-          {mode === 'sign-up' && (
-            <AuthField
-              id="full-name"
-              name="name"
-              label="Full name"
-              value={fullName}
-              autoComplete="name"
-              placeholder="Alex Morgan"
-              error={errors.fullName}
-              onChange={setFullName}
-            />
-          )}
-
           <AuthField
             id="work-email"
             name={mode === 'sign-in' ? 'username' : 'email'}
@@ -142,7 +105,7 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
             type="email"
             value={email}
             autoComplete={mode === 'sign-in' ? 'username' : 'email'}
-            placeholder="operator@aoi.local"
+            placeholder="admin@aoi.local"
             error={errors.email}
             onChange={setEmail}
           />
@@ -165,20 +128,6 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
             />
           )}
 
-          {mode === 'sign-up' && (
-            <AuthField
-              id="confirm-password"
-              name="confirmPassword"
-              label="Confirm password"
-              type={isPasswordVisible ? 'text' : 'password'}
-              value={confirmPassword}
-              autoComplete="new-password"
-              placeholder="Enter your password again"
-              error={errors.confirmPassword}
-              onChange={setConfirmPassword}
-            />
-          )}
-
           {mode === 'sign-in' && (
             <div className="auth-form__options">
               <button className="text-button" type="button" onClick={() => switchMode('forgot-password')}>
@@ -193,15 +142,10 @@ export function AuthPage({ onAuthenticated }: AuthPageProps) {
           <button className="primary-button" type="submit" disabled={isSubmitting}>
             {isSubmitting && <span className="button-spinner" aria-hidden="true" />}
             {mode === 'sign-in' && (isSubmitting ? 'Signing in…' : 'Sign in')}
-            {mode === 'sign-up' && (isSubmitting ? 'Creating account…' : 'Create account')}
             {mode === 'forgot-password' && (isSubmitting ? 'Sending link…' : 'Send reset link')}
           </button>
 
-          {mode === 'sign-in' ? (
-            <button className="secondary-button" type="button" onClick={() => switchMode('sign-up')}>
-              Create account
-            </button>
-          ) : (
+          {mode === 'forgot-password' && (
             <button className="back-button" type="button" onClick={() => switchMode('sign-in')}>
               <span aria-hidden="true">←</span> Back to sign in
             </button>

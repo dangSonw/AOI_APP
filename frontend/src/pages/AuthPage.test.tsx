@@ -17,4 +17,11 @@ describe('sign-in credential form', () => {
 
     expect(markup).not.toContain('Keep me signed in');
   });
+
+  it('does not expose public account registration', () => {
+    const markup = renderToStaticMarkup(<AuthPage onAuthenticated={vi.fn()} />);
+
+    expect(markup).not.toContain('Create account');
+    expect(markup).not.toContain('Create an account');
+  });
 });

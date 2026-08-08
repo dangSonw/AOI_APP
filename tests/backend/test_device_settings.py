@@ -19,6 +19,12 @@ def test_device_adapter_urls_default_to_loopback_services() -> None:
     assert settings.motion_adapter_url == 'http://127.0.0.1:9102'
 
 
+def test_public_registration_defaults_to_disabled() -> None:
+    settings = Settings(**settings_payload())
+
+    assert settings.allow_public_registration is False
+
+
 @pytest.mark.parametrize('field', ['camera_adapter_url', 'motion_adapter_url'])
 def test_device_adapter_urls_reject_non_loopback_hosts(field: str) -> None:
     with pytest.raises(ValidationError):

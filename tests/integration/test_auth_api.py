@@ -37,6 +37,21 @@ def test_protected_inputs_reject_anonymous_requests() -> None:
     assert response.status_code == 401
 
 
+def test_public_registration_is_disabled() -> None:
+    with TestClient(app) as client:
+        response = client.post(
+            '/api/auth/register',
+            json={
+                'email': 'other@example.com',
+                'fullName': 'Other User',
+                'password': 'secure-password',
+            },
+        )
+
+    assert response.status_code == 403
+    assert response.json()['detail'] == 'Public account registration is disabled.'
+
+
 @pytest.mark.parametrize(
     'origin',
     ['http://127.0.0.1:5173', 'http://localhost:5173'],

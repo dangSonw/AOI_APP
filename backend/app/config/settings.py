@@ -21,14 +21,15 @@ class Settings(BaseSettings):
     jwt_secret_key: str = Field(min_length=32)
     jwt_algorithm: str = 'HS256'
     jwt_access_token_expire_minutes: int = 60
+    allow_public_registration: bool = False
     physical_io_directory: str = 'io'
     projects_data_directory: str = 'data/projects'
     preferences_data_directory: str = 'data/preferences'
     datasets_data_directory: str = 'data/datasets'
     captures_data_directory: str = 'data/captures'
-    seed_admin_email: str = 'operator@aoi.local'
+    seed_admin_email: str = 'admin@aoi.local'
     seed_admin_password: str = Field(min_length=8)
-    seed_admin_full_name: str = 'AOI Operator'
+    seed_admin_full_name: str = 'AOI Administrator'
 
     @field_validator('camera_adapter_url', 'motion_adapter_url')
     @classmethod

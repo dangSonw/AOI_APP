@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 
 from app.auth.dependencies import DatabaseSession
+from app.config.settings import get_settings
 from app.models.user import User
 from app.schemas.auth import (
     AuthSessionResponse,
@@ -45,6 +46,11 @@ def login(credentials: LoginRequest, session: DatabaseSession) -> AuthSessionRes
 
 @router.post('/register', response_model=AuthSessionResponse, status_code=status.HTTP_201_CREATED)
 def register(account: RegisterRequest, session: DatabaseSession) -> AuthSessionResponse:
+    if not get_settings().allow_public_registration:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Public account registration is disabled.',
+        )
     if get_user_by_email(session, str(account.email)) is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail='An account already uses this email.')
 
