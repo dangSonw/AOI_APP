@@ -1,16 +1,24 @@
 import { useEffect, useState } from 'react';
+import { SettingsDocumentSection, type VersionedSectionId } from '../components/settings/SettingsDocumentSection';
+import type { DeviceSnapshot } from '../types/devices';
 import type { LocalePreferences, WorkstationPreferences } from '../types/workstation-preferences';
 import { updateLocalePreference } from '../utils/workstation-preferences';
 
 const SETTINGS_SECTIONS = [
-  'General',
-  'Language & region',
-  'Performance',
-  'Inspection workflow',
-  'Hardware & cameras',
-  'Notifications',
-  'Security & data',
-];
+  { id: 'overview', label: 'Overview & station', scope: 'Workstation' },
+  { id: 'appearance', label: 'Appearance & locale', scope: 'User + workstation' },
+  { id: 'acquisition', label: 'Acquisition & calibration', scope: 'Workstation' },
+  { id: 'motion', label: 'Motion & I/O', scope: 'Workstation' },
+  { id: 'inspection', label: 'Inspection defaults', scope: 'Recipe' },
+  { id: 'compute', label: 'Compute & performance', scope: 'System' },
+  { id: 'research', label: 'Research & models', scope: 'System' },
+  { id: 'data', label: 'Data & retention', scope: 'System' },
+  { id: 'integrations', label: 'Integrations', scope: 'System' },
+  { id: 'notifications', label: 'Notifications', scope: 'System' },
+  { id: 'security', label: 'Security, audit & updates', scope: 'System' },
+] as const;
+
+type SettingsSectionId = typeof SETTINGS_SECTIONS[number]['id'];
 
 const REGION_TIMEZONES: Record<LocalePreferences['region'], LocalePreferences['timezone']> = {
   'vi-VN': 'Asia/Ho_Chi_Minh',
@@ -21,6 +29,8 @@ const REGION_TIMEZONES: Record<LocalePreferences['region'], LocalePreferences['t
 const WORKSTATION_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 interface SettingsPageProps {
+  accessToken?: string;
+  deviceSnapshot?: DeviceSnapshot | null;
   preferences: WorkstationPreferences;
   isDirty: boolean;
   isSaving: boolean;
@@ -28,6 +38,7 @@ interface SettingsPageProps {
   onWorkstationSelect: (workstationId: string) => Promise<void>;
   onPreferencesChange: (preferences: WorkstationPreferences) => void;
   onSave: () => Promise<void>;
+  onOpenHardware?: () => void;
 }
 
 export function canLoadWorkstationProfile(currentWorkstationId: string, requestedWorkstationId: string): boolean {
@@ -60,7 +71,8 @@ export function createLocaleChangeHandlers(
   };
 }
 
-export function SettingsPage({ preferences, isDirty, isSaving, error, onWorkstationSelect, onPreferencesChange, onSave }: SettingsPageProps) {
+export function SettingsPage({ accessToken, deviceSnapshot, preferences, isDirty, isSaving, error, onWorkstationSelect, onPreferencesChange, onSave, onOpenHardware }: SettingsPageProps) {
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>('appearance');
   const [workstationIdDraft, setWorkstationIdDraft] = useState(preferences.workstationId);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
@@ -91,34 +103,38 @@ export function SettingsPage({ preferences, isDirty, isSaving, error, onWorkstat
       <header className="workspace-title-row">
         <div>
           <span className="overline">Settings</span>
-          <h1>Workstation preferences</h1>
-          <p>Configure how AOI Studio behaves for this inspection station.</p>
+          <h1>Configuration control</h1>
+          <p>Version desired state, validate changes, apply safely, and preserve lineage.</p>
         </div>
       </header>
 
       <div className="settings-layout">
         <nav className="settings-nav" aria-label="Settings sections">
-          <span className="overline">Workspace</span>
+          <span className="overline">Configuration scopes</span>
           {SETTINGS_SECTIONS.map((section) => (
             <button
               type="button"
-              key={section}
-              className={section === 'Language & region' ? 'settings-nav__active' : ''}
-              disabled={section !== 'Language & region'}
-              title={section !== 'Language & region' ? 'This section is not available in this milestone' : undefined}
+              key={section.id}
+              className={section.id === activeSection ? 'settings-nav__active' : ''}
+              aria-current={section.id === activeSection ? 'page' : undefined}
+              onClick={() => {
+                if (!isDirty || activeSection !== 'appearance' || window.confirm('Discard unsaved locale changes and change section?')) {
+                  setActiveSection(section.id);
+                }
+              }}
             >
-              <span aria-hidden="true">{section.slice(0, 1)}</span>{section}
+              <span aria-hidden="true">{section.label.slice(0, 1)}</span><b>{section.label}</b><small>{section.scope}</small>
             </button>
           ))}
         </nav>
 
         <section className="settings-form" aria-labelledby="settings-form-title">
           <header>
-            <span className="overline">Language & region</span>
-            <h2 id="settings-form-title">Language & region</h2>
-            <p>Control localisation, date, time, and measurement preferences for this workstation.</p>
+            <span className="overline">{SETTINGS_SECTIONS.find((section) => section.id === activeSection)?.scope}</span>
+            <h2 id="settings-form-title">{SETTINGS_SECTIONS.find((section) => section.id === activeSection)?.label}</h2>
+            <p>Persistent desired state. Live diagnostics and machine commands stay in Hardware.</p>
           </header>
-          <div className="settings-group">
+          {activeSection === 'appearance' ? <><div className="settings-ledger"><span><small>Scope</small><strong>User + workstation</strong></span><span><small>Revision</small><strong>R{preferences.revision}</strong></span><span><small>Active</small><strong>R{preferences.revision}</strong></span><span><small>Draft</small><strong>{isDirty ? 'Changed' : 'Clean'}</strong></span></div><div className="settings-group">
             <h3>Saved workspace state</h3>
             <label>
               <span>Workstation ID</span>
@@ -173,6 +189,7 @@ export function SettingsPage({ preferences, isDirty, isSaving, error, onWorkstat
             {saveMessage && <span role="status">{saveMessage}</span>}
             <button className="studio-primary-button" type="button" disabled={!isDirty || isSaving} onClick={() => void handleSave().catch(() => undefined)}>{isSaving ? 'Saving…' : 'Save workspace state'}</button>
           </div>
+          </> : <SettingsDocumentSection accessToken={accessToken} sectionId={activeSection as VersionedSectionId} workstationId={preferences.workstationId} deviceSnapshot={deviceSnapshot} onOpenHardware={onOpenHardware} />}
         </section>
       </div>
     </div>

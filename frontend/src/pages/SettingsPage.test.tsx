@@ -57,6 +57,35 @@ describe('SettingsPage', () => {
     expect(markup).not.toContain('onWorkstationIdChange');
   });
 
+  it('exposes every approved settings section without milestone-disabled navigation', () => {
+    const markup = renderToStaticMarkup(
+      <SettingsPage
+        accessToken="token"
+        preferences={createDefaultPreferences(1, 'station-01')}
+        isDirty={false}
+        isSaving={false}
+        error=""
+        onWorkstationSelect={vi.fn()}
+        onPreferencesChange={vi.fn()}
+        onSave={async () => undefined}
+      />,
+    );
+
+    for (const label of [
+      'Overview &amp; station', 'Appearance &amp; locale', 'Acquisition &amp; calibration',
+      'Motion &amp; I/O', 'Inspection defaults', 'Compute &amp; performance',
+      'Research &amp; models', 'Data &amp; retention', 'Integrations', 'Notifications',
+      'Security, audit &amp; updates',
+    ]) expect(markup).toContain(label);
+    expect(markup).not.toContain('not available in this milestone');
+    expect(markup).toContain('Scope');
+    expect(markup).toContain('Revision');
+    expect(markup).toContain('Draft');
+    expect(markup).not.toContain('>Home<');
+    expect(markup).not.toContain('>Move absolute<');
+    expect(markup).not.toContain('>Clear fault<');
+  });
+
   it('loads only a different valid workstation profile', async () => {
     const onWorkstationSelect = vi.fn(async () => undefined);
 

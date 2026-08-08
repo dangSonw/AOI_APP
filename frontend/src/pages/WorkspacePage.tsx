@@ -87,10 +87,11 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
   }, [session.accessToken]);
 
   useEffect(() => {
+    if (activeView !== 'hardware' && activeView !== 'settings') return;
     void loadDevices();
-    const interval = window.setInterval(() => void loadDevices(), 1000);
+    const interval = window.setInterval(() => void loadDevices(), activeView === 'hardware' ? 1000 : 5000);
     return () => window.clearInterval(interval);
-  }, [loadDevices]);
+  }, [activeView, loadDevices]);
 
   const loadSavedWorkflow = useCallback(async () => {
     setWorkflowError('');
@@ -218,7 +219,7 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
           onOutputToggle={(signalName, currentValue) => void toggleOutput(signalName, currentValue)}
         />
       )}
-      {activeView === 'settings' && <SettingsPage preferences={draftPreferences} isDirty={isPreferencesDirty} isSaving={isSavingPreferences} error={preferenceError} onWorkstationSelect={selectWorkstation} onPreferencesChange={setDraftPreferences} onSave={savePreferences} />}
+      {activeView === 'settings' && <SettingsPage accessToken={session.accessToken} deviceSnapshot={deviceSnapshot} preferences={draftPreferences} isDirty={isPreferencesDirty} isSaving={isSavingPreferences} error={preferenceError || deviceError} onWorkstationSelect={selectWorkstation} onPreferencesChange={setDraftPreferences} onSave={savePreferences} onOpenHardware={() => requestViewChange('hardware')} />}
       {activeView === 'hardware' && <HardwarePage accessToken={session.accessToken} snapshot={deviceSnapshot} error={deviceError} isLoading={isLoadingDevices} onRefresh={loadDevices} />}
       {activeView === 'camera-manager' && <CameraManagerPage preferences={draftPreferences} onChange={setDraftPreferences} />}
       {activeView === 'database' && <DatabasePage accessToken={session.accessToken} />}
