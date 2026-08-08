@@ -7,11 +7,19 @@ from sqlalchemy.orm import Session
 from app.models.audit_event import AuditEvent
 
 
-def record_audit_event(session: Session, event_data: Mapping[str, Any]) -> AuditEvent:
+def record_audit_event(
+    session: Session,
+    event_data: Mapping[str, Any],
+    *,
+    commit: bool = True,
+) -> AuditEvent:
     event = AuditEvent(**event_data)
     session.add(event)
-    session.commit()
-    session.refresh(event)
+    if commit:
+        session.commit()
+        session.refresh(event)
+    else:
+        session.flush()
     return event
 
 
