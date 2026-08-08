@@ -161,3 +161,11 @@ Baseline hiện tại gồm 15 backend test, 14 core test, 12 integration test, 
 - Contract an toàn Dataset gồm giới hạn batch/dung lượng file, validation magic byte ảnh, tên theo allowlist, từ chối traversal, đặt tên capture trùng an toàn và member path ZIP an toàn. Giữ characterization test kể cả khi production behavior đã pass sẵn.
 - Chỉ audit security metadata có giới hạn: actor ID đã xác minh, action, method, path, resource identity, request ID, status, result và timestamp. Không bao giờ đọc hoặc lưu request body, credential, bearer token, secret hay image byte. Lỗi audit phải được log và không được thay response route gốc.
 - GitNexus resolve repository qua global registry, không nhất thiết theo worktree hiện tại. Khi worktree và main checkout cùng tên repository, index worktree rõ ràng rồi truyền path của nó vào `detect-changes --repo ...`; nếu không, change detection có thể đọc main checkout sạch và báo sai `No changes detected.`
+
+## 20. Nền tảng Settings PostgreSQL
+
+- Alembic là cơ chế evolution schema duy nhất. Startup xác minh head; không tự chạy `create_all`, stamp hoặc upgrade.
+- Row lock PostgreSQL và expected revision thay file lock. Version bất biến; rollback chèn version mới liên kết source.
+- JSON preference workstation chỉ là input migration. Dry-run trước `--apply`; checksum bằng nhau là no-op và conflict chặn cả batch.
+- Idempotency key activation khác request ID. Tái dùng request ID vi phạm unique audit; chỉ replay `Idempotency-Key` với request ID mới.
+- Export Settings portable xác minh SHA-256 canonical nhưng không thay PostgreSQL disaster-recovery backup.

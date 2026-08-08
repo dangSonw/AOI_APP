@@ -161,3 +161,11 @@ The current baseline is 15 backend tests, 14 core tests, 12 integration tests, 1
 - Dataset safety contracts include bounded batch and file size, image magic-byte validation, allowlisted names, traversal rejection, duplicate capture naming, and safe ZIP member paths. Preserve characterization tests even when production behavior already passes.
 - Audit only bounded security metadata: verified actor ID, action, method, path, resource identity, request ID, status, result, and timestamp. Never read or store request bodies, credentials, bearer tokens, secrets, or image bytes. Audit failures must be logged and must not replace original route responses.
 - GitNexus resolves repositories through its global registry, not necessarily current worktree. When a worktree and main checkout share repository name, index worktree explicitly and pass its path to `detect-changes --repo ...`; otherwise change detection can inspect clean main checkout and incorrectly report `No changes detected.`
+
+## 20. PostgreSQL Settings Platform
+
+- Alembic is the only schema-evolution mechanism. Startup verifies head; it never runs `create_all`, stamps, or upgrades silently.
+- PostgreSQL row locks and expected revisions replace file locks. Versions are immutable; rollback inserts a source-linked version.
+- Workstation preference JSON is migration input only. Dry-run before `--apply`; equal checksums are no-op and conflicts block the batch.
+- Activation idempotency keys are distinct from request IDs. Reuse request IDs violates audit uniqueness; replay only the `Idempotency-Key` with a fresh request ID.
+- Portable settings export verifies canonical SHA-256 but is not a PostgreSQL disaster-recovery backup.

@@ -34,9 +34,9 @@ FastAPI control plane :8000
    |          | HTTP loopback   `-- HTTP loopback --> Motion adapter :9102
    |          `--------------------> Camera adapter :9101
    |
-   |-- PostgreSQL: users, inspections, audit events
+   |-- PostgreSQL: users, inspections, audit events, versioned settings
    |-- data/projects: workflow recipes
-   |-- data/preferences: workstation preferences
+   |-- data/preferences: legacy workstation preference migration input only
    `-- io/*.json: legacy physical I/O simulation
 
 Hardware mode:   camera adapter -> Jetson CSI boundary
@@ -256,6 +256,16 @@ Password-reset email delivery is intentionally not implemented in this milestone
 - Dataset operations reject unsafe names, traversal, invalid image magic bytes, files over 50 MiB, and batches over 100 files. Backend and authenticated API tests cover lifecycle, capture import, duplicate naming, and ZIP paths.
 - `POST`, `PUT`, `PATCH`, and `DELETE` requests receive an `X-Request-ID` and durable audit metadata. A verified bearer JWT supplies actor ID; failed mutations are recorded as failures. Audit persistence errors are logged without replacing the original API response.
 - `GET /api/audit-events` requires authentication and provides newest-first pagination with page size limited to 100.
+
+## PostgreSQL settings platform
+
+- Alembic owns schema evolution. Startup verifies migration head and refuses stale or unversioned databases.
+- Run `PYTHONPATH=backend conda run -n aoi-app python -m app.database.migrations upgrade` after installing a release. Existing pre-Alembic databases use `baseline-existing` once; it verifies the complete baseline before stamping.
+- PostgreSQL is the workstation-preference source of truth. Run `scripts/database/migrate-preferences.py --actor-id 1` as a dry-run, then repeat with `--apply` after reviewing conflicts.
+- `/api/v1/settings` provides validation, immutable versions, expected-revision conflicts, history, source-linked rollback, portable interchange, and idempotent metadata activation.
+- Activation requires `Idempotency-Key`. Exact replay returns the original activation; changed reuse returns `409` without moving the active pointer.
+- Export with `scripts/database/export-settings.py --output data/reports/settings-export.json`; verify with `scripts/database/verify-settings-export.py data/reports/settings-export.json`. Portable JSON has SHA-256 integrity but does not replace PostgreSQL-native backup.
+- In WSL, use Linux Node for GitNexus. A Windows npm shim can produce `invalid ELF header`; sanitize `PATH` and set `GITNEXUS_INVOCATION=npx` when needed.
 
 ## Workflow editor and storage
 

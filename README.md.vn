@@ -34,9 +34,9 @@ FastAPI control plane :8000
    |          | HTTP loopback   `-- HTTP loopback --> Motion adapter :9102
    |          `--------------------> Camera adapter :9101
    |
-   |-- PostgreSQL: người dùng, inspection, audit event
+   |-- PostgreSQL: người dùng, inspection, audit event, settings có version
    |-- data/projects: workflow recipe
-   |-- data/preferences: tùy chọn workstation
+   |-- data/preferences: chỉ là input migration preference workstation cũ
    `-- io/*.json: mô phỏng I/O vật lý cũ
 
 Hardware mode:   camera adapter -> ranh giới Jetson CSI
@@ -256,6 +256,16 @@ Gửi email đặt lại mật khẩu chưa được triển khai trong mốc n�
 - Dataset operation từ chối tên không an toàn, traversal, magic byte ảnh không hợp lệ, file lớn hơn 50 MiB và batch lớn hơn 100 file. Test backend và API có xác thực bao phủ lifecycle, import capture, duplicate naming và đường dẫn ZIP.
 - Request `POST`, `PUT`, `PATCH`, `DELETE` nhận `X-Request-ID` và audit metadata bền vững. Bearer JWT đã xác minh cung cấp actor ID; mutation thất bại được ghi với kết quả failure. Lỗi persistence audit được log mà không thay response API gốc.
 - `GET /api/audit-events` yêu cầu xác thực và cung cấp pagination mới nhất trước, với page size giới hạn 100.
+
+## Nền tảng Settings PostgreSQL
+
+- Alembic sở hữu evolution schema. Startup xác minh migration head và từ chối DB stale hoặc unversioned.
+- Chạy `PYTHONPATH=backend conda run -n aoi-app python -m app.database.migrations upgrade` sau khi cài release. DB trước Alembic dùng `baseline-existing` đúng một lần; command xác minh baseline đầy đủ trước khi stamp.
+- PostgreSQL là nguồn sự thật của preference workstation. Chạy `scripts/database/migrate-preferences.py --actor-id 1` ở chế độ dry-run, rồi lặp lại với `--apply` sau khi kiểm tra conflict.
+- `/api/v1/settings` cung cấp validation, version bất biến, conflict expected-revision, history, rollback liên kết source, interchange portable và activation metadata idempotent.
+- Activation yêu cầu `Idempotency-Key`. Replay chính xác trả activation cũ; tái dùng với request khác trả `409` và không đổi active pointer.
+- Export bằng `scripts/database/export-settings.py --output data/reports/settings-export.json`; verify bằng `scripts/database/verify-settings-export.py data/reports/settings-export.json`. JSON portable có SHA-256 nhưng không thay PostgreSQL-native backup.
+- Trong WSL, dùng Linux Node cho GitNexus. npm shim Windows có thể gây `invalid ELF header`; giới hạn `PATH` và đặt `GITNEXUS_INVOCATION=npx` khi cần.
 
 ## Workflow editor và lưu trữ
 
