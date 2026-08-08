@@ -61,3 +61,15 @@ class SettingsDocumentResponse(ApiSchema):
 class SettingsHistoryResponse(ApiSchema):
     versions: list[SettingsVersionResponse]
     total: int
+
+
+class SettingsExportEnvelope(ApiSchema):
+    format_version: Literal[1] = 1
+    scope: SettingsScope
+    subject_id: str
+    document_key: str
+    owner_user_id: int | None
+    revision: int = Field(ge=1)
+    schema_version: int = Field(ge=1)
+    payload: dict[str, Any]
+    payload_checksum: str = Field(pattern=r'^[a-f0-9]{64}$')
