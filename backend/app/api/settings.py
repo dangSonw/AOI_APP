@@ -74,6 +74,35 @@ def _validation_error(error: Exception) -> HTTPException:
     )
 
 
+def _record_settings_success(
+    session,
+    request: Request,
+    current_user,
+    version: SettingsVersion,
+    *,
+    action: str,
+    reason: str,
+    before_checksum: str | None,
+    status_code: int = 201,
+) -> None:
+    session.add(AuditEvent(
+        actor_id=current_user.id,
+        action=action,
+        method='POST',
+        path=request.url.path,
+        resource_type='settings',
+        resource_id=str(version.document_id),
+        request_id=request.state.request_id,
+        status_code=status_code,
+        result='success',
+        before_checksum=before_checksum,
+        after_checksum=version.checksum,
+        reason=reason,
+        client_metadata={},
+    ))
+    session.flush()
+
+
 @router.post('/{scope}/{subject_id}/validate')
 def validate_settings(
     scope: SettingsScope,
@@ -93,17 +122,25 @@ def create_version(
     scope: SettingsScope,
     subject_id: str,
     request: SettingsVersionCreate,
+    http_request: Request,
     current_user: CurrentUser,
     session: DatabaseSession,
 ) -> SettingsVersionResponse:
     identity = _identity(scope, subject_id, request.document_key, current_user.id)
     try:
+        previous = get_current_settings(session, identity)
         version = create_settings_version(
             session, identity, request.expected_revision, request.schema_version,
             request.payload, current_user.id, request.reason,
         )
+        _record_settings_success(
+            session, http_request, current_user, version,
+            action='create-version', reason=request.reason,
+            before_checksum=previous.checksum if previous is not None else None,
+        )
         session.commit()
         session.refresh(version)
+        http_request.state.audit_recorded = True
     except SettingsRevisionConflict as error:
         session.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_conflict_detail(error)) from error
@@ -166,17 +203,25 @@ def rollback_version(
     scope: SettingsScope,
     subject_id: str,
     request: SettingsRollbackRequest,
+    http_request: Request,
     current_user: CurrentUser,
     session: DatabaseSession,
 ) -> SettingsVersionResponse:
     identity = _identity(scope, subject_id, request.document_key, current_user.id)
     try:
+        previous = get_current_settings(session, identity)
         version = rollback_settings(
             session, identity, request.expected_revision, request.target_revision,
             current_user.id, request.reason,
         )
+        _record_settings_success(
+            session, http_request, current_user, version,
+            action='rollback', reason=request.reason,
+            before_checksum=previous.checksum if previous is not None else None,
+        )
         session.commit()
         session.refresh(version)
+        http_request.state.audit_recorded = True
     except SettingsRevisionConflict as error:
         session.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=_conflict_detail(error)) from error
@@ -219,6 +264,7 @@ def import_settings(
     scope: SettingsScope,
     subject_id: str,
     envelope: SettingsExportEnvelope,
+    http_request: Request,
     current_user: CurrentUser,
     session: DatabaseSession,
     expected_revision: int = Query(alias='expectedRevision', ge=0),
@@ -234,12 +280,19 @@ def import_settings(
             'code': 'settings_checksum_mismatch', 'message': 'The settings export checksum is invalid.',
         })
     try:
+        previous = get_current_settings(session, identity)
         version = create_settings_version(
             session, identity, expected_revision, envelope.schema_version,
             envelope.payload, current_user.id, reason,
         )
+        _record_settings_success(
+            session, http_request, current_user, version,
+            action='import', reason=reason,
+            before_checksum=previous.checksum if previous is not None else None,
+        )
         session.commit()
         session.refresh(version)
+        http_request.state.audit_recorded = True
     except SettingsRevisionConflict as error:
         session.rollback()
         raise HTTPException(status_code=409, detail=_conflict_detail(error)) from error

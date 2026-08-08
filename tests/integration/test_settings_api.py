@@ -5,6 +5,9 @@ from fastapi.testclient import TestClient
 
 from app.config.settings import get_settings
 from app.main import app
+from app.database.session import SessionLocal
+from app.models.audit_event import AuditEvent
+from sqlalchemy import select
 from app.schemas.workstation_preferences import WorkstationPreferenceContentSchema
 
 
@@ -85,3 +88,25 @@ def test_export_and_import_verify_checksum(authenticated_client) -> None:
     assert imported.status_code == 201
     assert tampered.status_code == 422
     assert tampered.json()['detail']['code'] == 'settings_checksum_mismatch'
+
+
+def test_version_success_audit_contains_settings_checksums(authenticated_client) -> None:
+    client, headers = authenticated_client
+    station = f'audit-version-{uuid4().hex}'
+    request_id = f'create-{station}'
+    response = client.post(
+        f'/api/v1/settings/workstation/{station}/versions',
+        headers={**headers, 'X-Request-ID': request_id},
+        json={
+            'documentKey': 'workstation-preferences', 'expectedRevision': 0,
+            'schemaVersion': 1, 'payload': content(), 'reason': 'Audited version',
+        },
+    )
+    with SessionLocal() as session:
+        events = list(session.scalars(select(AuditEvent).where(AuditEvent.request_id == request_id)))
+
+    assert response.status_code == 201
+    assert len(events) == 1
+    assert events[0].action == 'create-version'
+    assert events[0].after_checksum == response.json()['checksum']
+    assert events[0].reason == 'Audited version'
