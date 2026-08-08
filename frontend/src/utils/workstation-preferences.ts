@@ -1,4 +1,9 @@
-import type { PhotometricLight, ViewerPreference, WorkstationPreferences } from '../types/workstation-preferences';
+import type {
+  LocalePreferences,
+  PhotometricLight,
+  ViewerPreference,
+  WorkstationPreferences,
+} from '../types/workstation-preferences';
 
 
 const DEFAULT_LIGHT_COUNT = 4;
@@ -28,9 +33,29 @@ export function createDefaultPreferences(userId: number, workstationId: string):
         inspectionFlow: { isCollapsed: false },
       },
     },
+    locale: {
+      language: 'en-US',
+      region: 'vi-VN',
+      timezone: 'Asia/Ho_Chi_Minh',
+      measurementSystem: 'metric',
+      clockFormat: '24-hour',
+    },
     photometric: {
       lightCount: DEFAULT_LIGHT_COUNT,
       lights: createDefaultLights(DEFAULT_LIGHT_COUNT),
+    },
+  };
+}
+
+export function updateLocalePreference(
+  preferences: WorkstationPreferences,
+  patch: Partial<LocalePreferences>,
+): WorkstationPreferences {
+  return {
+    ...preferences,
+    locale: {
+      ...preferences.locale,
+      ...patch,
     },
   };
 }

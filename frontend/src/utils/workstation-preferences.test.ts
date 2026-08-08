@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createDefaultPreferences,
   resizePhotometricLights,
+  updateLocalePreference,
   updateViewerSize,
 } from './workstation-preferences';
 
@@ -10,8 +11,29 @@ describe('workstation preference helpers', () => {
   it('creates one evenly spaced capture configuration per light', () => {
     const preferences = createDefaultPreferences(3, 'station-01');
 
+    expect(preferences.locale).toEqual({
+      language: 'en-US',
+      region: 'vi-VN',
+      timezone: 'Asia/Ho_Chi_Minh',
+      measurementSystem: 'metric',
+      clockFormat: '24-hour',
+    });
     expect(preferences.photometric.lightCount).toBe(4);
     expect(preferences.photometric.lights.map((light) => light.azimuth)).toEqual([0, 90, 180, 270]);
+  });
+
+  it('updates one locale preference without changing workstation identity', () => {
+    const preferences = createDefaultPreferences(3, 'station-01');
+
+    const updated = updateLocalePreference(preferences, {
+      language: 'en-GB',
+      measurementSystem: 'imperial',
+    });
+
+    expect(updated.workstationId).toBe('station-01');
+    expect(updated.locale.language).toBe('en-GB');
+    expect(updated.locale.measurementSystem).toBe('imperial');
+    expect(updated.locale.timezone).toBe('Asia/Ho_Chi_Minh');
   });
 
   it('keeps image count equal to light count when resizing the rig', () => {

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import Field, model_validator
 
@@ -25,6 +25,14 @@ class DashboardPanelsSchema(ApiSchema):
 
 class DashboardPreferencesSchema(ApiSchema):
     panels: DashboardPanelsSchema = DashboardPanelsSchema()
+
+
+class LocalePreferencesSchema(ApiSchema):
+    language: Literal['en-US', 'en-GB'] = 'en-US'
+    region: Literal['vi-VN', 'en-SG', 'de-DE'] = 'vi-VN'
+    timezone: Literal['Asia/Ho_Chi_Minh', 'Asia/Singapore', 'Europe/Berlin'] = 'Asia/Ho_Chi_Minh'
+    measurement_system: Literal['metric', 'imperial'] = 'metric'
+    clock_format: Literal['24-hour', '12-hour'] = '24-hour'
 
 
 class PhotometricLightSchema(ApiSchema):
@@ -54,6 +62,7 @@ class WorkstationPreferencesSchema(ApiSchema):
     workstation_id: str
     updated_at: datetime
     dashboard: DashboardPreferencesSchema = DashboardPreferencesSchema()
+    locale: LocalePreferencesSchema = LocalePreferencesSchema()
     photometric: PhotometricPreferencesSchema
 
     @classmethod

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import type { WorkstationPreferences } from '../types/workstation-preferences';
+import type { LocalePreferences, WorkstationPreferences } from '../types/workstation-preferences';
+import { updateLocalePreference } from '../utils/workstation-preferences';
 
 const SETTINGS_SECTIONS = [
   'General',
@@ -11,21 +12,41 @@ const SETTINGS_SECTIONS = [
   'Security & data',
 ];
 
+const REGION_TIMEZONES: Record<LocalePreferences['region'], LocalePreferences['timezone']> = {
+  'vi-VN': 'Asia/Ho_Chi_Minh',
+  'en-SG': 'Asia/Singapore',
+  'de-DE': 'Europe/Berlin',
+};
+
 interface SettingsPageProps {
   preferences: WorkstationPreferences;
   isDirty: boolean;
   isSaving: boolean;
   error: string;
   onWorkstationIdChange: (workstationId: string) => void;
+  onPreferencesChange: (preferences: WorkstationPreferences) => void;
   onSave: () => Promise<void>;
 }
 
-export function SettingsPage({ preferences, isDirty, isSaving, error, onWorkstationIdChange, onSave }: SettingsPageProps) {
-  const [language, setLanguage] = useState('English (United States)');
-  const [region, setRegion] = useState('Vietnam · GMT+7');
-  const [units, setUnits] = useState('Metric (mm, μm)');
-  const [clock, setClock] = useState('24-hour clock');
+export function createLocaleChangeHandlers(
+  preferences: WorkstationPreferences,
+  onPreferencesChange: (preferences: WorkstationPreferences) => void,
+) {
+  const updateLocale = (patch: Partial<LocalePreferences>) => {
+    onPreferencesChange(updateLocalePreference(preferences, patch));
+  };
+
+  return {
+    language: (language: LocalePreferences['language']) => updateLocale({ language }),
+    region: (region: LocalePreferences['region']) => updateLocale({ region, timezone: REGION_TIMEZONES[region] }),
+    measurementSystem: (measurementSystem: LocalePreferences['measurementSystem']) => updateLocale({ measurementSystem }),
+    clockFormat: (clockFormat: LocalePreferences['clockFormat']) => updateLocale({ clockFormat }),
+  };
+}
+
+export function SettingsPage({ preferences, isDirty, isSaving, error, onWorkstationIdChange, onPreferencesChange, onSave }: SettingsPageProps) {
   const [saveMessage, setSaveMessage] = useState('');
+  const localeChangeHandlers = createLocaleChangeHandlers(preferences, onPreferencesChange);
 
   const handleSave = async () => {
     setSaveMessage('');
@@ -79,31 +100,31 @@ export function SettingsPage({ preferences, isDirty, isSaving, error, onWorkstat
             <h3>Regional preferences</h3>
             <label>
               <span>Display language</span>
-              <select value={language} onChange={(event) => setLanguage(event.target.value)}>
-                <option>English (United States)</option>
-                <option>English (United Kingdom)</option>
+              <select value={preferences.locale.language} onChange={(event) => localeChangeHandlers.language(event.target.value as LocalePreferences['language'])}>
+                <option value="en-US">English (United States)</option>
+                <option value="en-GB">English (United Kingdom)</option>
               </select>
             </label>
             <label>
               <span>Regional format</span>
-              <select value={region} onChange={(event) => setRegion(event.target.value)}>
-                <option>Vietnam · GMT+7</option>
-                <option>Singapore · GMT+8</option>
-                <option>Germany · GMT+1</option>
+              <select value={preferences.locale.region} onChange={(event) => localeChangeHandlers.region(event.target.value as LocalePreferences['region'])}>
+                <option value="vi-VN">Vietnam</option>
+                <option value="en-SG">Singapore</option>
+                <option value="de-DE">Germany</option>
               </select>
             </label>
             <label>
               <span>Measurement units</span>
-              <select value={units} onChange={(event) => setUnits(event.target.value)}>
-                <option>Metric (mm, μm)</option>
-                <option>Imperial (in, mil)</option>
+              <select value={preferences.locale.measurementSystem} onChange={(event) => localeChangeHandlers.measurementSystem(event.target.value as LocalePreferences['measurementSystem'])}>
+                <option value="metric">Metric (mm, μm)</option>
+                <option value="imperial">Imperial (in, mil)</option>
               </select>
             </label>
             <label>
               <span>Date & time</span>
-              <select value={clock} onChange={(event) => setClock(event.target.value)}>
-                <option>24-hour clock</option>
-                <option>12-hour clock</option>
+              <select value={preferences.locale.clockFormat} onChange={(event) => localeChangeHandlers.clockFormat(event.target.value as LocalePreferences['clockFormat'])}>
+                <option value="24-hour">24-hour clock</option>
+                <option value="12-hour">12-hour clock</option>
               </select>
             </label>
           </div>

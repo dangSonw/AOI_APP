@@ -16,6 +16,8 @@ def test_missing_preferences_return_user_scoped_defaults(tmp_path: Path) -> None
     assert preferences.user_id == 7
     assert preferences.workstation_id == 'station-01'
     assert preferences.revision == 0
+    assert preferences.locale.language == 'en-US'
+    assert preferences.locale.measurement_system == 'metric'
     assert preferences.photometric.light_count == 4
     assert len(preferences.photometric.lights) == 4
 

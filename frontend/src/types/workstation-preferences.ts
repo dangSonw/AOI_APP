@@ -17,6 +17,14 @@ export interface DashboardPreferences {
   };
 }
 
+export interface LocalePreferences {
+  language: 'en-US' | 'en-GB';
+  region: 'vi-VN' | 'en-SG' | 'de-DE';
+  timezone: 'Asia/Ho_Chi_Minh' | 'Asia/Singapore' | 'Europe/Berlin';
+  measurementSystem: 'metric' | 'imperial';
+  clockFormat: '24-hour' | '12-hour';
+}
+
 export interface PhotometricLight {
   id: number;
   azimuth: number;
@@ -31,6 +39,7 @@ export interface WorkstationPreferences {
   workstationId: string;
   updatedAt: string;
   dashboard: DashboardPreferences;
+  locale: LocalePreferences;
   photometric: {
     lightCount: number;
     lights: PhotometricLight[];

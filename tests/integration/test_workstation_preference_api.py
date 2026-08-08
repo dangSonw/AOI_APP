@@ -28,6 +28,8 @@ def test_preferences_round_trip_and_reject_stale_revision(client: TestClient) ->
     default_response = client.get('/api/workstation-preferences/station-01')
     payload = default_response.json()
     payload['photometric']['lights'][0]['azimuth'] = 35
+    payload['locale']['language'] = 'en-GB'
+    payload['locale']['measurementSystem'] = 'imperial'
 
     saved_response = client.put('/api/workstation-preferences/station-01', json=payload)
     stale_response = client.put('/api/workstation-preferences/station-01', json=payload)
@@ -36,6 +38,8 @@ def test_preferences_round_trip_and_reject_stale_revision(client: TestClient) ->
     assert saved_response.status_code == 200
     assert saved_response.json()['revision'] == 1
     assert saved_response.json()['photometric']['lights'][0]['azimuth'] == 35
+    assert saved_response.json()['locale']['language'] == 'en-GB'
+    assert saved_response.json()['locale']['measurementSystem'] == 'imperial'
     assert stale_response.status_code == 409
 
 
