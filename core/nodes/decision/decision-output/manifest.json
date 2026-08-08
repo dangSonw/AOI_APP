@@ -1,0 +1,53 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "decision-output",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "none",
+    "customKey": null
+  },
+  "definition": {
+    "id": "decision-output",
+    "name": "Decision output",
+    "description": "Publishes the configured inspection decision.",
+    "category": "Decision",
+    "documentation_group": "Acquisition and pipeline components",
+    "inputs": [
+      {
+        "key": "decision",
+        "label": "Decision",
+        "direction": "input",
+        "data_type": "decision",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "result-decision",
+        "label": "Result decision",
+        "direction": "output",
+        "data_type": "decision",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 7
+}

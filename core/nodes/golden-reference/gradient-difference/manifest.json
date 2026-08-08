@@ -1,0 +1,61 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "gradient-difference",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "none",
+    "customKey": null
+  },
+  "definition": {
+    "id": "gradient-difference",
+    "name": "Gradient difference",
+    "description": "Compares gradient evidence with a configured reference.",
+    "category": "Golden/reference",
+    "documentation_group": "Group A — Golden/reference comparison",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "anomaly-map",
+        "label": "Anomaly map",
+        "direction": "output",
+        "data_type": "anomaly-map",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "score",
+        "label": "Score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 38
+}

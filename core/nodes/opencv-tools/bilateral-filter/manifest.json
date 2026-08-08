@@ -1,0 +1,87 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "bilateral-filter",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "bilateral-filter",
+    "name": "Bilateral filter",
+    "description": "Smooths while preserving configured edges.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "processed-image",
+        "label": "Processed image",
+        "direction": "output",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "diameter",
+        "label": "Diameter",
+        "kind": "integer",
+        "default_value": 9,
+        "required": true,
+        "minimum": 1,
+        "maximum": 255,
+        "options": [],
+        "description": ""
+      },
+      {
+        "key": "sigmaColor",
+        "label": "Color sigma",
+        "kind": "number",
+        "default_value": 75.0,
+        "required": true,
+        "minimum": 0.0,
+        "maximum": 10000.0,
+        "options": [],
+        "description": ""
+      },
+      {
+        "key": "sigmaSpace",
+        "label": "Space sigma",
+        "kind": "number",
+        "default_value": 75.0,
+        "required": true,
+        "minimum": 0.0,
+        "maximum": 10000.0,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 14
+}

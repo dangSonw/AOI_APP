@@ -1,0 +1,82 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "morphology-operation",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "morphology-operation",
+    "name": "Morphology operation",
+    "description": "Applies a selected morphology operation.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {
+        "key": "mask",
+        "label": "Mask",
+        "direction": "input",
+        "data_type": "mask",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "processed-mask",
+        "label": "Processed mask",
+        "direction": "output",
+        "data_type": "mask",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "operation",
+        "label": "Operation",
+        "kind": "select",
+        "default_value": "open",
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "open",
+          "close",
+          "gradient",
+          "top-hat",
+          "black-hat"
+        ],
+        "description": ""
+      },
+      {
+        "key": "kernelSize",
+        "label": "Kernel size",
+        "kind": "integer",
+        "default_value": 3,
+        "required": true,
+        "minimum": 1,
+        "maximum": 255,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 20
+}

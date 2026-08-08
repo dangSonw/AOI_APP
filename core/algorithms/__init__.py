@@ -5,6 +5,7 @@ from .models import (
     ParameterDefinition,
     ParameterKind,
     ParameterValue,
+    is_json_parameter_value,
     PortDefinition,
     PortDirection,
 )
@@ -19,4 +20,5 @@ __all__ = [
     'PortDirection',
     'get_algorithm_catalog',
     'get_algorithm_definition',
+    'is_json_parameter_value',
 ]

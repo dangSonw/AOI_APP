@@ -1,0 +1,73 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "global-local-stream-split",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "global-local-stream-split",
+    "name": "Global/local stream split",
+    "description": "Creates global and local image streams.",
+    "category": "Pipeline",
+    "documentation_group": "Acquisition and pipeline components",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "global",
+        "label": "Global image",
+        "direction": "output",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "local",
+        "label": "Local images",
+        "direction": "output",
+        "data_type": "image-set",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "tileSize",
+        "label": "Tile size",
+        "kind": "integer",
+        "default_value": 256,
+        "required": true,
+        "minimum": 16,
+        "maximum": 4096,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 3
+}

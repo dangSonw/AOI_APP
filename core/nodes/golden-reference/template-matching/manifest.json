@@ -1,0 +1,78 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "template-matching",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "template-matching",
+    "name": "Template matching",
+    "description": "Matches configured templates against an image.",
+    "category": "Golden/reference",
+    "documentation_group": "Group A — Golden/reference comparison",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "detections",
+        "label": "Matches",
+        "direction": "output",
+        "data_type": "detections",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "score",
+        "label": "Score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "method",
+        "label": "Method",
+        "kind": "select",
+        "default_value": "ccoeff-normed",
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "sqdiff",
+          "sqdiff-normed",
+          "ccorr-normed",
+          "ccoeff-normed"
+        ],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 40
+}

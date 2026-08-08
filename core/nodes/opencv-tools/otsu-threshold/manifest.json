@@ -1,0 +1,53 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "otsu-threshold",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "none",
+    "customKey": null
+  },
+  "definition": {
+    "id": "otsu-threshold",
+    "name": "Otsu threshold",
+    "description": "Selects a global threshold using Otsu criteria.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "mask",
+        "label": "Mask",
+        "direction": "output",
+        "data_type": "mask",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 16
+}

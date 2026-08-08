@@ -1,0 +1,61 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "roi-extraction",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "none",
+    "customKey": null
+  },
+  "definition": {
+    "id": "roi-extraction",
+    "name": "ROI extraction",
+    "description": "Extracts configured regions from an image.",
+    "category": "Pipeline",
+    "documentation_group": "Acquisition and pipeline components",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "regions",
+        "label": "Regions",
+        "direction": "input",
+        "data_type": "roi-set",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "images",
+        "label": "ROI images",
+        "direction": "output",
+        "data_type": "image-set",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 2
+}

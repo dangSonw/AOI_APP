@@ -1,0 +1,92 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "resize",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "resize",
+    "name": "Resize",
+    "description": "Resizes an image to configured dimensions.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "processed-image",
+        "label": "Processed image",
+        "direction": "output",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "width",
+        "label": "Width",
+        "kind": "integer",
+        "default_value": 1024,
+        "required": true,
+        "minimum": 1,
+        "maximum": 16384,
+        "options": [],
+        "description": ""
+      },
+      {
+        "key": "height",
+        "label": "Height",
+        "kind": "integer",
+        "default_value": 1024,
+        "required": true,
+        "minimum": 1,
+        "maximum": 16384,
+        "options": [],
+        "description": ""
+      },
+      {
+        "key": "interpolation",
+        "label": "Interpolation",
+        "kind": "select",
+        "default_value": "linear",
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "nearest",
+          "linear",
+          "cubic",
+          "area"
+        ],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 9
+}

@@ -1,0 +1,76 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "gaussian-blur",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "gaussian-blur",
+    "name": "Gaussian blur",
+    "description": "Applies a configured Gaussian smoothing kernel.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "processed-image",
+        "label": "Processed image",
+        "direction": "output",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "kernelSize",
+        "label": "Kernel size",
+        "kind": "integer",
+        "default_value": 5,
+        "required": true,
+        "minimum": 1,
+        "maximum": 255,
+        "options": [],
+        "description": ""
+      },
+      {
+        "key": "sigma",
+        "label": "Sigma",
+        "kind": "number",
+        "default_value": 1.0,
+        "required": true,
+        "minimum": 0.0,
+        "maximum": 1000.0,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 12
+}

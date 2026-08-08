@@ -1,0 +1,67 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "camera-capture",
+  "use": "test",
+  "executionTarget": "adapter",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "custom",
+    "customKey": "camera-acquisition"
+  },
+  "definition": {
+    "id": "camera-capture",
+    "name": "Camera capture",
+    "description": "Describes a configured camera acquisition step.",
+    "category": "Acquisition",
+    "documentation_group": "Acquisition and pipeline components",
+    "inputs": [],
+    "outputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "output",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "cameraId",
+        "label": "Camera ID",
+        "kind": "text",
+        "default_value": "top-camera",
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [],
+        "description": ""
+      },
+      {
+        "key": "exposureUs",
+        "label": "Exposure (μs)",
+        "kind": "integer",
+        "default_value": 8000,
+        "required": true,
+        "minimum": 1,
+        "maximum": 1000000,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 1
+}

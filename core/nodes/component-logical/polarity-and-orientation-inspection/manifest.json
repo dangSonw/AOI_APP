@@ -1,0 +1,81 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "polarity-and-orientation-inspection",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "polarity-and-orientation-inspection",
+    "name": "Polarity and orientation inspection",
+    "description": "Checks configured component polarity and orientation evidence.",
+    "category": "Component/logical",
+    "documentation_group": "Group F — Component and logical inspection",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "components",
+        "label": "Components",
+        "direction": "input",
+        "data_type": "detections",
+        "required": false,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "detections",
+        "label": "Findings",
+        "direction": "output",
+        "data_type": "detections",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "score",
+        "label": "Score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "angleTolerance",
+        "label": "Angle tolerance",
+        "kind": "number",
+        "default_value": 5.0,
+        "required": true,
+        "minimum": 0.0,
+        "maximum": 180.0,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "Polarity and orientation inspection"
+  },
+  "catalogOrder": 57
+}

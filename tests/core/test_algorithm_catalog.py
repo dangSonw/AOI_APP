@@ -48,3 +48,10 @@ def test_documented_reference_algorithms_can_be_looked_up() -> None:
     assert get_algorithm_definition('median-mad-robust-difference').name == 'Median–MAD robust difference'
     assert get_algorithm_definition('patchcore').documentation_group == 'Group B — Feature distribution'
     assert get_algorithm_definition('does-not-exist') is None
+
+def test_parameter_values_support_bounded_json_compatible_structures() -> None:
+    from core.algorithms import is_json_parameter_value
+
+    assert is_json_parameter_value({'roi': [1, 2, 3], 'enabled': True, 'model': None})
+    assert not is_json_parameter_value({'depth': [[[[[[[[[[1]]]]]]]]]]}, maximum_depth=4)
+    assert not is_json_parameter_value({'unsafe': object()})

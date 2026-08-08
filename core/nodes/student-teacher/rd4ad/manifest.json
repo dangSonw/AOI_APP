@@ -1,0 +1,73 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "rd4ad",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "rd4ad",
+    "name": "RD4AD",
+    "description": "Configures reverse-distillation anomaly detection.",
+    "category": "Student–teacher",
+    "documentation_group": "Group C — Student–teacher and distillation",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "anomaly-map",
+        "label": "Anomaly map",
+        "direction": "output",
+        "data_type": "anomaly-map",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "score",
+        "label": "Score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "temperature",
+        "label": "Temperature",
+        "kind": "number",
+        "default_value": 1.0,
+        "required": true,
+        "minimum": 0.01,
+        "maximum": 100.0,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "RD4AD"
+  },
+  "catalogOrder": 48
+}

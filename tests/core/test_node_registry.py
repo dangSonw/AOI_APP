@@ -29,3 +29,46 @@ def test_placeholder_runtime_has_an_explicit_entry_point() -> None:
 
     with pytest.raises(NodeNotImplementedError, match='patchcore'):
         runtime.execute({'image': object()}, {'memoryBankSize': 10_000})
+
+def test_every_runtime_package_owns_one_versioned_manifest() -> None:
+    from core.nodes.registry import get_node_manifest_registry
+
+    manifests = get_node_manifest_registry()
+
+    assert len(manifests) == 58
+    assert set(manifests) == set(get_node_registry())
+    assert all(manifest.manifest_version == 1 for manifest in manifests.values())
+    assert all(manifest.execution_target in {'local-cpu', 'local-gpu', 'adapter'} for manifest in manifests.values())
+
+
+def test_manifest_and_runtime_contracts_cannot_drift() -> None:
+    from core.nodes.registry import get_node_manifest_registry
+
+    manifests = get_node_manifest_registry()
+    for node_id, runtime in get_node_registry().items():
+        manifest = manifests[node_id]
+        assert runtime.input_keys == tuple(port.key for port in manifest.definition.inputs)
+        assert runtime.output_keys == tuple(port.key for port in manifest.definition.outputs)
+        assert runtime.use == manifest.use
+
+
+def test_manifest_catalog_projection_has_no_monolithic_definition_table() -> None:
+    from core.algorithms.catalog import get_algorithm_catalog
+    from core.nodes.registry import get_node_manifest_registry
+
+    catalog = get_algorithm_catalog()
+    manifests = get_node_manifest_registry()
+
+    assert catalog == tuple(manifest.definition for manifest in sorted(manifests.values(), key=lambda item: item.catalog_order))
+
+
+def test_production_workflow_rejects_test_or_unsupported_runtimes() -> None:
+    from core.nodes.registry import validate_node_runtime_support
+
+    assert validate_node_runtime_support('patchcore', deployment_mode='production') == (
+        'Node patchcore uses a test runtime and cannot run in production.',
+    )
+    assert validate_node_runtime_support('patchcore', deployment_mode='research') == ()
+    assert validate_node_runtime_support('does-not-exist', deployment_mode='production') == (
+        'Node does-not-exist is not registered.',
+    )

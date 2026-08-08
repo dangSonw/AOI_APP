@@ -1,0 +1,70 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "color-conversion",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "color-conversion",
+    "name": "Color conversion",
+    "description": "Converts image color representation.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "processed-image",
+        "label": "Processed image",
+        "direction": "output",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "mode",
+        "label": "Mode",
+        "kind": "select",
+        "default_value": "bgr-to-gray",
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "bgr-to-gray",
+          "bgr-to-rgb",
+          "bgr-to-hsv",
+          "rgb-to-gray"
+        ],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 8
+}

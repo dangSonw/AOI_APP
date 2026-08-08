@@ -1,0 +1,76 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "uniad",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "uniad",
+    "name": "UniAD",
+    "description": "Configures unified anomaly detection features.",
+    "category": "Component/logical",
+    "documentation_group": "Group F — Component and logical inspection",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "anomaly-map",
+        "label": "Anomaly map",
+        "direction": "output",
+        "data_type": "anomaly-map",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "score",
+        "label": "Score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "backbone",
+        "label": "Backbone",
+        "kind": "select",
+        "default_value": "efficientnet-b4",
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "efficientnet-b4",
+          "resnet50"
+        ],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "UniAD"
+  },
+  "catalogOrder": 56
+}

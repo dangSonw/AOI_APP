@@ -1,0 +1,76 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "score-normalization",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "score-normalization",
+    "name": "Score normalization",
+    "description": "Normalizes a score to a configured range.",
+    "category": "Pipeline",
+    "documentation_group": "Acquisition and pipeline components",
+    "inputs": [
+      {
+        "key": "score",
+        "label": "Score",
+        "direction": "input",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "normalized-score",
+        "label": "Normalized score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "minimum",
+        "label": "Minimum",
+        "kind": "number",
+        "default_value": 0.0,
+        "required": true,
+        "minimum": -1000000.0,
+        "maximum": 1000000.0,
+        "options": [],
+        "description": ""
+      },
+      {
+        "key": "maximum",
+        "label": "Maximum",
+        "kind": "number",
+        "default_value": 1.0,
+        "required": true,
+        "minimum": -1000000.0,
+        "maximum": 1000000.0,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 4
+}

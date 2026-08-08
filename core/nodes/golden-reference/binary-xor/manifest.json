@@ -1,0 +1,69 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "binary-xor",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "none",
+    "customKey": null
+  },
+  "definition": {
+    "id": "binary-xor",
+    "name": "Binary XOR",
+    "description": "Compares binary evidence using exclusive OR.",
+    "category": "Golden/reference",
+    "documentation_group": "Group A — Golden/reference comparison",
+    "inputs": [
+      {
+        "key": "mask",
+        "label": "Mask",
+        "direction": "input",
+        "data_type": "mask",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "reference",
+        "label": "Reference mask",
+        "direction": "input",
+        "data_type": "mask",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "difference-mask",
+        "label": "Difference mask",
+        "direction": "output",
+        "data_type": "mask",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "score",
+        "label": "Score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 39
+}

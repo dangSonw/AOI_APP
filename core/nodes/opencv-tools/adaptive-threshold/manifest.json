@@ -1,0 +1,76 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "adaptive-threshold",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "adaptive-threshold",
+    "name": "Adaptive threshold",
+    "description": "Applies a local adaptive threshold.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "mask",
+        "label": "Mask",
+        "direction": "output",
+        "data_type": "mask",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "blockSize",
+        "label": "Block size",
+        "kind": "integer",
+        "default_value": 11,
+        "required": true,
+        "minimum": 3,
+        "maximum": 255,
+        "options": [],
+        "description": ""
+      },
+      {
+        "key": "constant",
+        "label": "Constant",
+        "kind": "number",
+        "default_value": 2.0,
+        "required": true,
+        "minimum": -255.0,
+        "maximum": 255.0,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 17
+}

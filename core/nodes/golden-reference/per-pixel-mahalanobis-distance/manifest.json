@@ -1,0 +1,73 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "per-pixel-mahalanobis-distance",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "per-pixel-mahalanobis-distance",
+    "name": "Per-pixel Mahalanobis distance",
+    "description": "Scores pixels against configured multivariate normal statistics.",
+    "category": "Golden/reference",
+    "documentation_group": "Group A — Golden/reference comparison",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "anomaly-map",
+        "label": "Anomaly map",
+        "direction": "output",
+        "data_type": "anomaly-map",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "score",
+        "label": "Score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "regularization",
+        "label": "Regularization",
+        "kind": "number",
+        "default_value": 0.001,
+        "required": true,
+        "minimum": 1e-07,
+        "maximum": 1.0,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 41
+}

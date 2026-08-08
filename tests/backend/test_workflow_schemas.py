@@ -26,3 +26,16 @@ def test_algorithm_schema_exposes_typed_configuration_metadata() -> None:
     assert payload['availability'] == 'configuration-only'
     assert payload['outputs'][0]['dataType'] == 'image'
     assert payload['parameters'][0]['defaultValue'] == 'recipe-image'
+
+def test_algorithm_schema_projects_manifest_and_inspector_contract() -> None:
+    from app.schemas.workflow import AlgorithmDefinitionSchema
+    from core.algorithms import get_algorithm_definition
+
+    schema = AlgorithmDefinitionSchema.from_core(get_algorithm_definition('camera-capture'))
+    payload = schema.model_dump(mode='json', by_alias=True)
+
+    assert payload['manifestVersion'] == 1
+    assert payload['packageVersion'] == '1.0.0'
+    assert payload['executionTarget'] == 'adapter'
+    assert payload['inspectorKind'] == 'custom'
+    assert payload['customInspectorKey'] == 'camera-acquisition'

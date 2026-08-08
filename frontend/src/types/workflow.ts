@@ -13,8 +13,8 @@ export type DataType =
   | 'decision';
 
 export type PortDirection = 'input' | 'output';
-export type ParameterKind = 'boolean' | 'integer' | 'number' | 'text' | 'select';
-export type ParameterValue = boolean | number | string;
+export type ParameterKind = 'boolean' | 'integer' | 'number' | 'text' | 'select' | 'json' | 'reference';
+export type ParameterValue = null | boolean | number | string | ParameterValue[] | { [key: string]: ParameterValue };
 export type NodeUse = 'test' | 'debug' | 'release';
 
 export interface PortDefinition {
@@ -50,6 +50,11 @@ export interface AlgorithmDefinition {
   outputs: PortDefinition[];
   parameters: ParameterDefinition[];
   documentationReference: string | null;
+  manifestVersion: number;
+  packageVersion: string;
+  executionTarget: 'local-cpu' | 'local-gpu' | 'adapter';
+  inspectorKind: 'none' | 'generic' | 'custom';
+  customInspectorKey: string | null;
 }
 
 export interface WorkflowPoint {

@@ -1,0 +1,76 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "decision-fusion",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "decision-fusion",
+    "name": "Decision fusion",
+    "description": "Combines one or more scores into a review decision.",
+    "category": "Decision",
+    "documentation_group": "Acquisition and pipeline components",
+    "inputs": [
+      {
+        "key": "scores",
+        "label": "Scores",
+        "direction": "input",
+        "data_type": "score",
+        "required": true,
+        "variadic": true
+      }
+    ],
+    "outputs": [
+      {
+        "key": "decision",
+        "label": "Decision",
+        "direction": "output",
+        "data_type": "decision",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "reviewThreshold",
+        "label": "Review threshold",
+        "kind": "number",
+        "default_value": 0.5,
+        "required": true,
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "options": [],
+        "description": ""
+      },
+      {
+        "key": "failThreshold",
+        "label": "Fail threshold",
+        "kind": "number",
+        "default_value": 0.8,
+        "required": true,
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 6
+}

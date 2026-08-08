@@ -1,0 +1,85 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "feature-detection-and-matching",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "feature-detection-and-matching",
+    "name": "Feature detection and matching",
+    "description": "Configures feature extraction and correspondence matching.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "reference",
+        "label": "Reference",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "keypoints",
+        "label": "Matches",
+        "direction": "output",
+        "data_type": "keypoints",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "transform",
+        "label": "Transform",
+        "direction": "output",
+        "data_type": "transform",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "detector",
+        "label": "Detector",
+        "kind": "select",
+        "default_value": "orb",
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "orb",
+          "sift",
+          "akaze"
+        ],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 29
+}

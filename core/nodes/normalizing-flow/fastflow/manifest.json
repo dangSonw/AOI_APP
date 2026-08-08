@@ -1,0 +1,73 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "fastflow",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "fastflow",
+    "name": "FastFlow",
+    "description": "Configures fast feature-space normalizing flows.",
+    "category": "Normalizing flow",
+    "documentation_group": "Group E — Normalizing flow",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "anomaly-map",
+        "label": "Anomaly map",
+        "direction": "output",
+        "data_type": "anomaly-map",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "score",
+        "label": "Score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "flowSteps",
+        "label": "Flow steps",
+        "kind": "integer",
+        "default_value": 8,
+        "required": true,
+        "minimum": 1,
+        "maximum": 128,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "FastFlow"
+  },
+  "catalogOrder": 51
+}

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Self
 
-from pydantic import Field, field_serializer
+from pydantic import Field, JsonValue, field_serializer
 
 from app.schemas.base import ApiSchema
 from core.algorithms import (
@@ -9,7 +9,6 @@ from core.algorithms import (
     DataType,
     ParameterDefinition,
     ParameterKind,
-    ParameterValue,
     PortDefinition,
     PortDirection,
 )
@@ -34,11 +33,11 @@ class ParameterDefinitionSchema(ApiSchema):
     key: str
     label: str
     kind: ParameterKind
-    default_value: ParameterValue
+    default_value: JsonValue
     required: bool
     minimum: float | None
     maximum: float | None
-    options: tuple[ParameterValue, ...]
+    options: tuple[JsonValue, ...]
     description: str
 
     @classmethod
@@ -58,6 +57,11 @@ class AlgorithmDefinitionSchema(ApiSchema):
     outputs: tuple[PortDefinitionSchema, ...]
     parameters: tuple[ParameterDefinitionSchema, ...]
     documentation_reference: str | None
+    manifest_version: int
+    package_version: str
+    execution_target: str
+    inspector_kind: str
+    custom_inspector_key: str | None
 
     @classmethod
     def from_core(cls, definition: AlgorithmDefinition) -> Self:
@@ -76,6 +80,11 @@ class AlgorithmDefinitionSchema(ApiSchema):
             outputs=tuple(PortDefinitionSchema.from_core(port) for port in definition.outputs),
             parameters=tuple(ParameterDefinitionSchema.from_core(parameter) for parameter in definition.parameters),
             documentation_reference=definition.documentation_reference,
+            manifest_version=definition.manifest_version,
+            package_version=definition.package_version,
+            execution_target=definition.execution_target,
+            inspector_kind=definition.inspector_kind,
+            custom_inspector_key=definition.custom_inspector_key,
         )
 
 
@@ -115,7 +124,7 @@ class WorkflowNodeSchema(ApiSchema):
     algorithm_id: str
     display_name: str
     position: PointSchema
-    parameters: dict[str, ParameterValue]
+    parameters: dict[str, JsonValue]
     ports: tuple[PortInstanceSchema, ...]
 
     def to_core(self) -> WorkflowNode:

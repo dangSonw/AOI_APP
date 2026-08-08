@@ -1,0 +1,69 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "find-contours",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "find-contours",
+    "name": "Find contours",
+    "description": "Extracts vector contours from a mask.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {
+        "key": "mask",
+        "label": "Mask",
+        "direction": "input",
+        "data_type": "mask",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "contours",
+        "label": "Contours",
+        "direction": "output",
+        "data_type": "contours",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "retrieval",
+        "label": "Retrieval",
+        "kind": "select",
+        "default_value": "external",
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "external",
+          "list",
+          "tree"
+        ],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 25
+}

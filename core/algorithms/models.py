@@ -3,7 +3,26 @@ from enum import StrEnum
 from typing import TypeAlias
 
 
-ParameterValue: TypeAlias = bool | int | float | str
+JsonScalar: TypeAlias = None | bool | int | float | str
+ParameterValue: TypeAlias = JsonScalar | list['ParameterValue'] | dict[str, 'ParameterValue']
+
+
+def is_json_parameter_value(value: object, *, maximum_depth: int = 8, maximum_items: int = 1000, _depth: int = 0) -> bool:
+    if _depth > maximum_depth:
+        return False
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return True
+    if isinstance(value, list):
+        return len(value) <= maximum_items and all(
+            is_json_parameter_value(item, maximum_depth=maximum_depth, maximum_items=maximum_items, _depth=_depth + 1)
+            for item in value
+        )
+    if isinstance(value, dict):
+        return len(value) <= maximum_items and all(
+            isinstance(key, str) and is_json_parameter_value(item, maximum_depth=maximum_depth, maximum_items=maximum_items, _depth=_depth + 1)
+            for key, item in value.items()
+        )
+    return False
 
 
 class DataType(StrEnum):
@@ -32,6 +51,8 @@ class ParameterKind(StrEnum):
     NUMBER = 'number'
     TEXT = 'text'
     SELECT = 'select'
+    JSON = 'json'
+    REFERENCE = 'reference'
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,3 +90,8 @@ class AlgorithmDefinition:
     parameters: tuple[ParameterDefinition, ...] = ()
     availability: str = 'configuration-only'
     documentation_reference: str | None = None
+    manifest_version: int = 1
+    package_version: str = '1.0.0'
+    execution_target: str = 'local-cpu'
+    inspector_kind: str = 'generic'
+    custom_inspector_key: str | None = None

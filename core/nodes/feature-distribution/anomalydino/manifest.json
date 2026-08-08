@@ -1,0 +1,77 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "anomalydino",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "anomalydino",
+    "name": "AnomalyDINO",
+    "description": "Configures DINO feature anomaly scoring.",
+    "category": "Feature distribution",
+    "documentation_group": "Group B — Feature distribution",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "anomaly-map",
+        "label": "Anomaly map",
+        "direction": "output",
+        "data_type": "anomaly-map",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "score",
+        "label": "Score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "backbone",
+        "label": "Backbone",
+        "kind": "select",
+        "default_value": "dinov2-small",
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "dinov2-small",
+          "dinov2-base",
+          "dinov2-large"
+        ],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "AnomalyDINO"
+  },
+  "catalogOrder": 46
+}

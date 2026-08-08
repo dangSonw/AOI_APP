@@ -1,0 +1,73 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "connected-component-evidence-filter",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "connected-component-evidence-filter",
+    "name": "Connected-component evidence filter",
+    "description": "Filters spatial evidence by component geometry.",
+    "category": "Pipeline",
+    "documentation_group": "Acquisition and pipeline components",
+    "inputs": [
+      {
+        "key": "anomaly-map",
+        "label": "Anomaly map",
+        "direction": "input",
+        "data_type": "anomaly-map",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "detections",
+        "label": "Evidence",
+        "direction": "output",
+        "data_type": "detections",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "score",
+        "label": "Score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "minimumArea",
+        "label": "Minimum area",
+        "kind": "integer",
+        "default_value": 4,
+        "required": true,
+        "minimum": 1,
+        "maximum": 1000000,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 5
+}

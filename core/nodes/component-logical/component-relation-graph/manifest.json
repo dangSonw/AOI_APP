@@ -1,0 +1,73 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "component-relation-graph",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "component-relation-graph",
+    "name": "Component relation graph",
+    "description": "Scores configured spatial and logical component relations.",
+    "category": "Component/logical",
+    "documentation_group": "Group F — Component and logical inspection",
+    "inputs": [
+      {
+        "key": "detections",
+        "label": "Components",
+        "direction": "input",
+        "data_type": "detections",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "score",
+        "label": "Score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "decision",
+        "label": "Decision",
+        "direction": "output",
+        "data_type": "decision",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "relationTolerance",
+        "label": "Relation tolerance",
+        "kind": "number",
+        "default_value": 0.1,
+        "required": true,
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "options": [],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "Component relation graph"
+  },
+  "catalogOrder": 55
+}

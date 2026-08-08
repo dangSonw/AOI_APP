@@ -1,0 +1,53 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "connected-components",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "none",
+    "customKey": null
+  },
+  "definition": {
+    "id": "connected-components",
+    "name": "Connected components",
+    "description": "Labels connected mask components.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {
+        "key": "mask",
+        "label": "Mask",
+        "direction": "input",
+        "data_type": "mask",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "outputs": [
+      {
+        "key": "detections",
+        "label": "Components",
+        "direction": "output",
+        "data_type": "detections",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 26
+}

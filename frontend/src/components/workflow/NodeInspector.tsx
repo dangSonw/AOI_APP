@@ -1,4 +1,5 @@
 import type { AlgorithmDefinition, ParameterValue, WorkflowNode } from '../../types/workflow';
+import { getNodeInspectorPlugin } from '../../node-plugins/registry';
 import { RuntimeUseBadge } from '../RuntimeUseBadge';
 
 
@@ -23,6 +24,8 @@ export function NodeInspector({ node, definition, onChange }: NodeInspectorProps
     parameters: { ...node.parameters, [key]: value },
   });
 
+  const CustomInspector = definition.inspectorKind === 'custom' ? getNodeInspectorPlugin(definition.customInspectorKey) : null;
+
   return (
     <aside className="workflow-inspector" aria-label="Node inspector">
       <header className="workflow-region-heading">
@@ -35,37 +38,46 @@ export function NodeInspector({ node, definition, onChange }: NodeInspectorProps
           <span>Display name</span>
           <input value={node.displayName} onChange={(event) => onChange({ ...node, displayName: event.target.value })} />
         </label>
-        <section className="workflow-inspector__section">
-          <h3>Parameters</h3>
-          {definition.parameters.length === 0 && <p className="workflow-hint">This method has no configurable parameters.</p>}
-          {definition.parameters.map((parameter) => {
-            const value = node.parameters[parameter.key];
-            return (
-              <label className="workflow-field" key={parameter.key}>
-                <span>{parameter.label}{parameter.required ? ' *' : ''}</span>
-                {parameter.kind === 'boolean' ? (
-                  <input type="checkbox" checked={Boolean(value)} onChange={(event) => updateParameter(parameter.key, event.target.checked)} />
-                ) : parameter.kind === 'select' ? (
-                  <select value={String(value)} onChange={(event) => updateParameter(parameter.key, event.target.value)}>
-                    {parameter.options.map((option) => <option value={String(option)} key={String(option)}>{String(option)}</option>)}
-                  </select>
-                ) : (
-                  <input
-                    type={parameter.kind === 'integer' || parameter.kind === 'number' ? 'number' : 'text'}
-                    value={String(value ?? '')}
-                    min={parameter.minimum ?? undefined}
-                    max={parameter.maximum ?? undefined}
-                    step={parameter.kind === 'integer' ? 1 : parameter.kind === 'number' ? 'any' : undefined}
-                    onChange={(event) => updateParameter(parameter.key, parameter.kind === 'integer' || parameter.kind === 'number' ? Number(event.target.value) : event.target.value)}
-                  />
-                )}
-                {(parameter.minimum !== null || parameter.maximum !== null || parameter.description) && (
-                  <small>{parameter.description || `Range ${parameter.minimum ?? '—'} to ${parameter.maximum ?? '—'}`}</small>
-                )}
-              </label>
-            );
-          })}
-        </section>
+        {definition.inspectorKind === 'none' ? (
+          <div data-inspector-content="empty" />
+        ) : CustomInspector ? (
+          <CustomInspector node={node} definition={definition} updateParameter={updateParameter} />
+        ) : (
+          <section className="workflow-inspector__section" data-inspector-content="generic">
+            <h3>Parameters</h3>
+            {definition.parameters.map((parameter) => {
+              const value = node.parameters[parameter.key];
+              return (
+                <label className="workflow-field" key={parameter.key}>
+                  <span>{parameter.label}{parameter.required ? ' *' : ''}</span>
+                  {parameter.kind === 'boolean' ? (
+                    <input type="checkbox" checked={Boolean(value)} onChange={(event) => updateParameter(parameter.key, event.target.checked)} />
+                  ) : parameter.kind === 'select' ? (
+                    <select value={String(value)} onChange={(event) => updateParameter(parameter.key, event.target.value)}>
+                      {parameter.options.map((option) => <option value={String(option)} key={String(option)}>{String(option)}</option>)}
+                    </select>
+                  ) : parameter.kind === 'json' ? (
+                    <textarea value={JSON.stringify(value, null, 2)} onChange={(event) => {
+                      try { updateParameter(parameter.key, JSON.parse(event.target.value) as ParameterValue); } catch { /* Keep last valid JSON draft. */ }
+                    }} />
+                  ) : (
+                    <input
+                      type={parameter.kind === 'integer' || parameter.kind === 'number' ? 'number' : 'text'}
+                      value={String(value ?? '')}
+                      min={parameter.minimum ?? undefined}
+                      max={parameter.maximum ?? undefined}
+                      step={parameter.kind === 'integer' ? 1 : parameter.kind === 'number' ? 'any' : undefined}
+                      onChange={(event) => updateParameter(parameter.key, parameter.kind === 'integer' || parameter.kind === 'number' ? Number(event.target.value) : event.target.value)}
+                    />
+                  )}
+                  {(parameter.minimum !== null || parameter.maximum !== null || parameter.description) && (
+                    <small>{parameter.description || `Range ${parameter.minimum ?? '—'} to ${parameter.maximum ?? '—'}`}</small>
+                  )}
+                </label>
+              );
+            })}
+          </section>
+        )}
         <section className="workflow-inspector__section">
           <h3>Port labels</h3>
           {node.ports.map((port) => (

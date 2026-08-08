@@ -21,6 +21,7 @@ const imageInput: AlgorithmDefinition = {
   inputs: [],
   outputs: [{ key: 'image', label: 'Image', direction: 'output', dataType: 'image', required: true, variadic: false }],
   parameters: [{ key: 'source', label: 'Source', kind: 'text', defaultValue: 'recipe-image', required: true, minimum: null, maximum: null, options: [], description: '' }],
+  manifestVersion: 1, packageVersion: '1.0.0', executionTarget: 'local-cpu', inspectorKind: 'generic', customInspectorKey: null,
   documentationReference: null,
 };
 
@@ -38,6 +39,7 @@ const patchCore: AlgorithmDefinition = {
     { key: 'score', label: 'Score', direction: 'output', dataType: 'score', required: true, variadic: false },
   ],
   parameters: [{ key: 'memoryBankSize', label: 'Memory bank size', kind: 'integer', defaultValue: 10000, required: true, minimum: 1, maximum: 10000000, options: [], description: '' }],
+  manifestVersion: 1, packageVersion: '1.0.0', executionTarget: 'local-cpu', inspectorKind: 'generic', customInspectorKey: null,
   documentationReference: 'PatchCore',
 };
 
@@ -52,6 +54,7 @@ const decisionFusion: AlgorithmDefinition = {
   inputs: [{ key: 'scores', label: 'Scores', direction: 'input', dataType: 'score', required: true, variadic: true }],
   outputs: [{ key: 'decision', label: 'Decision', direction: 'output', dataType: 'decision', required: true, variadic: false }],
   parameters: [],
+  manifestVersion: 1, packageVersion: '1.0.0', executionTarget: 'local-cpu', inspectorKind: 'generic', customInspectorKey: null,
   documentationReference: null,
 };
 

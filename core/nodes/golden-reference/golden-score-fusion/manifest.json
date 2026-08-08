@@ -1,0 +1,69 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "golden-score-fusion",
+  "use": "test",
+  "executionTarget": "local-cpu",
+  "capabilities": [],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 256,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
+  "definition": {
+    "id": "golden-score-fusion",
+    "name": "Golden score fusion",
+    "description": "Fuses configured golden-reference scores.",
+    "category": "Golden/reference",
+    "documentation_group": "Group A — Golden/reference comparison",
+    "inputs": [
+      {
+        "key": "scores",
+        "label": "Scores",
+        "direction": "input",
+        "data_type": "score",
+        "required": true,
+        "variadic": true
+      }
+    ],
+    "outputs": [
+      {
+        "key": "score",
+        "label": "Score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
+    ],
+    "parameters": [
+      {
+        "key": "method",
+        "label": "Method",
+        "kind": "select",
+        "default_value": "maximum",
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "maximum",
+          "mean",
+          "weighted-mean"
+        ],
+        "description": ""
+      }
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 42
+}
