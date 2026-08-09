@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# Exit on error
-set -e
+set -euo pipefail
 
 # Resolve the project root directory relative to this script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
@@ -10,6 +9,10 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." &>/dev/null && pwd)"
 echo "=== AOI System Deployment Script ==="
 echo "Project Root: $PROJECT_ROOT"
 cd "$PROJECT_ROOT"
+
+if ! command -v conda &>/dev/null && [ -x "$HOME/miniconda3/bin/conda" ]; then
+    export PATH="$HOME/miniconda3/bin:$PATH"
+fi
 
 # Check if project is built
 if [ ! -d "frontend/dist" ]; then
@@ -29,10 +32,13 @@ if ! conda env list | grep -q -E "^${CONDA_ENV_NAME}[[:space:]]"; then
     exit 1
 fi
 
-echo "AOI System is ready for deployment."
-echo "Production Launch Commands:"
-echo "1. Run backend server:"
-echo "   nohup conda run --no-capture-output -n $CONDA_ENV_NAME python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --workers 4 > backend.log 2>&1 &"
-echo "2. Serve frontend:"
-echo "   Serve 'frontend/dist' directory using Nginx, Apache, or Caddy."
-echo "=== Deployment Check Passed ==="
+echo "Checking migration head and pilot safety gates..."
+PYTHONPATH=.:backend conda run -n "$CONDA_ENV_NAME" python -m app.database.migrations check
+if [ "${AOI_PILOT_ACCEPTANCE_REPORT:-}" = "" ] || [ ! -f "${AOI_PILOT_ACCEPTANCE_REPORT:-}" ]; then
+    echo "BLOCKED: AOI_PILOT_ACCEPTANCE_REPORT must reference a measured target-hardware acceptance report." >&2
+    echo "No production-ready claim was made. Simulator tests do not satisfy pilot acceptance." >&2
+    exit 2
+fi
+PYTHONPATH=.:backend conda run -n "$CONDA_ENV_NAME" python \
+    scripts/operations/verify-pilot-acceptance.py "$AOI_PILOT_ACCEPTANCE_REPORT" || exit 2
+echo "Deployment preflight passed. Use a supervised single-worker station service behind a loopback reverse proxy."

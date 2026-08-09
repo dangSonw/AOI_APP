@@ -114,6 +114,9 @@ export interface InspectionRun {
   boardSerial: string;
   lot: string;
   recipeId: number;
+  stationId: string;
+  workOrderId: string | null;
+  commissioningSnapshot: Record<string, unknown>;
   resultId: number | null;
   status: InspectionRunStatus;
   currentStep: string;

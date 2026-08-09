@@ -129,6 +129,23 @@ Chạy một bản build sạch và đóng gói các tài nguyên production (di
 bash scripts/release/release.sh
 ```
 
+### 8. Vận hành Pilot (`scripts/operations/`)
+
+Tạo PostgreSQL dump dạng custom, artifact archive và checksum manifest:
+
+```bash
+PYTHONPATH=.:backend conda run -n aoi-app python scripts/operations/pilot-backup.py --output data/backups/pilot-001
+```
+
+Kiểm toàn bộ checksum và đọc PostgreSQL restore catalog mà không ghi database:
+
+```bash
+PYTHONPATH=.:backend conda run -n aoi-app python scripts/operations/pilot-restore-dry-run.py data/backups/pilot-001
+```
+
+`scripts/deploy/deploy.sh` giờ fail closed nếu `AOI_PILOT_ACCEPTANCE_REPORT` không trỏ tới report
+target-hardware có measurement typed và mọi safety/recovery gate đã pass. Evidence simulator không đủ điều kiện.
+
 ---
 
 ## Các Quy tắc Quan trọng khi Viết Script

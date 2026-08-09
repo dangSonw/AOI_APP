@@ -27,6 +27,8 @@ mkdir -p "$RELEASE_DIR"
 cp -r frontend/dist "$RELEASE_DIR/frontend-dist"
 cp -r backend "$RELEASE_DIR/backend"
 cp -r core "$RELEASE_DIR/core"
+cp -r hardware "$RELEASE_DIR/hardware"
+cp -r simulator "$RELEASE_DIR/simulator"
 cp -r database "$RELEASE_DIR/database"
 cp -r docs "$RELEASE_DIR/docs"
 cp -r scripts "$RELEASE_DIR/scripts"
@@ -38,11 +40,14 @@ rm -rf "$RELEASE_DIR/backend/.venv"
 rm -rf "$RELEASE_DIR/backend/__pycache__"
 rm -rf "$RELEASE_DIR/backend/app/__pycache__"
 rm -rf "$RELEASE_DIR/core/native/build"
+find "$RELEASE_DIR" -type d -name '__pycache__' -prune -exec rm -rf {} +
+find "$RELEASE_DIR" -type f -name '*.pyc' -delete
 
 # Archive release directory
 echo "Creating archive..."
 cd release
 tar -czf "${RELEASE_NAME}.tar.gz" "${RELEASE_NAME}"
+sha256sum "${RELEASE_NAME}.tar.gz" > "${RELEASE_NAME}.tar.gz.sha256"
 rm -rf "${RELEASE_NAME}"
 
 echo "=== Release Packaged Successfully: release/${RELEASE_NAME}.tar.gz ==="

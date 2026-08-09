@@ -1,6 +1,6 @@
 # AOI Studio
 
-AOI Studio is an industrial automated optical inspection web application. The current milestone provides an authenticated React/FastAPI control plane, PostgreSQL-backed users, workflow configuration, file-backed physical I/O, versioned camera and three-axis motion contracts, local hardware adapter boundaries, deterministic simulators, and a verified backend gateway between the HMI and device services.
+AOI Studio is an industrial automated optical inspection web application. Current milestone provides persisted inspection orchestration plus industrial-pilot software foundations: commissioning/calibration lineage, durable integration outbox, bounded CSI/UART transport boundaries, and fail-closed backup/deployment acceptance. Real pilot acceptance remains blocked until factory contracts and target-hardware measurements are supplied.
 
 ## Implemented milestone
 
@@ -21,6 +21,9 @@ AOI Studio is an industrial automated optical inspection web application. The cu
 - Workstation preferences persist language, region, timezone, measurement system, and clock format; station profiles load explicitly before editing.
 - Dataset service and API safety coverage includes validation, upload limits, magic bytes, traversal rejection, rename, move, delete, capture import, and ZIP export.
 - PostgreSQL-backed audit events record authenticated and failed mutations without storing request bodies, credentials, bearer tokens, secrets, or image bytes.
+- Persisted inspection runs pin workflow, node versions, verified artifacts, commissioning profile, calibration, station, work order, and immutable evidence.
+- Industrial-pilot commissioning requires valid calibration; PLC/MES policies are typed and completed results enter an idempotent durable outbox.
+- Deployment preflight refuses production-ready claims without measured target-hardware cycle time, false-call, escape, uptime, recovery, safety, integration, and restore evidence.
 
 ## Architecture
 

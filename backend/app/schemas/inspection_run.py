@@ -14,6 +14,8 @@ class InspectionRunCreateRequest(ApiSchema):
     board_serial: str = Field(min_length=1, max_length=128)
     lot: str = Field(default='', max_length=128)
     recipe_id: int
+    station_id: str = Field(default='station-01', pattern=r'^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$')
+    work_order_id: str | None = Field(default=None, min_length=1, max_length=128)
     threshold: float = Field(default=0.5, ge=0, le=1)
     camera_id: str = Field(default='top-camera', pattern=r'^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$')
     sensor_mode: str = Field(default='3280x2464', min_length=1, max_length=128)
@@ -45,6 +47,9 @@ class InspectionRunResponse(ApiSchema):
     board_serial: str
     lot: str
     recipe_id: int
+    station_id: str
+    work_order_id: str | None
+    commissioning_snapshot: dict
     result_id: int | None
     status: RunStatus
     current_step: str

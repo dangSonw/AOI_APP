@@ -1,0 +1,59 @@
+# Triển khai Pilot Công nghiệp — Foundation Phase 6
+
+**Trạng thái:** foundation phần mềm đã triển khai; nghiệm thu pilot thật bị block đến khi có factory contract và target hardware.
+
+## Contract Đã Biết
+
+- Camera: Jetson CSI qua GStreamer argv có giới hạn, PNG lossless, publish atomic, evidence SHA-256.
+- Motion transport: UART frame version 1 gồm magic, sequence, frame type, payload bounded và CRC-32.
+- Calibration: artifact checksum immutable, acquisition metrics, validity, expiry, lineage station/camera.
+- Commissioning: station profile có version, deployment mode, PLC signal map typed, PLC/MES outage policy typed.
+- Integration: outbox durable/idempotent cho trao đổi result sau inspection hoàn tất.
+- Operations: disk/quota preflight, retention tôn trọng legal hold, backup manifest, restore catalog dry-run.
+- Acceptance: measurement target-hardware typed cho cycle time, false-call, escape, uptime và recovery time.
+
+## Quy tắc Fail-Closed
+
+1. Hardware camera chỉ báo ready khi GStreamer khả dụng; không fallback simulation.
+2. Profile hardware-pilot/production cần calibration valid và chưa hết hạn.
+3. Mọi run pin snapshot commissioning, calibration, signal mapping và integration policy.
+4. Calibration hết hạn block execution trước physical capture.
+5. Outage behavior rõ ràng: PLC `block|fail-safe`, MES `queue|block`.
+6. Deployment preflight bị block nếu thiếu pilot acceptance report có measurement hợp lệ.
+7. Restore dry-run kiểm checksum và PostgreSQL archive catalog, không ghi đè database.
+
+## File Đã Cung cấp
+
+- `hardware/camera/csi_capture.py`
+- `hardware/mcu/uart_protocol.py`
+- `hardware/mcu/uart_transport.py`
+- `database/migrations/versions/0005_create_pilot_foundation.py`
+- `backend/app/models/pilot.py`
+- `backend/app/services/pilot_service.py`
+- `backend/app/services/pilot_operations.py`
+- `backend/app/services/pilot_acceptance.py`
+- `backend/app/api/pilot.py`
+- `scripts/operations/pilot-backup.py`
+- `scripts/operations/pilot-restore-dry-run.py`
+- `scripts/operations/verify-pilot-acceptance.py`
+
+## Phần Target-Hardware Đang Block
+
+Không thể hoàn thành trung thực chỉ từ repository:
+
+- MCU command/ACK/state payload và watchdog acceptance: cần firmware contract.
+- PLC signal điện, polarity, timing, debounce, handshake: cần PLC I/O contract.
+- MES auth, work-order schema, serial ownership, retry SLA: cần factory MES contract.
+- IPC-CFX/OPC UA endpoint profile tùy chọn: cần yêu cầu factory integration.
+- Nghiệm thu CSI mode/exposure: cần Jetson và sensor được chọn.
+- Nghiệm thu safety, cycle time, false-call, escape, uptime, recovery: cần fixture production và bộ PCB có label.
+- Restore backup vào isolated target DB: cần operations window và target được phê duyệt.
+
+## Workflow Nghiệm thu
+
+1. Đưa calibration JSON vào `data/calibration` qua API có xác thực.
+2. Tạo calibration record và commissioning profile có version; chỉ activate sau khi quality gate pass.
+3. Chạy pilot board có label và thu report measurement theo schema trong `pilot_acceptance.py`.
+4. Tạo backup và chạy restore dry-run.
+5. Đặt `AOI_PILOT_ACCEPTANCE_REPORT`, chạy `bash scripts/deploy/deploy.sh`.
+6. Deployment tiếp tục bị block đến khi mọi gate typed đều pass.

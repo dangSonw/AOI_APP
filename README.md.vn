@@ -1,6 +1,6 @@
 # AOI Studio
 
-AOI Studio là ứng dụng web kiểm tra quang học tự động trong công nghiệp. Mốc hiện tại cung cấp control plane React/FastAPI có xác thực, người dùng lưu trên PostgreSQL, cấu hình workflow, I/O vật lý dựa trên tệp, contract camera và chuyển động ba trục có version, ranh giới hardware adapter local, simulator xác định và gateway backend đã được xác minh giữa HMI với các dịch vụ thiết bị.
+AOI Studio là ứng dụng web kiểm tra quang học tự động trong công nghiệp. Mốc hiện tại cung cấp inspection orchestrator được lưu và foundation pilot công nghiệp: lineage commissioning/calibration, integration outbox durable, ranh giới CSI/UART bounded và backup/deployment acceptance fail-closed. Nghiệm thu pilot thật vẫn bị block đến khi có factory contract và measurement target-hardware.
 
 ## Mốc đã triển khai
 
@@ -21,6 +21,9 @@ AOI Studio là ứng dụng web kiểm tra quang học tự động trong công 
 - Workstation preference lưu language, region, timezone, measurement system và clock format; station profile được load rõ ràng trước khi chỉnh sửa.
 - Coverage an toàn service/API Dataset gồm validation, upload limit, magic byte, từ chối traversal, rename, move, delete, import capture và export ZIP.
 - Audit event lưu trên PostgreSQL ghi mutation đã xác thực và mutation thất bại mà không lưu request body, credential, bearer token, secret hoặc image byte.
+- Inspection run được lưu pin workflow, node version, artifact đã xác minh, commissioning profile, calibration, station, work order và immutable evidence.
+- Commissioning pilot yêu cầu calibration valid; PLC/MES policy có kiểu và result hoàn tất vào outbox durable/idempotent.
+- Deployment preflight từ chối tuyên bố production-ready nếu thiếu measurement target-hardware về cycle time, false-call, escape, uptime, recovery, safety, integration và restore.
 
 ## Kiến trúc
 

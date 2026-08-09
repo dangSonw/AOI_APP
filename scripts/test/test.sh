@@ -76,6 +76,16 @@ else
     echo "No simulator tests found in tests/simulator"
 fi
 
+# Run hardware boundary tests without requiring physical devices
+echo "----------------------------------------"
+echo "Running Hardware Boundary Tests..."
+echo "----------------------------------------"
+if find tests/hardware -maxdepth 1 -name 'test_*.py' 2>/dev/null | grep -q .; then
+    PYTHONPATH=.:backend conda run -n "$CONDA_ENV_NAME" python -m pytest tests/hardware/ || exit_code=1
+else
+    echo "No hardware boundary tests found in tests/hardware"
+fi
+
 echo "----------------------------------------"
 echo "Running Frontend Tests & Type Checks..."
 echo "----------------------------------------"

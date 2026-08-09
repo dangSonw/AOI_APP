@@ -129,6 +129,23 @@ Runs a clean build and bundles the production assets into a `.tar.gz` package lo
 bash scripts/release/release.sh
 ```
 
+### 8. Pilot Operations (`scripts/operations/`)
+
+Create a PostgreSQL custom-format dump, artifact archive, and checksum manifest:
+
+```bash
+PYTHONPATH=.:backend conda run -n aoi-app python scripts/operations/pilot-backup.py --output data/backups/pilot-001
+```
+
+Verify all checksums and inspect the PostgreSQL restore catalog without writing a database:
+
+```bash
+PYTHONPATH=.:backend conda run -n aoi-app python scripts/operations/pilot-restore-dry-run.py data/backups/pilot-001
+```
+
+`scripts/deploy/deploy.sh` now fails closed unless `AOI_PILOT_ACCEPTANCE_REPORT` points to a typed,
+measured target-hardware report with every safety/recovery gate passed. Simulator evidence cannot satisfy it.
+
 ---
 
 ## Important Rules for Writing Scripts

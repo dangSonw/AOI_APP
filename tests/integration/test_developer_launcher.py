@@ -39,3 +39,13 @@ def test_launcher_manages_adapter_ports_and_never_declares_a_fallback() -> None:
     assert 'fallback' not in launcher.lower()
     assert 'adapter_is_healthy' in launcher
     assert '[ "$RUNTIME_MODE" = "simulation" ]' in launcher
+
+
+def test_release_package_contains_device_adapters_and_checksum() -> None:
+    release = (PROJECT_ROOT / 'scripts' / 'release' / 'release.sh').read_text(encoding='utf-8')
+
+    assert 'cp -r hardware "$RELEASE_DIR/hardware"' in release
+    assert 'cp -r simulator "$RELEASE_DIR/simulator"' in release
+    assert 'sha256sum "${RELEASE_NAME}.tar.gz"' in release
+    assert "-name '__pycache__'" in release
+    assert "-name '*.pyc'" in release

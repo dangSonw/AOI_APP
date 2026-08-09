@@ -21,6 +21,7 @@ from app.models.defect import Defect
 from app.models.inspection_image import InspectionImage
 from app.models.inspection_result import InspectionResult
 from app.models.inspection_run import InspectionNodeRun, InspectionRun
+from app.models.pilot import CommissioningProfile, IntegrationOutboxEvent
 from app.models.recipe import Recipe
 from app.schemas.inspection_run import InspectionRunCreateRequest
 from app.services.inspection_orchestrator import (
@@ -31,6 +32,7 @@ from app.services.inspection_orchestrator import (
     InspectionOrchestrator,
     recover_interrupted_status,
 )
+from app.services.pilot_service import commissioning_snapshot
 from app.services.workflow_repository import WorkflowRepository
 from core.devices.camera import CaptureRequest
 from core.nodes import get_node_manifest_registry
@@ -132,11 +134,32 @@ def create_run(
     }
     effective_versions['deterministic-reference'] = '2.0.0'
     parameters = request.model_dump(mode='json', by_alias=True)
+    try:
+        pilot_snapshot = commissioning_snapshot(
+            session, request.station_id, projects_root.parent / 'calibration',
+        )
+    except ValueError as error:
+        raise InspectionRunError('Station commissioning calibration evidence is invalid.') from error
+    if pilot_snapshot is None:
+        has_profile = session.scalar(select(CommissioningProfile.id).where(
+            CommissioningProfile.station_id == request.station_id,
+        ).limit(1))
+        if has_profile is not None:
+            raise InspectionRunError('Station commissioning profile is not active or valid.')
+        pilot_snapshot = {
+            'stationId': request.station_id,
+            'deploymentMode': 'simulation-uncommissioned',
+            'signalMapping': {},
+            'integrationPolicy': {},
+            'calibration': None,
+        }
     run = InspectionRun(
         id=f'inspection-{uuid4().hex}', board_serial=request.board_serial, lot=request.lot,
         recipe_id=request.recipe_id, operator_id=operator_id, status='queued', current_step='queued',
         workflow_snapshot=snapshot, workflow_sha256=_canonical_sha256(snapshot),
         effective_versions=effective_versions, parameters=parameters,
+        station_id=request.station_id, work_order_id=request.work_order_id,
+        commissioning_snapshot=pilot_snapshot,
     )
     session.add(run)
     session.commit()
@@ -312,6 +335,10 @@ def execute_run(
     try:
         _transition(session, run, 'precheck', 'motion-precheck', 10)
         _check_cancelled(session, run)
+        calibration = run.commissioning_snapshot.get('calibration')
+        if run.commissioning_snapshot.get('deploymentMode') in {'hardware-pilot', 'production'}:
+            if calibration is None or datetime.fromisoformat(calibration['validUntil']) <= _now():
+                return _fault(session, run, 'invalid-calibration', 'Production calibration is missing or expired.')
         state = motion.state()
         pose_age = (_now() - state.updated_at).total_seconds()
         if pose_age < 0 or pose_age > POSE_TOLERANCE_SECONDS:
@@ -401,6 +428,7 @@ def execute_run(
         run.result_id = result.id
         run.decision = outcome.decision
         run.evidence_sha256 = outcome.evidence_sha256
+        _enqueue_integration_events(session, run, result.id)
         _transition(session, run, 'completed', 'completed', 100)
         return _load_run(session, run.id) or run
     except InspectionCancelled:
@@ -447,3 +475,19 @@ def replay_run(session: Session, run_id: str, artifact_root: Path) -> tuple[str,
     return outcome.decision, outcome.evidence_sha256, (
         outcome.decision == run.decision and outcome.evidence_sha256 == run.evidence_sha256
     )
+
+
+def _enqueue_integration_events(session: Session, run: InspectionRun, result_id: int) -> None:
+    policy = run.commissioning_snapshot.get('integrationPolicy', {})
+    payload = {
+        'schemaVersion': 1, 'runId': run.id, 'resultId': result_id,
+        'stationId': run.station_id, 'workOrderId': run.work_order_id,
+        'boardSerial': run.board_serial, 'lot': run.lot, 'decision': run.decision,
+        'evidenceSha256': run.evidence_sha256,
+    }
+    for channel in ('plc', 'mes'):
+        if policy.get(channel, {}).get('enabled') is True:
+            session.add(IntegrationOutboxEvent(
+                idempotency_key=f'{run.id}:{channel}:inspection-completed:v1',
+                run_id=run.id, channel=channel, event_type='inspection-completed', payload=payload,
+            ))

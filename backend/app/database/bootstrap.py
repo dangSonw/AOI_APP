@@ -9,6 +9,7 @@ from app.models.recipe import Recipe  # noqa: F401
 from app.models.research import ModelAlias, ModelPromotionEvent, ModelRegistryEntry, ModelVersion, ResearchArtifact, ResearchExperiment, ResearchRun  # noqa: F401
 from app.models.inspection_result import InspectionResult  # noqa: F401
 from app.models.inspection_run import InspectionNodeRun, InspectionReviewEvent, InspectionRun  # noqa: F401
+from app.models.pilot import CalibrationRecord, CommissioningActivationEvent, CommissioningProfile, IntegrationOutboxEvent  # noqa: F401
 from app.models.defect import Defect  # noqa: F401
 from app.models.inspection_image import InspectionImage  # noqa: F401
 from app.models.audit_event import AuditEvent  # noqa: F401
