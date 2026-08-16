@@ -1,0 +1,3 @@
+# Node Switch / case
+
+So sánh `value` generic với `cases` JSON có thứ tự. Mỗi case chứa `branch` và `value`. Match đầu tiên phát nhánh tương ứng; không match phát `default`. Thêm custom control output trùng tên trong node inspector. Trạng thái: `debug`.

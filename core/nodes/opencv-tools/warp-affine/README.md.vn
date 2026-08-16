@@ -1,0 +1,3 @@
+# Node Warp affine
+
+Áp dụng `transform` 2×3 vào `image` với kích thước output, interpolation và border policy có giới hạn. Trạng thái: `debug`.

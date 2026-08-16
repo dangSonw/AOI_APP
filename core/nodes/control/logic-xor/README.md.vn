@@ -1,0 +1,3 @@
+# Node Logic XOR
+
+Đánh giá parity lẻ trên input boolean variadic `values`, phát `result`, rồi định tuyến `true` hoặc `false`. Trạng thái: `debug`.

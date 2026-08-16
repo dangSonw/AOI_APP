@@ -1,0 +1,3 @@
+# Node Counter / limit
+
+Đếm visit trong một lần chạy workflow. Visit dưới `limit` phát `under-limit`; đạt hoặc vượt giới hạn phát `limit-reached`. Trạng thái: `debug`.

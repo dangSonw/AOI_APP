@@ -1,0 +1,3 @@
+# Node Merge
+
+Gộp control arrival theo policy `any` hoặc `all`, rồi phát `merged`. `all` đợi một arrival từ mọi control edge đi vào trong vòng merge hiện tại. Trạng thái: `debug`.

@@ -1,0 +1,3 @@
+# Node Estimate affine transform
+
+Ước lượng affine transform 2×3 từ ít nhất ba cặp `source-points` và `destination-points` bằng RANSAC hoặc LMeDS. Trạng thái: `debug`; phải kiểm tra điểm hiệu chuẩn trên phần cứng đích.

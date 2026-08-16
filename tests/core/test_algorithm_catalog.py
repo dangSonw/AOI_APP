@@ -4,7 +4,7 @@ from core.algorithms import DataType, ParameterKind, get_algorithm_catalog, get_
 def test_catalog_contains_every_approved_configuration_definition() -> None:
     catalog = get_algorithm_catalog()
 
-    assert len(catalog) == 75
+    assert len(catalog) == 91
     assert len({item.id for item in catalog}) == len(catalog)
     assert all(item.availability == 'configuration-only' for item in catalog)
     assert all(item.name and item.description and item.category for item in catalog)
@@ -48,6 +48,34 @@ def test_documented_reference_algorithms_can_be_looked_up() -> None:
     assert get_algorithm_definition('median-mad-robust-difference').name == 'Median–MAD robust difference'
     assert get_algorithm_definition('patchcore').documentation_group == 'Group B — Feature distribution'
     assert get_algorithm_definition('does-not-exist') is None
+
+
+def test_catalog_contains_approved_logic_and_extended_opencv_packages() -> None:
+    ids = {definition.id for definition in get_algorithm_catalog()}
+
+    assert {
+        'logic-and', 'logic-or', 'logic-not', 'logic-xor', 'switch-case', 'merge',
+        'counter-limit',
+    } <= ids
+    assert {
+        'template-matching', 'estimate-affine-transform', 'warp-affine',
+        'estimate-perspective-transform', 'distance-transform', 'watershed',
+        'convex-hull', 'contour-metrics', 'image-arithmetic', 'image-bitwise',
+    } <= ids
+    assert {'bounded-loop', 'control-gate', 'feedback-state'}.isdisjoint(ids)
+
+
+def test_logic_definitions_expose_boolean_data_and_dynamic_control_ports() -> None:
+    logic_and = get_algorithm_definition('logic-and')
+    switch = get_algorithm_definition('switch-case')
+
+    assert logic_and is not None
+    assert logic_and.inputs[0].data_type is DataType.BOOLEAN
+    assert logic_and.inputs[0].variadic is True
+    assert logic_and.outputs[0].data_type is DataType.BOOLEAN
+    assert [port.key for port in logic_and.control_ports] == ['true', 'false']
+    assert switch is not None
+    assert [port.key for port in switch.control_ports] == ['default']
 
 def test_parameter_values_support_bounded_json_compatible_structures() -> None:
     from core.algorithms import is_json_parameter_value

@@ -2,6 +2,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 
 import numpy as np
+import pytest
 
 from core.pipeline import create_default_workflow, execute_workflow
 from core.algorithms import get_algorithm_definition
@@ -74,3 +75,47 @@ def test_transform_output_does_not_replace_latest_viewable_image() -> None:
     assert all(record.status == 'completed' for record in result.records)
     assert result.final_image is not None
     assert result.final_image.shape == source.shape
+
+
+def test_workflow_passes_context_only_to_contextual_executor(monkeypatch: pytest.MonkeyPatch) -> None:
+    from core.nodes import NodeExecutionContext
+    from core.pipeline import execution
+
+    workflow = create_default_workflow()
+    source = np.zeros((12, 16, 3), dtype=np.uint8)
+    original_get_runtime = execution.get_node_runtime
+    received_contexts = []
+
+    def get_runtime(node_id: str):
+        runtime = original_get_runtime(node_id)
+        assert runtime is not None
+        if node_id != 'image-input':
+            return runtime
+
+        def execute_with_context(inputs, parameters, context):
+            received_contexts.append(context)
+            return runtime.execute(inputs, parameters)
+
+        return replace(runtime, execute_with_context=execute_with_context)
+
+    monkeypatch.setattr(execution, 'get_node_runtime', get_runtime)
+    context = NodeExecutionContext()
+
+    result = execute_workflow(workflow, source_image=source, context=context)
+
+    assert all(record.status == 'completed' for record in result.records)
+    assert received_contexts == [context]
+
+
+def test_workflow_stops_before_node_execution_when_context_is_cancelled() -> None:
+    from core.nodes import NodeExecutionContext
+
+    result = execute_workflow(
+        create_default_workflow(),
+        source_image=np.zeros((8, 8, 3), dtype=np.uint8),
+        context=NodeExecutionContext(is_cancelled=lambda: True),
+    )
+
+    assert len(result.records) == 1
+    assert result.records[0].status == 'cancelled'
+    assert result.records[0].error_code == 'node-execution-cancelled'

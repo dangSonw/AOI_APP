@@ -1,0 +1,3 @@
+# Node Logic NOT
+
+Đảo boolean `value`, phát `result`, rồi định tuyến `true` hoặc `false`. Trạng thái: `debug`.

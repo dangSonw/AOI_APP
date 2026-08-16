@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.audit_events import router as audit_events_router
 from app.api.auth import router as auth_router
+from app.api.database_schema import router as database_schema_router
 from app.api.datasets import router as datasets_router
 from app.api.devices import router as devices_router
 from app.api.inspections import router as inspections_router
@@ -40,6 +41,7 @@ app.add_middleware(
 app.add_middleware(AuditMiddleware)
 app.include_router(audit_events_router)
 app.include_router(auth_router)
+app.include_router(database_schema_router)
 app.include_router(datasets_router)
 app.include_router(devices_router)
 app.include_router(inspections_router)

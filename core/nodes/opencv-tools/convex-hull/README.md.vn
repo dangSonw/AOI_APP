@@ -1,0 +1,3 @@
+# Node Convex hull
+
+Tính một convex hull cho mỗi contour input và trả `contours` có kiểu. Trạng thái: `debug`.

@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "packageVersion": "1.0.0",
   "id": "gradient-difference",
-  "use": "test",
+  "use": "debug",
   "executionTarget": "local-cpu",
   "capabilities": [],
   "resourceHints": {
@@ -11,7 +11,7 @@
     "gpuMemoryMegabytes": 0
   },
   "artifactContracts": {
-    "inputs": [],
+    "inputs": ["golden-image:application/x-numpy"],
     "outputs": []
   },
   "parameterMigrationHooks": [],

@@ -13,6 +13,7 @@ const baseDefinition: AlgorithmDefinition = {
   parameters: [{ key: 'cameraId', label: 'Camera ID', kind: 'text', defaultValue: 'top-camera', required: true, minimum: null, maximum: null, options: [], description: '' }],
   documentationReference: null, manifestVersion: 1, packageVersion: '1.0.0', executionTarget: 'adapter',
   inspectorKind: 'generic', customInspectorKey: null,
+  controlPorts: [],
 };
 
 describe('NodeInspector plugin contract', () => {
@@ -36,5 +37,22 @@ describe('NodeInspector plugin contract', () => {
     expect(markup).toContain('Port labels');
     expect(markup).toContain('data-inspector-content="empty"');
     expect(markup).not.toContain('This method has no configurable parameters.');
+  });
+
+  it('renders custom port editor and marks system ports as locked', () => {
+    const withPorts: WorkflowNode = {
+      ...node,
+      ports: [{
+        id: 'trigger', templateKey: 'trigger', direction: 'input', dataType: 'generic',
+        displayLabel: 'Trigger', required: false, variadic: false, variadicInstanceIndex: null,
+        channel: 'control', origin: 'system', runtimeBinding: 'none', runtimeKey: null,
+        passthroughInputPortId: null,
+      }],
+    };
+    const markup = renderToStaticMarkup(<NodeInspector node={withPorts} definition={baseDefinition} onChange={vi.fn()} />);
+
+    expect(markup).toContain('Add custom port');
+    expect(markup).toContain('System port · locked');
+    expect(markup).not.toContain('Remove custom port');
   });
 });

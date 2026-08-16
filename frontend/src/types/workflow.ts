@@ -1,4 +1,6 @@
 export type DataType =
+  | 'generic'
+  | 'boolean'
   | 'image'
   | 'image-set'
   | 'mask'
@@ -13,6 +15,9 @@ export type DataType =
   | 'decision';
 
 export type PortDirection = 'input' | 'output';
+export type PortChannel = 'data' | 'control';
+export type PortOrigin = 'system' | 'default' | 'custom';
+export type RuntimeBindingMode = 'slot' | 'passthrough' | 'none';
 export type ParameterKind = 'boolean' | 'integer' | 'number' | 'text' | 'select' | 'json' | 'reference';
 export type ParameterValue = null | boolean | number | string | ParameterValue[] | { [key: string]: ParameterValue };
 export type NodeUse = 'test' | 'debug' | 'release';
@@ -48,6 +53,7 @@ export interface AlgorithmDefinition {
   use: NodeUse;
   inputs: PortDefinition[];
   outputs: PortDefinition[];
+  controlPorts?: PortDefinition[];
   parameters: ParameterDefinition[];
   documentationReference: string | null;
   manifestVersion: number;
@@ -79,6 +85,11 @@ export interface WorkflowPort {
   required: boolean;
   variadic: boolean;
   variadicInstanceIndex: number | null;
+  channel: PortChannel;
+  origin: PortOrigin;
+  runtimeBinding: RuntimeBindingMode;
+  runtimeKey: string | null;
+  passthroughInputPortId: string | null;
 }
 
 export interface WorkflowNode {
@@ -96,6 +107,8 @@ export interface WorkflowConnection {
   sourcePortId: string;
   targetNodeId: string;
   targetPortId: string;
+  kind?: 'data' | 'control';
+  maxTraversals?: number | null;
 }
 
 export interface Workflow {
@@ -107,6 +120,7 @@ export interface Workflow {
   nodes: WorkflowNode[];
   connections: WorkflowConnection[];
   executionOrder: string[];
+  migrationNotices: string[];
 }
 
 export type ValidationIssueCode =
@@ -120,6 +134,8 @@ export type ValidationIssueCode =
   | 'input-already-connected'
   | 'missing-required-input'
   | 'invalid-parameter'
+  | 'generic-type-conflict'
+  | 'unbounded-control-cycle'
   | 'cycle'
   | 'execution-order-mismatch'
   | 'dependency-order';
@@ -137,4 +153,6 @@ export interface ConnectionDraft {
   sourcePortId: string;
   targetNodeId: string;
   targetPortId: string;
+  kind?: 'data' | 'control';
+  maxTraversals?: number | null;
 }

@@ -1,6 +1,6 @@
 from collections import defaultdict
 
-from .models import Workflow
+from .models import ConnectionKind, Workflow
 
 
 class CycleError(ValueError):
@@ -20,6 +20,8 @@ def stable_topological_order(
     dependents: dict[str, set[str]] = defaultdict(set)
 
     for connection in workflow.connections:
+        if connection.kind is ConnectionKind.CONTROL:
+            continue
         source = connection.source_node_id
         target = connection.target_node_id
         if source not in node_set or target not in node_set or target in dependents[source]:

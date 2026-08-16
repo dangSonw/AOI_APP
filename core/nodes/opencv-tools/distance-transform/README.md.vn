@@ -1,0 +1,3 @@
+# Node Distance transform
+
+Tính distance map float32 từ `mask` nhị phân bằng khoảng cách L1, L2 hoặc chessboard. Trạng thái: `debug`.

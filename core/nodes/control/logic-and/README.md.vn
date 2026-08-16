@@ -1,0 +1,3 @@
+# Node Logic AND
+
+Đánh giá toàn bộ input boolean variadic `values`, phát boolean `result`, rồi định tuyến control qua `true` hoặc `false`. Trạng thái: `debug`; chưa duyệt cho production.

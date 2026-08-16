@@ -10,13 +10,13 @@ Scores pixels against configured multivariate normal statistics.
 |---|---|
 | Node ID | `per-pixel-mahalanobis-distance` |
 | Category | Golden/reference |
-| Status | `test` |
+| Status | `debug` |
 | Package version | `1.0.0` |
 | Execution target | `local-cpu` |
 | Inspector | `generic` |
 | Capabilities | None declared |
 
-Contract-only `test` runtime. Execution raises `NodeNotImplementedError`; do not use it in a workflow expected to complete.
+Executable `debug` runtime for development, simulation, and research. This node is not approved for production.
 
 ## Ports
 
@@ -46,6 +46,6 @@ Connections require exact data-type equality. Workflow remains a DAG; cycles and
 
 Runtime stores parameters, summarized inputs and outputs, duration, version, status, and evidence hash. Image arrays are not stored in JSON evidence. `image-output` marks latest image for encoded PNG preview in 2D optical view.
 
-- Status `test` is not production approval.
+- Status `debug` is not production approval.
 - Validate dimensions, channel order, dtype, thresholds, timing, and memory on target hardware.
 - Production mode rejects every node not marked `release`.

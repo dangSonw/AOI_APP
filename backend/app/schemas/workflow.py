@@ -12,7 +12,10 @@ from core.algorithms import (
     PortDefinition,
     PortDirection,
 )
-from core.pipeline import Connection, Point, PortInstance, ValidationIssue, Workflow, WorkflowNode
+from core.pipeline import (
+    Connection, ConnectionKind, Point, PortChannel, PortInstance, PortOrigin,
+    RuntimeBindingMode, ValidationIssue, Workflow, WorkflowNode,
+)
 from core.nodes import NodeUse, get_node_runtime
 
 
@@ -55,6 +58,7 @@ class AlgorithmDefinitionSchema(ApiSchema):
     use: NodeUse
     inputs: tuple[PortDefinitionSchema, ...]
     outputs: tuple[PortDefinitionSchema, ...]
+    control_ports: tuple[PortDefinitionSchema, ...]
     parameters: tuple[ParameterDefinitionSchema, ...]
     documentation_reference: str | None
     manifest_version: int
@@ -78,6 +82,7 @@ class AlgorithmDefinitionSchema(ApiSchema):
             use=runtime.use,
             inputs=tuple(PortDefinitionSchema.from_core(port) for port in definition.inputs),
             outputs=tuple(PortDefinitionSchema.from_core(port) for port in definition.outputs),
+            control_ports=tuple(PortDefinitionSchema.from_core(port) for port in definition.control_ports),
             parameters=tuple(ParameterDefinitionSchema.from_core(parameter) for parameter in definition.parameters),
             documentation_reference=definition.documentation_reference,
             manifest_version=definition.manifest_version,
@@ -111,6 +116,11 @@ class PortInstanceSchema(ApiSchema):
     required: bool
     variadic: bool
     variadic_instance_index: int | None = Field(default=None, ge=0)
+    channel: PortChannel = PortChannel.DATA
+    origin: PortOrigin = PortOrigin.DEFAULT
+    runtime_binding: RuntimeBindingMode = RuntimeBindingMode.SLOT
+    runtime_key: str | None = None
+    passthrough_input_port_id: str | None = None
 
     def to_core(self) -> PortInstance:
         return PortInstance(
@@ -122,6 +132,11 @@ class PortInstanceSchema(ApiSchema):
             required=self.required,
             variadic=self.variadic,
             variadic_instance_index=self.variadic_instance_index,
+            channel=self.channel,
+            origin=self.origin,
+            runtime_binding=self.runtime_binding,
+            runtime_key=self.runtime_key,
+            passthrough_input_port_id=self.passthrough_input_port_id,
         )
 
 
@@ -150,6 +165,8 @@ class ConnectionSchema(ApiSchema):
     source_port_id: str
     target_node_id: str
     target_port_id: str
+    kind: ConnectionKind = ConnectionKind.DATA
+    max_traversals: int | None = Field(default=None, ge=1)
 
     def to_core(self) -> Connection:
         return Connection(
@@ -158,6 +175,8 @@ class ConnectionSchema(ApiSchema):
             source_port_id=self.source_port_id,
             target_node_id=self.target_node_id,
             target_port_id=self.target_port_id,
+            kind=self.kind,
+            max_traversals=self.max_traversals,
         )
 
 
@@ -170,6 +189,7 @@ class WorkflowSchema(ApiSchema):
     nodes: tuple[WorkflowNodeSchema, ...]
     connections: tuple[ConnectionSchema, ...]
     execution_order: tuple[str, ...]
+    migration_notices: tuple[str, ...] = ()
 
     @field_serializer('updated_at', when_used='json')
     def serialize_updated_at(self, value: datetime) -> str:
@@ -189,6 +209,7 @@ class WorkflowSchema(ApiSchema):
             nodes=tuple(node.to_core() for node in self.nodes),
             connections=tuple(connection.to_core() for connection in self.connections),
             execution_order=tuple(self.execution_order),
+            migration_notices=tuple(self.migration_notices),
         )
 
 

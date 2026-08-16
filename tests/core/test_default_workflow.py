@@ -20,5 +20,6 @@ def test_default_workflow_is_valid_branched_configuration() -> None:
         'decision-output',
         'image-output',
     ]
-    assert len(workflow.connections) == 11
+    assert len([connection for connection in workflow.connections if connection.kind.value == 'data']) == 11
+    assert len([connection for connection in workflow.connections if connection.kind.value == 'control']) == 10
     assert validate_workflow(workflow) == ()

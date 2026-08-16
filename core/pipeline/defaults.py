@@ -1,8 +1,11 @@
 from datetime import datetime, timezone
 
-from core.algorithms import get_algorithm_definition
+from core.algorithms import DataType, PortDirection, get_algorithm_definition
 
-from .models import Connection, Point, PortInstance, Workflow, WorkflowNode
+from .models import (
+    Connection, ConnectionKind, Point, PortChannel, PortInstance, PortOrigin,
+    RuntimeBindingMode, Workflow, WorkflowNode,
+)
 from .ordering import stable_topological_order
 
 
@@ -15,7 +18,7 @@ def _node(index: int, algorithm_id: str, x: float, y: float) -> WorkflowNode:
     if definition is None:
         raise ValueError(f'Unknown default algorithm: {algorithm_id}')
     node_id = _id(3, index)
-    ports = tuple(
+    data_ports = tuple(
         PortInstance(
             id=_id(4, index * 100 + port_index),
             template_key=port.key,
@@ -25,8 +28,48 @@ def _node(index: int, algorithm_id: str, x: float, y: float) -> WorkflowNode:
             required=port.required,
             variadic=port.variadic,
             variadic_instance_index=0 if port.variadic else None,
+            channel=PortChannel.DATA,
+            origin=PortOrigin.DEFAULT,
+            runtime_binding=RuntimeBindingMode.SLOT,
+            runtime_key=port.key,
         )
         for port_index, port in enumerate((*definition.inputs, *definition.outputs), start=1)
+    )
+    control_ports = (
+        PortInstance(
+            id=_id(4, index * 100 + 91), template_key='trigger',
+            direction=PortDirection.INPUT, data_type=DataType.GENERIC,
+            display_label='Trigger', required=False, channel=PortChannel.CONTROL,
+            origin=PortOrigin.SYSTEM, runtime_binding=RuntimeBindingMode.NONE,
+        ),
+        PortInstance(
+            id=_id(4, index * 100 + 92), template_key='success',
+            direction=PortDirection.OUTPUT, data_type=DataType.GENERIC,
+            display_label='Success', required=False, channel=PortChannel.CONTROL,
+            origin=PortOrigin.SYSTEM, runtime_binding=RuntimeBindingMode.NONE,
+        ),
+        PortInstance(
+            id=_id(4, index * 100 + 93), template_key='failure',
+            direction=PortDirection.OUTPUT, data_type=DataType.GENERIC,
+            display_label='Failure', required=False, channel=PortChannel.CONTROL,
+            origin=PortOrigin.SYSTEM, runtime_binding=RuntimeBindingMode.NONE,
+        ),
+        *tuple(
+            PortInstance(
+                id=_id(4, index * 100 + 94 + port_index),
+                template_key=port.key,
+                direction=port.direction,
+                data_type=DataType.GENERIC,
+                display_label=port.label,
+                required=port.required,
+                variadic=port.variadic,
+                variadic_instance_index=0 if port.variadic else None,
+                channel=PortChannel.CONTROL,
+                origin=PortOrigin.DEFAULT,
+                runtime_binding=RuntimeBindingMode.NONE,
+            )
+            for port_index, port in enumerate(definition.control_ports)
+        ),
     )
     return WorkflowNode(
         id=node_id,
@@ -34,7 +77,7 @@ def _node(index: int, algorithm_id: str, x: float, y: float) -> WorkflowNode:
         display_name=definition.name,
         position=Point(x, y),
         parameters={parameter.key: parameter.default_value for parameter in definition.parameters},
-        ports=ports,
+        ports=(*data_ports, *control_ports),
     )
 
 
@@ -75,7 +118,17 @@ def create_default_workflow(
         _connection(10, fusion, 'decision', decision, 'decision'),
         _connection(11, draw, 'annotated-image', output, 'image'),
     )
-    workflow = Workflow(recipe_slug, recipe_name, 1, 0, datetime.now(timezone.utc), nodes, connections, ())
+    control_connections = tuple(
+        Connection(
+            _id(6, index), source.id, _port(source, 'success'), target.id, _port(target, 'trigger'),
+            kind=ConnectionKind.CONTROL,
+        )
+        for index, (source, target) in enumerate(zip(nodes, nodes[1:]), start=1)
+    )
+    workflow = Workflow(
+        recipe_slug, recipe_name, 2, 0, datetime.now(timezone.utc), nodes,
+        (*connections, *control_connections), (),
+    )
     return Workflow(
         workflow.recipe_slug,
         workflow.recipe_name,

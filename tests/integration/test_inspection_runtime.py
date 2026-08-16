@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import func, select
 
 from app.clients.camera_client import InspectionImage as VerifiedImage
@@ -24,6 +25,7 @@ from app.services.inspection_service import submit_review
 from core.devices.camera import CaptureRequest, CaptureResult
 from core.devices.models import DeviceMode
 from core.devices.motion import CommandResult, HomeRequest, MotionState, MotionStateName, Position
+from core.nodes import NodeExecutionContext
 from simulator.camera.capture_service import create_test_pattern_png
 
 
@@ -237,6 +239,38 @@ def test_cancel_intent_wins_when_blocking_adapter_returns_timeout(tmp_path: Path
             session, run.id, CancelledTimeoutCamera(session, run.id), ReadyMotion(), tmp_path,
         )
 
+        assert cancelled.status == 'cancelled'
+        assert cancelled.cancel_requested is True
+        assert cancelled.result_id is None
+
+
+def test_live_workflow_passes_refreshing_cancellation_context(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services import inspection_runtime_service
+
+    operator_id, recipe_id = _operator_and_recipe()
+    received_contexts: list[NodeExecutionContext] = []
+    with SessionLocal() as session:
+        run = create_run(session, InspectionRunCreateRequest(
+            board_serial=f'PCB-{uuid4().hex}', recipe_id=recipe_id,
+        ), operator_id, tmp_path / 'projects')
+
+        def cancelled_workflow(workflow, *, source_image, context):
+            received_contexts.append(context)
+            run.cancel_requested = True
+            session.commit()
+            context.checkpoint()
+            raise AssertionError('Cancellation checkpoint must stop workflow execution.')
+
+        monkeypatch.setattr(inspection_runtime_service, 'execute_workflow', cancelled_workflow)
+
+        cancelled = execute_run(
+            session, run.id, VerifiedCamera(), ReadyMotion(), tmp_path / 'captures',
+        )
+
+        assert received_contexts and isinstance(received_contexts[0], NodeExecutionContext)
         assert cancelled.status == 'cancelled'
         assert cancelled.cancel_requested is True
         assert cancelled.result_id is None

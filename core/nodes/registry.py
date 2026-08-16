@@ -62,6 +62,7 @@ def _load_manifest(path: Path) -> NodeManifest:
             documentation_group=definition_payload['documentation_group'],
             inputs=tuple(_port(item) for item in definition_payload['inputs']),
             outputs=tuple(_port(item) for item in definition_payload['outputs']),
+            control_ports=tuple(_port(item) for item in definition_payload.get('control_ports', ())),
             parameters=tuple(_parameter(item) for item in definition_payload.get('parameters', ())),
             availability=definition_payload.get('availability', 'configuration-only'),
             documentation_reference=definition_payload.get('documentation_reference'),
@@ -110,6 +111,7 @@ def _load_registry(manifests: dict[str, NodeManifest]) -> dict[str, NodeRuntime]
             runtime = NodeRuntime(
                 id=module.NODE_ID, use=NodeUse(module.USE), input_keys=tuple(module.INPUT_KEYS),
                 output_keys=tuple(module.OUTPUT_KEYS), execute=module.execute,
+                execute_with_context=getattr(module, 'execute_with_context', None),
             )
         except (AttributeError, TypeError, ValueError) as error:
             raise InvalidNodeRuntime(f'Node module {path.parent.name} has an invalid contract.') from error

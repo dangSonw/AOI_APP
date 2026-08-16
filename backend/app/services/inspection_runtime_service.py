@@ -41,7 +41,7 @@ from app.services.workflow_repository import WorkflowRepository
 from core.devices.camera import CaptureRequest
 from core.devices.models import DeviceMode
 from core.devices.motion import HomeRequest
-from core.nodes import get_node_manifest_registry
+from core.nodes import NodeExecutionCancelled, NodeExecutionContext, get_node_manifest_registry
 from core.pipeline import execute_workflow
 
 
@@ -356,6 +356,11 @@ def _workflow_evidence_hash(
                 'inputs': record.inputs,
                 'outputs': record.outputs,
                 'errorCode': record.error_code,
+                **({
+                    'activationId': record.activation_id,
+                    'activationSequence': record.activation_sequence,
+                    'visitIndex': record.visit_index,
+                } if record.activation_id is not None else {}),
             }
             for record in records
         ],
@@ -444,8 +449,16 @@ def execute_run(
             return _fault(session, run, precheck.error_code or 'execution-fault', 'Inspection safety contract rejected input artifact.')
 
         workflow = WorkflowSchema.model_validate(run.workflow_snapshot).to_core()
-        workflow_result = execute_workflow(workflow, source_image=_decode_image(image.content))
+        def workflow_is_cancelled() -> bool:
+            session.refresh(run, attribute_names=['cancel_requested'])
+            return bool(run.cancel_requested)
+
+        node_context = NodeExecutionContext(is_cancelled=workflow_is_cancelled)
+        workflow_result = execute_workflow(
+            workflow, source_image=_decode_image(image.content), context=node_context,
+        )
         faulted_record = next((record for record in workflow_result.records if record.status == 'faulted'), None)
+        cancelled_record = next((record for record in workflow_result.records if record.status == 'cancelled'), None)
         completed = _now()
         manifests = get_node_manifest_registry()
         for sequence, record in enumerate(workflow_result.records, start=1):
@@ -455,6 +468,11 @@ def execute_run(
                 'nodeInstanceId': record.node_instance_id, 'algorithmId': record.algorithm_id,
                 'parameters': record.parameters, 'inputs': record.inputs, 'outputs': record.outputs,
                 'status': record.status, 'errorCode': record.error_code,
+                **({
+                    'activationId': record.activation_id,
+                    'activationSequence': record.activation_sequence,
+                    'visitIndex': record.visit_index,
+                } if record.activation_id is not None else {}),
             })
             session.add(InspectionNodeRun(
                 run_id=run.id, sequence=sequence, node_id=record.algorithm_id,
@@ -472,6 +490,9 @@ def execute_run(
                 session, run, faulted_record.error_code or 'node-execution-error',
                 faulted_record.error_message or f'Workflow node {faulted_record.algorithm_id} faulted.',
             )
+        if cancelled_record is not None:
+            _transition(session, run, 'cancelled', 'cancelled', run.progress_percent)
+            return _load_run(session, run.id) or run
 
         preview_image = workflow_result.final_image
         if preview_image is None:
@@ -530,7 +551,7 @@ def execute_run(
         _enqueue_integration_events(session, run, result.id)
         _transition(session, run, 'completed', 'completed', 100)
         return _load_run(session, run.id) or run
-    except InspectionCancelled:
+    except (InspectionCancelled, NodeExecutionCancelled):
         _transition(session, run, 'cancelled', 'cancelled', run.progress_percent)
         return _load_run(session, run.id) or run
     except DeviceServiceError as error:

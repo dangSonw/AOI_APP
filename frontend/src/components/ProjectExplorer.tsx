@@ -17,7 +17,6 @@ const EXPLORER_ITEMS: Array<{
   { label: 'Hardware', icon: 'H', view: 'hardware' },
   { label: 'Camera rig', icon: 'C', view: 'camera-manager' },
   { label: 'Workflow', icon: 'W', view: 'workflow-editor' },
-  { label: 'Models', icon: 'M', view: 'research', isExpanded: true },
   { label: 'Dataset', icon: 'D', view: 'dataset' },
   { label: 'Database', icon: 'DB', view: 'database' },
   { label: 'Plugins', icon: 'PL' },

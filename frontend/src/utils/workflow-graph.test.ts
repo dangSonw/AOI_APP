@@ -89,6 +89,7 @@ function makeWorkflow(): Workflow {
     nodes: [source, detector, fusion],
     connections,
     executionOrder: [source.id, detector.id, fusion.id],
+    migrationNotices: [],
   };
 }
 
@@ -104,8 +105,11 @@ describe('workflow graph helpers', () => {
 
     expect(node.id).toBe('00000000-0000-4000-8000-000000000001');
     expect(node.parameters.memoryBankSize).toBe(10000);
-    expect(node.ports.map((port) => [port.templateKey, port.dataType])).toEqual([
+    expect(node.ports.filter((port) => port.channel === 'data').map((port) => [port.templateKey, port.dataType])).toEqual([
       ['image', 'image'], ['anomaly-map', 'anomaly-map'], ['score', 'score'],
+    ]);
+    expect(node.ports.filter((port) => port.channel === 'control').map((port) => port.templateKey)).toEqual([
+      'trigger', 'success', 'failure',
     ]);
   });
 

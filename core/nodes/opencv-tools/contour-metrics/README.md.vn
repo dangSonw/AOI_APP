@@ -1,0 +1,3 @@
+# Node Contour metrics
+
+Trả area, perimeter, centroid và solidity cho mỗi contour. Contour suy biến nhận centroid hoặc solidity bằng 0 khi không xác định. Trạng thái: `debug`.

@@ -1,0 +1,10 @@
+from core.nodes.logic_runtime import execute_logic_node
+from core.nodes.models import NodeInputs, NodeOutputs, NodeParameters, NodeUse
+
+NODE_ID = 'logic-xor'
+USE = NodeUse.DEBUG
+INPUT_KEYS = ('values',)
+OUTPUT_KEYS = ('result',)
+
+def execute(inputs: NodeInputs, parameters: NodeParameters) -> NodeOutputs:
+    return execute_logic_node(NODE_ID, inputs, parameters)

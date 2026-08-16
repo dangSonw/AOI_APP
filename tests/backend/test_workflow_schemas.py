@@ -1,6 +1,8 @@
+from dataclasses import replace
+
 from app.schemas.workflow import AlgorithmDefinitionSchema, WorkflowSchema
 from core.algorithms import get_algorithm_catalog
-from core.pipeline import create_default_workflow
+from core.pipeline import ConnectionKind, create_default_workflow
 
 
 def test_workflow_schema_round_trip_uses_camel_case_contract() -> None:
@@ -15,6 +17,21 @@ def test_workflow_schema_round_trip_uses_camel_case_contract() -> None:
     assert payload['nodes'][0]['algorithmId'] == 'image-input'
     assert payload['nodes'][0]['ports'][0]['templateKey'] == 'image'
     assert schema.to_core() == workflow
+
+
+def test_workflow_schema_round_trips_control_connection_fields() -> None:
+    workflow = create_default_workflow()
+    control = replace(
+        workflow.connections[0], source_port_id='completed', target_port_id='control-in',
+        kind=ConnectionKind.CONTROL, max_traversals=3,
+    )
+    workflow = replace(workflow, connections=(control, *workflow.connections[1:]))
+
+    payload = WorkflowSchema.from_core(workflow).model_dump(mode='json', by_alias=True)
+
+    assert payload['connections'][0]['kind'] == 'control'
+    assert payload['connections'][0]['maxTraversals'] == 3
+    assert WorkflowSchema.model_validate(payload).to_core() == workflow
 
 
 def test_algorithm_schema_exposes_typed_configuration_metadata() -> None:
@@ -39,3 +56,14 @@ def test_algorithm_schema_projects_manifest_and_inspector_contract() -> None:
     assert payload['executionTarget'] == 'adapter'
     assert payload['inspectorKind'] == 'custom'
     assert payload['customInspectorKey'] == 'camera-acquisition'
+
+
+def test_algorithm_schema_projects_default_custom_control_ports() -> None:
+    from core.algorithms import get_algorithm_definition
+
+    payload = AlgorithmDefinitionSchema.from_core(
+        get_algorithm_definition('logic-and'),
+    ).model_dump(mode='json', by_alias=True)
+
+    assert [port['key'] for port in payload['controlPorts']] == ['true', 'false']
+    assert all(port['dataType'] == 'boolean' for port in payload['inputs'])

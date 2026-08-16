@@ -26,6 +26,8 @@ def is_json_parameter_value(value: object, *, maximum_depth: int = 8, maximum_it
 
 
 class DataType(StrEnum):
+    GENERIC = 'generic'
+    BOOLEAN = 'boolean'
     IMAGE = 'image'
     IMAGE_SET = 'image-set'
     MASK = 'mask'
@@ -87,6 +89,7 @@ class AlgorithmDefinition:
     documentation_group: str
     inputs: tuple[PortDefinition, ...]
     outputs: tuple[PortDefinition, ...]
+    control_ports: tuple[PortDefinition, ...] = ()
     parameters: tuple[ParameterDefinition, ...] = ()
     availability: str = 'configuration-only'
     documentation_reference: str | None = None

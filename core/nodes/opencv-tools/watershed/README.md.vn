@@ -1,0 +1,3 @@
+# Node Watershed
+
+Phân đoạn `image` từ connected components trong foreground `mask`, trả mask nhị phân. Kích thước input phải trùng. Trạng thái: `debug`.

@@ -129,6 +129,26 @@ export function WorkflowEditorPage({
     setSelectedNodeId((current) => current === nodeId ? null : current);
   };
 
+  const updateNode = (nextNode: WorkflowNode) => {
+    if (!draftWorkflow) return;
+    const current = draftWorkflow.nodes.find((node) => node.id === nextNode.id);
+    const nextPortIds = new Set(nextNode.ports.map((port) => port.id));
+    const removedPortIds = new Set(
+      (current?.ports ?? []).filter((port) => !nextPortIds.has(port.id)).map((port) => port.id),
+    );
+    const affected = draftWorkflow.connections.filter((connection) => (
+      connection.sourceNodeId === nextNode.id && removedPortIds.has(connection.sourcePortId)
+    ) || (
+      connection.targetNodeId === nextNode.id && removedPortIds.has(connection.targetPortId)
+    ));
+    if (affected.length > 0 && !window.confirm(`Remove this port and ${affected.length} dependent connection${affected.length === 1 ? '' : 's'}?`)) return;
+    updateDraft((workflow) => ({
+      ...workflow,
+      nodes: workflow.nodes.map((node) => node.id === nextNode.id ? nextNode : node),
+      connections: workflow.connections.filter((connection) => !affected.some((item) => item.id === connection.id)),
+    }));
+  };
+
   const handleSave = async () => {
     if (!draftWorkflow || !canSave) return;
     setIsSaving(true);
@@ -213,7 +233,7 @@ export function WorkflowEditorPage({
         <NodeInspector
           node={selectedNode}
           definition={selectedDefinition}
-          onChange={(nextNode: WorkflowNode) => updateDraft((workflow) => ({ ...workflow, nodes: workflow.nodes.map((node) => node.id === nextNode.id ? nextNode : node) }))}
+          onChange={updateNode}
         />
       </div>
       <ExecutionOrderRail

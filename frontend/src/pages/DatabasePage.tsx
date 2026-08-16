@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { PostgreSQLSchemaPanel } from '../components/database/PostgreSQLSchemaPanel';
 import { StatusBadge } from '../components/StatusBadge';
+import { readDatabaseSchema } from '../services/database-schema-service';
 import { readInspectionMetrics, readInspections, submitReview } from '../services/inspection-service';
+import type { DatabaseSchema } from '../types/database-schema';
 import type { InspectionFilters, InspectionListItem, InspectionListResponse, InspectionMetrics } from '../types/inspection';
 
 const EMPTY_METRICS: InspectionMetrics = {
@@ -10,6 +13,7 @@ const EMPTY_METRICS: InspectionMetrics = {
 const PAGE_SIZE = 25;
 
 export function DatabasePage({ accessToken }: { accessToken: string }) {
+  const [activeDatabaseView, setActiveDatabaseView] = useState<'inspections' | 'postgresql'>('inspections');
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [resultFilter, setResultFilter] = useState('');
@@ -19,6 +23,9 @@ export function DatabasePage({ accessToken }: { accessToken: string }) {
   const [selectedRecord, setSelectedRecord] = useState<InspectionListItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [databaseSchema, setDatabaseSchema] = useState<DatabaseSchema | null>(null);
+  const [isLoadingSchema, setIsLoadingSchema] = useState(false);
+  const [schemaError, setSchemaError] = useState('');
 
   useEffect(() => {
     const timer = setTimeout(() => { setDebouncedQuery(query.trim()); setPage(1); }, 300);
@@ -50,6 +57,24 @@ export function DatabasePage({ accessToken }: { accessToken: string }) {
   }, [accessToken, filters, selectedRecord]);
 
   useEffect(() => { void loadData(); }, [loadData]);
+
+  const loadDatabaseSchema = useCallback(async () => {
+    setSchemaError('');
+    setIsLoadingSchema(true);
+    try {
+      setDatabaseSchema(await readDatabaseSchema(accessToken));
+    } catch (schemaFailure) {
+      setSchemaError(schemaFailure instanceof Error ? schemaFailure.message : 'Could not load PostgreSQL schema.');
+    } finally {
+      setIsLoadingSchema(false);
+    }
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (activeDatabaseView === 'postgresql' && databaseSchema === null && !isLoadingSchema && !schemaError) {
+      void loadDatabaseSchema();
+    }
+  }, [activeDatabaseView, databaseSchema, isLoadingSchema, schemaError, loadDatabaseSchema]);
 
   const items = listResponse?.items ?? [];
   const totalPages = listResponse?.totalPages ?? 1;
@@ -85,40 +110,62 @@ export function DatabasePage({ accessToken }: { accessToken: string }) {
 
   return (
     <div className="database-page">
-      <DatabaseHeader query={query} setQuery={setQuery} resultFilter={resultFilter} setResultFilter={setResultFilter} setPage={setPage} />
-      {error && <p style={{ color: 'var(--studio-error)', padding: '8px 0' }}>{error}</p>}
-      <section className="database-metrics" aria-label="Database metrics">
-        {md.map((m) => (<article key={m.label}><strong>{m.value}</strong><span>{m.label}</span><small>{m.note}</small></article>))}
-      </section>
-      <section className="database-layout">
-        <RecordsPanel items={items} isLoading={isLoading} selectedId={sr?.id ?? null} total={total} page={page} totalPages={totalPages} debouncedQuery={debouncedQuery} onSelect={setSelectedRecord} onExport={exportRecords} onPageChange={setPage} fmt={fmt} />
-        <EvidencePanel record={sr} onReview={handleReview} fmt={fmt} />
-      </section>
+      <DatabaseHeader
+        activeView={activeDatabaseView}
+        onViewChange={setActiveDatabaseView}
+        query={query}
+        setQuery={setQuery}
+        resultFilter={resultFilter}
+        setResultFilter={setResultFilter}
+        setPage={setPage}
+      />
+      {activeDatabaseView === 'inspections' ? (
+        <>
+          {error && <p className="studio-message studio-message--error">{error}</p>}
+          <section className="database-metrics" aria-label="Database metrics">
+            {md.map((m) => (<article key={m.label}><strong>{m.value}</strong><span>{m.label}</span><small>{m.note}</small></article>))}
+          </section>
+          <section className="database-layout">
+            <RecordsPanel items={items} isLoading={isLoading} selectedId={sr?.id ?? null} total={total} page={page} totalPages={totalPages} debouncedQuery={debouncedQuery} onSelect={setSelectedRecord} onExport={exportRecords} onPageChange={setPage} fmt={fmt} />
+            <EvidencePanel record={sr} onReview={handleReview} fmt={fmt} />
+          </section>
+        </>
+      ) : (
+        <PostgreSQLSchemaPanel schema={databaseSchema} isLoading={isLoadingSchema} error={schemaError} onRefresh={() => void loadDatabaseSchema()} />
+      )}
     </div>
   );
 }
 
 
-function DatabaseHeader({ query, setQuery, resultFilter, setResultFilter, setPage }: any) {
+function DatabaseHeader({ activeView, onViewChange, query, setQuery, resultFilter, setResultFilter, setPage }: any) {
   return (
     <header className="workspace-title-row database-header">
       <div>
-        <span className="overline">Inspection database</span>
-        <h1>Board history &amp; evidence</h1>
-        <p>Review inspection results, defect records, and captured evidence.</p>
+        <span className="overline">Database</span>
+        <h1>{activeView === 'inspections' ? 'Board history & evidence' : 'PostgreSQL schema'}</h1>
+        <p>{activeView === 'inspections' ? 'Review inspection results, defect records, and captured evidence.' : 'Explore read-only tables, columns, indexes, constraints, and foreign keys.'}</p>
       </div>
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <select value={resultFilter} onChange={(e) => { setResultFilter(e.target.value); setPage(1); }} style={{ minHeight: '42px', padding: '0 12px', border: '1px solid var(--studio-border)', borderRadius: '8px', background: '#ffffff' }}>
-          <option value="">All results</option>
-          <option value="PASS">Pass</option>
-          <option value="FAIL">Fail</option>
-          <option value="REVIEW">Review</option>
-        </select>
-        <label className="database-search">
-          <span className="sr-only">Search inspection records</span>
-          <span aria-hidden="true">⌕</span>
-          <input value={query} placeholder="Search serial, lot, or recipe" onChange={(e) => setQuery(e.target.value)} />
-        </label>
+      <div className="database-header__actions">
+        <div className="database-view-switch" aria-label="Database view">
+          <button type="button" className={activeView === 'inspections' ? 'is-active' : ''} aria-pressed={activeView === 'inspections'} onClick={() => onViewChange('inspections')}>Inspection data</button>
+          <button type="button" className={activeView === 'postgresql' ? 'is-active' : ''} aria-pressed={activeView === 'postgresql'} onClick={() => onViewChange('postgresql')}>PostgreSQL</button>
+        </div>
+        {activeView === 'inspections' && (
+          <div className="database-header__filters">
+            <select aria-label="Filter inspection results" value={resultFilter} onChange={(e) => { setResultFilter(e.target.value); setPage(1); }}>
+              <option value="">All results</option>
+              <option value="PASS">Pass</option>
+              <option value="FAIL">Fail</option>
+              <option value="REVIEW">Review</option>
+            </select>
+            <label className="database-search">
+              <span className="sr-only">Search inspection records</span>
+              <span aria-hidden="true">⌕</span>
+              <input value={query} placeholder="Search serial, lot, or recipe" onChange={(e) => setQuery(e.target.value)} />
+            </label>
+          </div>
+        )}
       </div>
     </header>
   );

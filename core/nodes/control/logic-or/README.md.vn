@@ -1,0 +1,3 @@
+# Node Logic OR
+
+Đánh giá có input boolean variadic `values` nào đúng hay không, phát `result`, rồi định tuyến `true` hoặc `false`. Trạng thái: `debug`.

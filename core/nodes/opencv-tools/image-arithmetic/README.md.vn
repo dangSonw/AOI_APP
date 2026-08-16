@@ -1,0 +1,3 @@
+# Node Image arithmetic
+
+Thực hiện add, subtract hoặc multiply bão hòa trên hai ảnh cùng shape và dtype tương thích OpenCV. Trạng thái: `debug`.

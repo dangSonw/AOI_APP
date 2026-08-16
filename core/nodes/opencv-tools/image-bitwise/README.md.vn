@@ -1,0 +1,3 @@
+# Node Image bitwise
+
+Thực hiện bitwise AND, OR hoặc XOR trên hai ảnh integer cùng shape. Trạng thái: `debug`.

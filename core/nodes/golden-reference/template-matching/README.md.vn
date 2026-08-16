@@ -10,13 +10,13 @@ Node `template-matching` xử lý bước **Template matching** thuộc nhóm **
 |---|---|
 | Node ID | `template-matching` |
 | Nhóm | Golden/reference |
-| Trạng thái | `test` |
+| Trạng thái | `debug` |
 | Phiên bản package | `1.0.0` |
 | Đích thực thi | `local-cpu` |
 | Inspector | `generic` |
 | Khả năng | Chưa khai báo |
 
-Runtime `test` mới có contract. Khi chạy, node phát sinh `NodeNotImplementedError`; không dùng trong workflow cần hoàn thành.
+Runtime `debug` có thể thực thi trong phát triển, mô phỏng và nghiên cứu. Node chưa được duyệt cho production.
 
 ## Port
 
@@ -46,6 +46,6 @@ Connection yêu cầu kiểu dữ liệu trùng tuyệt đối. Workflow vẫn l
 
 Runtime lưu tham số, tóm tắt input/output, thời lượng, phiên bản, trạng thái và evidence hash. Mảng ảnh không được lưu trong JSON evidence. `image-output` đánh dấu ảnh mới nhất để mã hóa PNG và hiển thị trong 2D optical view.
 
-- Trạng thái `test` không đồng nghĩa được duyệt cho production.
+- Trạng thái `debug` không đồng nghĩa được duyệt cho production.
 - Phải kiểm tra kích thước, thứ tự channel, dtype, threshold, timing và memory trên phần cứng đích.
 - Production mode từ chối mọi node chưa mang trạng thái `release`.

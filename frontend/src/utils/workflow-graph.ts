@@ -20,9 +20,10 @@ function findPort(workflow: Workflow, nodeId: string, portId: string): WorkflowP
   return workflow.nodes.find((node) => node.id === nodeId)?.ports.find((port) => port.id === portId);
 }
 
-function createsCycle(workflow: Workflow, sourceNodeId: string, targetNodeId: string): boolean {
+function createsCycle(workflow: Workflow, sourceNodeId: string, targetNodeId: string, kind: 'data' | 'control'): boolean {
   const dependents = new Map<string, string[]>();
   for (const connection of workflow.connections) {
+    if ((connection.kind ?? 'data') !== kind) continue;
     const targets = dependents.get(connection.sourceNodeId) ?? [];
     targets.push(connection.targetNodeId);
     dependents.set(connection.sourceNodeId, targets);
@@ -48,7 +49,7 @@ export function createNodeFromDefinition(
   position: WorkflowPoint,
 ): WorkflowNode {
   const nodeId = crypto.randomUUID();
-  const ports = [...definition.inputs, ...definition.outputs].map<WorkflowPort>((port) => ({
+  const dataPorts = [...definition.inputs, ...definition.outputs].map<WorkflowPort>((port) => ({
     id: crypto.randomUUID(),
     templateKey: port.key,
     direction: port.direction,
@@ -57,6 +58,37 @@ export function createNodeFromDefinition(
     required: port.required,
     variadic: port.variadic,
     variadicInstanceIndex: port.variadic ? 0 : null,
+    channel: 'data',
+    origin: 'default',
+    runtimeBinding: 'slot',
+    runtimeKey: port.key,
+    passthroughInputPortId: null,
+  }));
+  const controlPorts: WorkflowPort[] = [
+    ['trigger', 'Trigger', 'input'],
+    ['success', 'Success', 'output'],
+    ['failure', 'Failure', 'output'],
+  ].map(([templateKey, displayLabel, direction]) => ({
+    id: crypto.randomUUID(), templateKey, displayLabel,
+    direction: direction as WorkflowPort['direction'], dataType: 'generic',
+    required: false, variadic: false, variadicInstanceIndex: null,
+    channel: 'control', origin: 'system', runtimeBinding: 'none', runtimeKey: null,
+    passthroughInputPortId: null,
+  }));
+  const defaultControlPorts = (definition.controlPorts ?? []).map<WorkflowPort>((port) => ({
+    id: crypto.randomUUID(),
+    templateKey: port.key,
+    direction: port.direction,
+    dataType: 'generic',
+    displayLabel: port.label,
+    required: port.required,
+    variadic: port.variadic,
+    variadicInstanceIndex: port.variadic ? 0 : null,
+    channel: 'control',
+    origin: 'default',
+    runtimeBinding: 'none',
+    runtimeKey: null,
+    passthroughInputPortId: null,
   }));
   return {
     id: nodeId,
@@ -64,7 +96,7 @@ export function createNodeFromDefinition(
     displayName: definition.name,
     position,
     parameters: Object.fromEntries(definition.parameters.map((parameter) => [parameter.key, parameter.defaultValue])),
-    ports,
+    ports: [...dataPorts, ...controlPorts, ...defaultControlPorts],
   };
 }
 
@@ -82,10 +114,15 @@ export function validateConnection(
   if (!sourcePort || !targetPort || sourcePort.direction !== 'output' || targetPort.direction !== 'input') {
     return issue('unknown-port', 'Connect an output port to an input port.');
   }
-  if (sourceNode.id === targetNode.id) {
+  const kind = connection.kind ?? sourcePort.channel;
+  if (sourcePort.channel !== kind || targetPort.channel !== kind) {
+    return issue('unknown-port', `Connect ${kind} ports only to ${kind} ports.`);
+  }
+  if (kind === 'data' && sourceNode.id === targetNode.id) {
     return issue('self-loop', 'A node cannot connect to itself.');
   }
-  if (sourcePort.dataType !== targetPort.dataType) {
+  if (kind === 'data' && sourcePort.dataType !== targetPort.dataType
+    && sourcePort.dataType !== 'generic' && targetPort.dataType !== 'generic') {
     return issue('type-mismatch', `Connect ${sourcePort.dataType} only to ${sourcePort.dataType}.`);
   }
   if (workflow.connections.some((candidate) =>
@@ -95,11 +132,17 @@ export function validateConnection(
     && candidate.targetPortId === connection.targetPortId)) {
     return issue('duplicate-connection', 'These ports are already connected.');
   }
-  if (!targetPort.variadic && workflow.connections.some((candidate) =>
+  if (kind === 'data' && !targetPort.variadic && workflow.connections.some((candidate) =>
     candidate.targetNodeId === connection.targetNodeId && candidate.targetPortId === connection.targetPortId)) {
     return issue('input-already-connected', 'The target input already has a connection.');
   }
-  if (createsCycle(workflow, sourceNode.id, targetNode.id)) {
+  if (kind === 'control' && connection.maxTraversals !== null && connection.maxTraversals !== undefined
+    && (!Number.isInteger(connection.maxTraversals) || connection.maxTraversals < 1 || connection.maxTraversals > 10_000)) {
+    return issue('invalid-parameter', 'Maximum traversals must be between 1 and 10,000.');
+  }
+  if (createsCycle(workflow, sourceNode.id, targetNode.id, kind)) {
+    if (kind === 'control' && connection.maxTraversals) return null;
+    if (kind === 'control') return issue('unbounded-control-cycle', 'Control feedback requires maximum traversals.');
     return issue('cycle', 'This connection would create a cycle.');
   }
   return null;
@@ -113,6 +156,7 @@ export function stableTopologicalOrder(workflow: Workflow, preferredOrder = work
   const indegree = new Map(nodeIds.map((nodeId) => [nodeId, 0]));
   const dependents = new Map<string, Set<string>>();
   for (const connection of workflow.connections) {
+    if ((connection.kind ?? 'data') === 'control') continue;
     if (!nodeSet.has(connection.sourceNodeId) || !nodeSet.has(connection.targetNodeId)) {
       continue;
     }

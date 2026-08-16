@@ -1,5 +1,10 @@
-import type { AlgorithmDefinition, ParameterValue, WorkflowNode } from '../../types/workflow';
+import { useState } from 'react';
+import type {
+  AlgorithmDefinition, DataType, ParameterValue, PortChannel, PortDirection,
+  RuntimeBindingMode, WorkflowNode,
+} from '../../types/workflow';
 import { getNodeInspectorPlugin } from '../../node-plugins/registry';
+import { addCustomPort, removeCustomPort, updateCustomPort } from '../../utils/workflow-ports';
 import { RuntimeUseBadge } from '../RuntimeUseBadge';
 
 
@@ -7,6 +12,55 @@ interface NodeInspectorProps {
   node: WorkflowNode | null;
   definition: AlgorithmDefinition | null;
   onChange: (node: WorkflowNode) => void;
+}
+
+const DATA_TYPES: DataType[] = [
+  'generic', 'boolean', 'image', 'image-set', 'mask', 'roi-set', 'keypoints',
+  'contours', 'features', 'detections', 'anomaly-map', 'score', 'transform', 'decision',
+];
+
+function CustomPortEditor({ node, onChange }: Pick<NodeInspectorProps, 'node' | 'onChange'> & { node: WorkflowNode }) {
+  const [key, setKey] = useState('custom-port');
+  const [label, setLabel] = useState('Custom port');
+  const [direction, setDirection] = useState<PortDirection>('output');
+  const [channel, setChannel] = useState<PortChannel>('control');
+  const [dataType, setDataType] = useState<DataType>('generic');
+  const [runtimeBinding, setRuntimeBinding] = useState<RuntimeBindingMode>('none');
+  const [error, setError] = useState('');
+
+  const commit = () => {
+    try {
+      onChange(addCustomPort(node, {
+        templateKey: key,
+        displayLabel: label,
+        direction,
+        channel,
+        dataType: channel === 'control' ? 'generic' : dataType,
+        runtimeBinding: channel === 'control' ? 'none' : runtimeBinding,
+        runtimeKey: channel === 'data' && runtimeBinding === 'slot' ? key : null,
+        passthroughInputPortId: null,
+      }));
+      setError('');
+    } catch (portError) {
+      setError(portError instanceof Error ? portError.message : 'Custom port is invalid.');
+    }
+  };
+
+  return (
+    <div className="workflow-custom-port-editor">
+      <h4>Add custom port</h4>
+      <label className="workflow-field"><span>Port key</span><input value={key} onChange={(event) => setKey(event.target.value)} /></label>
+      <label className="workflow-field"><span>Label</span><input value={label} onChange={(event) => setLabel(event.target.value)} /></label>
+      <label className="workflow-field"><span>Direction</span><select value={direction} onChange={(event) => setDirection(event.target.value as PortDirection)}><option value="input">Input</option><option value="output">Output</option></select></label>
+      <label className="workflow-field"><span>Channel</span><select value={channel} onChange={(event) => setChannel(event.target.value as PortChannel)}><option value="control">Control</option><option value="data">Data</option></select></label>
+      {channel === 'data' && <>
+        <label className="workflow-field"><span>Data type</span><select value={dataType} onChange={(event) => setDataType(event.target.value as DataType)}>{DATA_TYPES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+        <label className="workflow-field"><span>Runtime binding</span><select value={runtimeBinding} onChange={(event) => setRuntimeBinding(event.target.value as RuntimeBindingMode)}><option value="none">None</option><option value="slot">Slot</option></select></label>
+      </>}
+      {error && <small className="workflow-field-error" role="alert">{error}</small>}
+      <button type="button" className="secondary-button" onClick={commit}>Add custom port</button>
+    </div>
+  );
 }
 
 export function NodeInspector({ node, definition, onChange }: NodeInspectorProps) {
@@ -85,12 +139,14 @@ export function NodeInspector({ node, definition, onChange }: NodeInspectorProps
               <span>{port.direction} · {port.dataType}{port.required ? ' · required' : ''}</span>
               <input
                 value={port.displayLabel}
-                onChange={(event) => onChange({
-                  ...node,
-                  ports: node.ports.map((candidate) => candidate.id === port.id ? { ...candidate, displayLabel: event.target.value } : candidate),
-                })}
+                disabled={port.origin === 'system'}
+                onChange={(event) => onChange(updateCustomPort(node, port.id, { displayLabel: event.target.value }))}
               />
               <small>Template: {port.templateKey}</small>
+              {port.origin === 'system' && <small>System port · locked</small>}
+              {port.origin !== 'system' && !port.variadic && (
+                <button type="button" className="text-action" onClick={() => onChange(removeCustomPort(node, port.id))}>Remove custom port</button>
+              )}
               {port.variadic && port.variadicInstanceIndex !== 0 && (
                 <button
                   type="button"
@@ -120,6 +176,11 @@ export function NodeInspector({ node, definition, onChange }: NodeInspectorProps
                     required: false,
                     variadic: true,
                     variadicInstanceIndex: existing.length,
+                    channel: 'data',
+                    origin: 'default',
+                    runtimeBinding: 'slot',
+                    runtimeKey: template.key,
+                    passthroughInputPortId: null,
                   }],
                 });
               }}
@@ -127,6 +188,7 @@ export function NodeInspector({ node, definition, onChange }: NodeInspectorProps
               Add {template.label.toLocaleLowerCase()} input
             </button>
           ))}
+          <CustomPortEditor node={node} onChange={onChange} />
         </section>
       </div>
     </aside>
