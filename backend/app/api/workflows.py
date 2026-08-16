@@ -1,10 +1,10 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import CurrentUser
 from app.config.settings import get_settings
-from app.schemas.workflow import AlgorithmDefinitionSchema, ValidationIssueSchema, WorkflowSchema
+from app.schemas.workflow import AlgorithmDefinitionSchema, AlgorithmDocumentationSchema, ValidationIssueSchema, WorkflowSchema
 from app.services.workflow_repository import (
     InvalidRecipeSlug,
     StaleWorkflowRevision,
@@ -13,6 +13,7 @@ from app.services.workflow_repository import (
     WorkflowValidationError,
 )
 from core.algorithms import get_algorithm_catalog
+from core.nodes.registry import get_node_documentation
 
 
 router = APIRouter(prefix='/api', tags=['workflows'])
@@ -28,6 +29,19 @@ WorkflowRepositoryDependency = Annotated[WorkflowRepository, Depends(get_workflo
 @router.get('/algorithms', response_model=list[AlgorithmDefinitionSchema])
 def get_algorithms(_: CurrentUser) -> list[AlgorithmDefinitionSchema]:
     return [AlgorithmDefinitionSchema.from_core(definition) for definition in get_algorithm_catalog()]
+
+
+@router.get('/algorithms/{algorithm_id}/documentation', response_model=AlgorithmDocumentationSchema)
+def get_algorithm_documentation(
+    algorithm_id: str,
+    _: CurrentUser,
+    language: Literal['en', 'vi'] = 'vi',
+) -> AlgorithmDocumentationSchema:
+    documentation = get_node_documentation(algorithm_id, language)
+    if documentation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Algorithm documentation was not found.')
+    resolved_language, content = documentation
+    return AlgorithmDocumentationSchema(algorithm_id=algorithm_id, language=resolved_language, content=content)
 
 
 @router.get('/recipes/{recipe_slug}/workflow', response_model=WorkflowSchema)

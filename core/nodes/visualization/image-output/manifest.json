@@ -1,0 +1,25 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "image-output",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["image-preview"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 64, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": ["image"], "outputs": ["image"]},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "none", "customKey": null},
+  "definition": {
+    "id": "image-output",
+    "name": "Image output",
+    "description": "Marks an image as a workflow preview and evidence output.",
+    "category": "Visualization",
+    "documentation_group": "Acquisition and pipeline components",
+    "inputs": [{"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false}],
+    "outputs": [{"key": "preview-image", "label": "Preview image", "direction": "output", "data_type": "image", "required": true, "variadic": false}],
+    "parameters": [],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 59
+}

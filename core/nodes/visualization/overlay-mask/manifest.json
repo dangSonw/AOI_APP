@@ -1,0 +1,31 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "overlay-mask",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["opencv", "image-annotation", "mask-overlay"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 384, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "overlay-mask",
+    "name": "Overlay mask",
+    "description": "Blends a configurable BGR color over pixels selected by a binary mask.",
+    "category": "Visualization",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false},
+      {"key": "mask", "label": "Mask", "direction": "input", "data_type": "mask", "required": true, "variadic": false}
+    ],
+    "outputs": [{"key": "annotated-image", "label": "Annotated image", "direction": "output", "data_type": "image", "required": true, "variadic": false}],
+    "parameters": [
+      {"key": "color", "label": "Overlay BGR", "kind": "json", "default_value": [0, 0, 255], "required": true, "minimum": null, "maximum": null, "options": [], "description": "Three integer BGR channels from 0 to 255."},
+      {"key": "opacity", "label": "Opacity", "kind": "number", "default_value": 0.45, "required": true, "minimum": 0.0, "maximum": 1.0, "options": [], "description": "Overlay opacity from zero to one."}
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV addWeighted"
+  },
+  "catalogOrder": 73
+}

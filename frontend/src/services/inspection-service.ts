@@ -1,4 +1,4 @@
-import { apiRequest } from './api-client';
+import { apiBlobRequest, apiRequest } from './api-client';
 import type {
   InspectionDetail,
   InspectionFilters,
@@ -71,4 +71,8 @@ export async function cancelInspectionRun(accessToken: string, runId: string): P
   return apiRequest<InspectionRun>(`/api/inspection-runs/${runId}/cancel`, {
     method: 'POST',
   }, accessToken);
+}
+
+export async function readInspectionPreview(accessToken: string, runId: string): Promise<Blob> {
+  return apiBlobRequest(`/api/inspection-runs/${encodeURIComponent(runId)}/preview`, accessToken);
 }

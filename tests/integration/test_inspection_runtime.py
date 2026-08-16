@@ -15,13 +15,15 @@ from app.schemas.inspection_run import InspectionRunCreateRequest
 from app.services.inspection_runtime_service import (
     create_run,
     execute_run,
+    get_preview_artifact,
     recover_interrupted_runs,
     replay_run,
     request_cancellation,
 )
 from app.services.inspection_service import submit_review
 from core.devices.camera import CaptureRequest, CaptureResult
-from core.devices.motion import MotionState, MotionStateName, Position
+from core.devices.models import DeviceMode
+from core.devices.motion import CommandResult, HomeRequest, MotionState, MotionStateName, Position
 from simulator.camera.capture_service import create_test_pattern_png
 
 
@@ -45,6 +47,37 @@ class StaleMotion(ReadyMotion):
         from datetime import timedelta
         state = super().state()
         return state.model_copy(update={'updated_at': state.updated_at - timedelta(seconds=120)})
+
+
+class UnhomedSimulationMotion(ReadyMotion):
+    def __init__(self) -> None:
+        self.was_homed = False
+
+    def state(self) -> MotionState:
+        state = super().state()
+        if self.was_homed:
+            return state
+        return state.model_copy(update={
+            'revision': 0,
+            'state': MotionStateName.NOT_HOMED,
+            'is_homed': False,
+            'is_in_position': False,
+        })
+
+    def health(self):
+        return type('Health', (), {'mode': DeviceMode.SIMULATION})()
+
+    def home(self, request: HomeRequest) -> CommandResult:
+        self.was_homed = True
+        return CommandResult(command_id=request.command_id, status='completed', state_revision=1)
+
+
+class UnhomedHardwareMotion(UnhomedSimulationMotion):
+    def health(self):
+        return type('Health', (), {'mode': DeviceMode.HARDWARE})()
+
+    def home(self, request: HomeRequest) -> CommandResult:
+        raise AssertionError('Hardware motion must not be auto-homed by an uncommissioned run.')
 
 
 class VerifiedCamera:
@@ -116,13 +149,50 @@ def test_persisted_run_completes_with_replayable_node_and_artifact_evidence(tmp_
         assert completed.input_artifact is not None
         assert len(completed.workflow_sha256) == 64
         assert len(completed.evidence_sha256 or '') == 64
-        assert len(completed.node_runs) == 1
-        assert completed.node_runs[0].status == 'completed'
+        assert len(completed.node_runs) == 11
+        assert all(node.status == 'completed' for node in completed.node_runs)
+        assert completed.node_runs[-1].node_id == 'image-output'
+        assert completed.input_artifact['previewRelativePath'].endswith('.png')
+        preview = get_preview_artifact(session, run.id, tmp_path / 'captures')
+        assert preview is not None
+        assert preview[0].read_bytes().startswith(b'\x89PNG\r\n\x1a\n')
+        assert preview[1] == 'image/png'
 
         decision, evidence, matches = replay_run(session, run.id, tmp_path / 'captures')
         assert decision == completed.decision
         assert evidence == completed.evidence_sha256
         assert matches is True
+
+
+def test_uncommissioned_simulation_homes_before_capture_and_persists_preview(tmp_path: Path) -> None:
+    operator_id, recipe_id = _operator_and_recipe()
+    motion = UnhomedSimulationMotion()
+    with SessionLocal() as session:
+        run = create_run(session, InspectionRunCreateRequest(
+            board_serial=f'PCB-{uuid4().hex}', recipe_id=recipe_id,
+        ), operator_id, tmp_path / 'projects')
+
+        completed = execute_run(session, run.id, VerifiedCamera(), motion, tmp_path / 'captures')
+
+        assert motion.was_homed is True
+        assert completed.status == 'completed'
+        assert completed.input_artifact is not None
+        assert get_preview_artifact(session, run.id, tmp_path / 'captures') is not None
+
+
+def test_uncommissioned_run_does_not_auto_home_a_hardware_adapter(tmp_path: Path) -> None:
+    operator_id, recipe_id = _operator_and_recipe()
+    motion = UnhomedHardwareMotion()
+    with SessionLocal() as session:
+        run = create_run(session, InspectionRunCreateRequest(
+            board_serial=f'PCB-{uuid4().hex}', recipe_id=recipe_id,
+        ), operator_id, tmp_path / 'projects')
+
+        faulted = execute_run(session, run.id, VerifiedCamera(), motion, tmp_path / 'captures')
+
+        assert faulted.status == 'faulted'
+        assert faulted.error_code == 'motion-not-in-position'
+        assert faulted.input_artifact is None
 
 
 def test_queued_cancel_and_restart_recovery_are_persisted_without_device_calls(tmp_path: Path) -> None:

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi.testclient import TestClient
 
 from simulator.mcu.app import create_app
@@ -24,6 +26,16 @@ def test_motion_simulator_homes_and_executes_idempotent_absolute_move() -> None:
     assert state.json()['isHomed'] is True
     assert state.json()['isInPosition'] is True
     assert state.json()['position'] == move_payload['target']
+
+
+def test_motion_state_read_refreshes_observation_time_without_changing_revision() -> None:
+    client = TestClient(create_app())
+    client.post('/commands/home', json={'commandId': 'home-freshness'})
+    first = client.get('/state').json()
+    second = client.get('/state').json()
+
+    assert second['revision'] == first['revision']
+    assert datetime.fromisoformat(second['updatedAt']) >= datetime.fromisoformat(first['updatedAt'])
 
 
 def test_motion_simulator_rejects_move_before_homing_and_outside_workspace() -> None:

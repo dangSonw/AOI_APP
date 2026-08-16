@@ -169,3 +169,12 @@ The current baseline is 15 backend tests, 14 core tests, 12 integration tests, 1
 - Workstation preference JSON is migration input only. Dry-run before `--apply`; equal checksums are no-op and conflicts block the batch.
 - Activation idempotency keys are distinct from request IDs. Reuse request IDs violates audit uniqueness; replay only the `Idempotency-Key` with a fresh request ID.
 - Portable settings export verifies canonical SHA-256 but is not a PostgreSQL disaster-recovery backup.
+
+## 21. Executable Workflow and OpenCV Node Runtime
+
+- Saved workflow snapshots are now the runtime source of truth. Project Run must execute their typed DAG in persisted execution order and must never silently substitute the former deterministic reference slice.
+- Node evidence stores summaries only. NumPy arrays and image bytes must remain artifact data, not JSONB node input/output payloads.
+- Workflow preview artifacts use relative paths under the configured capture root, SHA-256 verification, authenticated `FileResponse`, and `private, no-store` caching before reaching the 2D optical view.
+- OpenCV and implemented support nodes remain `debug` until target-hardware qualification. Model, reference-data, and calibration-dependent placeholders remain `test` and fault explicitly when executed.
+- Keep workflow graphs acyclic. `bounded-repeat` expands one image into a bounded image set; it is not permission to persist a graph cycle. `delay` is capped at ten seconds.
+- Every node package owns `README.md` and `README.md.vn`. Regenerate both from manifests with `python scripts/generate_node_docs.py`; do not use a PowerShell text pipeline for Vietnamese UTF-8 output.

@@ -1,0 +1,34 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "draw-detections",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["opencv", "image-annotation"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 256, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "draw-detections",
+    "name": "Draw detections",
+    "description": "Draws detection boxes, circles, lines, and labels on a copy of the image.",
+    "category": "Visualization",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false},
+      {"key": "detections", "label": "Detections", "direction": "input", "data_type": "detections", "required": true, "variadic": false}
+    ],
+    "outputs": [
+      {"key": "annotated-image", "label": "Annotated image", "direction": "output", "data_type": "image", "required": true, "variadic": false}
+    ],
+    "parameters": [
+      {"key": "color", "label": "BGR color", "kind": "json", "default_value": [0, 255, 0], "required": true, "minimum": null, "maximum": null, "options": [], "description": "Three integer BGR channels from 0 to 255."},
+      {"key": "thickness", "label": "Thickness", "kind": "integer", "default_value": 2, "required": true, "minimum": 1, "maximum": 32, "options": [], "description": "Stroke thickness in pixels."},
+      {"key": "showLabels", "label": "Show labels", "kind": "boolean", "default_value": true, "required": true, "minimum": null, "maximum": null, "options": [], "description": "Draw detection labels above boxes."}
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV drawing functions"
+  },
+  "catalogOrder": 58
+}

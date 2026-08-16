@@ -1,0 +1,28 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "apply-mask",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["opencv", "mask-application"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 256, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "none", "customKey": null},
+  "definition": {
+    "id": "apply-mask",
+    "name": "Apply mask",
+    "description": "Keeps image pixels selected by a same-size binary mask and clears all others.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false},
+      {"key": "mask", "label": "Mask", "direction": "input", "data_type": "mask", "required": true, "variadic": false}
+    ],
+    "outputs": [{"key": "processed-image", "label": "Masked image", "direction": "output", "data_type": "image", "required": true, "variadic": false}],
+    "parameters": [],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV bitwise_and"
+  },
+  "catalogOrder": 71
+}

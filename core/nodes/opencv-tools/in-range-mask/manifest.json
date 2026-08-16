@@ -1,0 +1,29 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "in-range-mask",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["opencv", "color-segmentation"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 256, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "in-range-mask",
+    "name": "In-range mask",
+    "description": "Creates a binary mask from inclusive channel bounds in BGR, HSV, Lab, or grayscale space.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [{"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false}],
+    "outputs": [{"key": "mask", "label": "Mask", "direction": "output", "data_type": "mask", "required": true, "variadic": false}],
+    "parameters": [
+      {"key": "colorSpace", "label": "Color space", "kind": "select", "default_value": "hsv", "required": true, "minimum": null, "maximum": null, "options": ["bgr", "hsv", "lab", "grayscale"], "description": "Color space used before range comparison."},
+      {"key": "lowerBound", "label": "Lower bound", "kind": "json", "default_value": [0, 0, 0], "required": true, "minimum": null, "maximum": null, "options": [], "description": "Inclusive lower channel values; use one value for grayscale."},
+      {"key": "upperBound", "label": "Upper bound", "kind": "json", "default_value": [179, 255, 255], "required": true, "minimum": null, "maximum": null, "options": [], "description": "Inclusive upper channel values; use one value for grayscale."}
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV inRange"
+  },
+  "catalogOrder": 70
+}

@@ -11,6 +11,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
+import cv2
+import numpy as np
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -24,6 +27,7 @@ from app.models.inspection_run import InspectionNodeRun, InspectionRun
 from app.models.pilot import CommissioningProfile, IntegrationOutboxEvent
 from app.models.recipe import Recipe
 from app.schemas.inspection_run import InspectionRunCreateRequest
+from app.schemas.workflow import WorkflowSchema
 from app.services.inspection_orchestrator import (
     CancellationToken,
     ExecutionContext,
@@ -35,7 +39,10 @@ from app.services.inspection_orchestrator import (
 from app.services.pilot_service import commissioning_snapshot
 from app.services.workflow_repository import WorkflowRepository
 from core.devices.camera import CaptureRequest
+from core.devices.models import DeviceMode
+from core.devices.motion import HomeRequest
 from core.nodes import get_node_manifest_registry
+from core.pipeline import execute_workflow
 
 
 TERMINAL_STATUSES = {'completed', 'faulted', 'cancelled'}
@@ -132,7 +139,6 @@ def create_run(
         for node in workflow.nodes
         if node.algorithm_id in manifests
     }
-    effective_versions['deterministic-reference'] = '2.0.0'
     parameters = request.model_dump(mode='json', by_alias=True)
     try:
         pilot_snapshot = commissioning_snapshot(
@@ -310,6 +316,52 @@ def _store_artifact(root: Path, content: bytes, sha256: str, media_type: str) ->
     return relative.as_posix()
 
 
+def _decode_image(content: bytes) -> np.ndarray:
+    image = cv2.imdecode(np.frombuffer(content, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None or image.size == 0:
+        raise InspectionRunError('Captured artifact cannot be decoded by OpenCV.')
+    return image
+
+
+def _encode_preview(image: np.ndarray) -> bytes:
+    preview = image
+    if preview.dtype != np.uint8:
+        preview = cv2.normalize(preview, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    encoded, payload = cv2.imencode('.png', preview)
+    if not encoded:
+        raise InspectionRunError('Workflow preview could not be encoded.')
+    return payload.tobytes()
+
+
+def _workflow_evidence_hash(
+    workflow_sha256: str,
+    artifact_sha256: str,
+    preview_sha256: str,
+    decision: str,
+    score: float | None,
+    records: tuple,
+) -> str:
+    return _canonical_sha256({
+        'workflowSha256': workflow_sha256,
+        'artifactSha256': artifact_sha256,
+        'previewSha256': preview_sha256,
+        'decision': decision,
+        'score': score,
+        'nodes': [
+            {
+                'nodeInstanceId': record.node_instance_id,
+                'algorithmId': record.algorithm_id,
+                'status': record.status,
+                'parameters': record.parameters,
+                'inputs': record.inputs,
+                'outputs': record.outputs,
+                'errorCode': record.error_code,
+            }
+            for record in records
+        ],
+    })
+
+
 def _fault(session: Session, run: InspectionRun, code: str, message: str) -> InspectionRun:
     run.error_code = code
     run.error_message = message[:500]
@@ -345,6 +397,10 @@ def execute_run(
             return _fault(session, run, 'stale-pose', 'Motion pose is stale; refresh or move the stage before capture.')
         if state.emergency_stop or not state.door_closed or not state.communication_connected:
             return _fault(session, run, 'motion-interlock', 'Motion safety interlock or communication state is not ready.')
+        if not state.is_homed and run.commissioning_snapshot.get('deploymentMode') == 'simulation-uncommissioned':
+            if motion.health().mode == DeviceMode.SIMULATION:
+                motion.home(HomeRequest(command_id=f'{run.id}-auto-home'))
+                state = motion.state()
         if (
             not state.is_homed or not state.is_in_position
             or not _positions_match(state.position, request.expected_position)
@@ -371,42 +427,79 @@ def execute_run(
         }
         session.commit()
 
-        _transition(session, run, 'executing', 'deterministic-reference', 70)
+        _transition(session, run, 'executing', 'workflow-execution', 70)
         _check_cancelled(session, run)
         context = ExecutionContext(
-            run_id=run.id, node_id='deterministic-reference', deadline=_now() + timedelta(seconds=2),
-            cancellation=CancellationToken(run.cancel_requested), resources={'cpuCores': 1, 'memoryMiB': 64},
+            run_id=run.id, node_id='workflow-execution', deadline=_now() + timedelta(seconds=30),
+            cancellation=CancellationToken(run.cancel_requested), resources={'cpuCores': 1, 'memoryMiB': 512},
         )
         context.checkpoint()
-        algorithm_version = run.effective_versions['deterministic-reference']
-        outcome = InspectionOrchestrator().run_reference_slice(InspectionInput(
+        precheck = InspectionOrchestrator().run_reference_slice(InspectionInput(
             artifact_sha256=capture.sha256, observed_sha256=image.sha256, byte_length=len(image.content),
             is_blurred=blurred, is_registered=registered, motion_in_position=state.is_in_position,
             pose_observed_at=state.updated_at, pose_tolerance_seconds=POSE_TOLERANCE_SECONDS,
             reference_score=_reference_score(image.content),
-        ), threshold=request.threshold, algorithm_version=algorithm_version)
+        ), threshold=request.threshold, algorithm_version='2.0.0')
+        if precheck.decision == 'FAULT':
+            return _fault(session, run, precheck.error_code or 'execution-fault', 'Inspection safety contract rejected input artifact.')
+
+        workflow = WorkflowSchema.model_validate(run.workflow_snapshot).to_core()
+        workflow_result = execute_workflow(workflow, source_image=_decode_image(image.content))
+        faulted_record = next((record for record in workflow_result.records if record.status == 'faulted'), None)
         completed = _now()
-        for sequence, node in enumerate(outcome.node_runs, start=1):
+        manifests = get_node_manifest_registry()
+        for sequence, record in enumerate(workflow_result.records, start=1):
+            manifest = manifests[record.algorithm_id]
+            record_evidence = _canonical_sha256({
+                'workflowSha256': run.workflow_sha256, 'artifactSha256': image.sha256,
+                'nodeInstanceId': record.node_instance_id, 'algorithmId': record.algorithm_id,
+                'parameters': record.parameters, 'inputs': record.inputs, 'outputs': record.outputs,
+                'status': record.status, 'errorCode': record.error_code,
+            })
             session.add(InspectionNodeRun(
-                run_id=run.id, sequence=sequence, node_id=node.node_id, node_version=algorithm_version,
-                execution_target='local-cpu', status=node.status, parameters=node.parameters,
-                inputs={'artifactSha256': image.sha256}, outputs=node.outputs,
-                resources=context.resources, evidence_sha256=outcome.evidence_sha256,
-                error_code=node.error_code, error_message=node.error_code,
-                started_at=run.started_at or completed, completed_at=completed,
-                duration_ms=max(0, int((time.monotonic() - started) * 1000)),
+                run_id=run.id, sequence=sequence, node_id=record.algorithm_id,
+                node_version=run.effective_versions[record.algorithm_id],
+                execution_target=manifest.execution_target, status=record.status,
+                parameters=record.parameters, inputs=record.inputs, outputs=record.outputs,
+                resources=dict(manifest.resource_hints), evidence_sha256=record_evidence,
+                error_code=record.error_code, error_message=record.error_message,
+                started_at=completed - timedelta(milliseconds=record.duration_ms), completed_at=completed,
+                duration_ms=record.duration_ms,
             ))
-        if outcome.decision == 'FAULT':
+        if faulted_record is not None:
             session.commit()
-            return _fault(session, run, outcome.error_code or 'execution-fault', 'Inspection safety contract rejected input artifact.')
+            return _fault(
+                session, run, faulted_record.error_code or 'node-execution-error',
+                faulted_record.error_message or f'Workflow node {faulted_record.algorithm_id} faulted.',
+            )
+
+        preview_image = workflow_result.final_image
+        if preview_image is None:
+            raise InspectionRunError('Workflow did not produce a preview image.')
+        preview_content = _encode_preview(preview_image)
+        preview_sha256 = hashlib.sha256(preview_content).hexdigest()
+        preview_relative_path = _store_artifact(artifact_root, preview_content, preview_sha256, 'image/png')
+        decision = workflow_result.decision or ('FAIL' if (workflow_result.score or 0.0) >= request.threshold else 'PASS')
+        score = workflow_result.score
+        evidence_sha256 = _workflow_evidence_hash(
+            run.workflow_sha256, image.sha256, preview_sha256, decision, score, workflow_result.records,
+        )
+        run.input_artifact = {
+            **run.input_artifact,
+            'previewRelativePath': preview_relative_path,
+            'previewSha256': preview_sha256,
+            'previewMediaType': 'image/png',
+            'previewWidth': int(preview_image.shape[1]),
+            'previewHeight': int(preview_image.shape[0]),
+        }
 
         recipe = session.get(Recipe, run.recipe_id)
         if recipe is None:
             raise InspectionRunError('Inspection recipe disappeared during execution.')
         result = InspectionResult(
             board_serial=run.board_serial, lot=run.lot, recipe_id=run.recipe_id,
-            recipe_name=recipe.name, operator_id=run.operator_id, result=outcome.decision,
-            defect_count=1 if outcome.decision == 'FAIL' else 0, score=outcome.score,
+            recipe_name=recipe.name, operator_id=run.operator_id, result=decision,
+            defect_count=1 if decision == 'FAIL' else 0, score=score,
             cycle_time_ms=max(0, int((time.monotonic() - started) * 1000)),
             camera_config={
                 'cameraId': request.camera_id, 'sensorMode': request.sensor_mode,
@@ -415,19 +508,25 @@ def execute_run(
         )
         session.add(result)
         session.flush()
-        if outcome.decision == 'FAIL':
+        if decision == 'FAIL':
             session.add(Defect(
                 result_id=result.id, defect_type='reference-anomaly', severity='high',
-                confidence=outcome.score, description='Deterministic PCB reference score exceeded threshold.',
+                confidence=score, description='Workflow score exceeded the configured threshold.',
             ))
         session.add(InspectionImage(
             result_id=result.id, image_type='original', relative_path=relative_path,
             file_size_bytes=len(image.content), width_px=capture.width, height_px=capture.height,
             sha256_hash=image.sha256, media_type=image.media_type, captured_at=capture.captured_at,
         ))
+        session.add(InspectionImage(
+            result_id=result.id, image_type='workflow-preview', relative_path=preview_relative_path,
+            file_size_bytes=len(preview_content), width_px=int(preview_image.shape[1]),
+            height_px=int(preview_image.shape[0]), sha256_hash=preview_sha256,
+            media_type='image/png', captured_at=capture.captured_at,
+        ))
         run.result_id = result.id
-        run.decision = outcome.decision
-        run.evidence_sha256 = outcome.evidence_sha256
+        run.decision = decision
+        run.evidence_sha256 = evidence_sha256
         _enqueue_integration_events(session, run, result.id)
         _transition(session, run, 'completed', 'completed', 100)
         return _load_run(session, run.id) or run
@@ -464,17 +563,49 @@ def replay_run(session: Session, run_id: str, artifact_root: Path) -> tuple[str,
         raise InspectionRunError('Replay artifact checksum or byte length is invalid.')
     request = InspectionRunCreateRequest.model_validate(run.parameters)
     algorithm_version = run.effective_versions.get('deterministic-reference')
-    if algorithm_version not in {'1.0.0', '2.0.0'}:
-        raise InspectionRunError('Replay requires a supported immutable deterministic reference version.')
-    outcome = InspectionOrchestrator().run_reference_slice(InspectionInput(
-        artifact_sha256=manifest['sha256'], observed_sha256=checksum, byte_length=len(content),
-        is_blurred=_is_blurred(content), is_registered=True, motion_in_position=True,
-        pose_observed_at=_now(), pose_tolerance_seconds=POSE_TOLERANCE_SECONDS,
-        reference_score=_reference_score(content),
-    ), threshold=request.threshold, algorithm_version=algorithm_version)
-    return outcome.decision, outcome.evidence_sha256, (
-        outcome.decision == run.decision and outcome.evidence_sha256 == run.evidence_sha256
+    if algorithm_version in {'1.0.0', '2.0.0'}:
+        outcome = InspectionOrchestrator().run_reference_slice(InspectionInput(
+            artifact_sha256=manifest['sha256'], observed_sha256=checksum, byte_length=len(content),
+            is_blurred=_is_blurred(content), is_registered=True, motion_in_position=True,
+            pose_observed_at=_now(), pose_tolerance_seconds=POSE_TOLERANCE_SECONDS,
+            reference_score=_reference_score(content),
+        ), threshold=request.threshold, algorithm_version=algorithm_version)
+        return outcome.decision, outcome.evidence_sha256, (
+            outcome.decision == run.decision and outcome.evidence_sha256 == run.evidence_sha256
+        )
+
+    workflow = WorkflowSchema.model_validate(run.workflow_snapshot).to_core()
+    current_versions = get_node_manifest_registry()
+    for node in workflow.nodes:
+        pinned = run.effective_versions.get(node.algorithm_id)
+        current = current_versions.get(node.algorithm_id)
+        if current is None or pinned != current.package_version:
+            raise InspectionRunError(f'Replay requires immutable node version {node.algorithm_id}@{pinned}.')
+    workflow_result = execute_workflow(workflow, source_image=_decode_image(content))
+    if any(record.status == 'faulted' for record in workflow_result.records) or workflow_result.final_image is None:
+        raise InspectionRunError('Replay workflow did not complete successfully.')
+    preview_content = _encode_preview(workflow_result.final_image)
+    preview_sha256 = hashlib.sha256(preview_content).hexdigest()
+    decision = workflow_result.decision or ('FAIL' if (workflow_result.score or 0.0) >= request.threshold else 'PASS')
+    evidence_sha256 = _workflow_evidence_hash(
+        run.workflow_sha256, checksum, preview_sha256, decision,
+        workflow_result.score, workflow_result.records,
     )
+    return decision, evidence_sha256, decision == run.decision and evidence_sha256 == run.evidence_sha256
+
+
+def get_preview_artifact(session: Session, run_id: str, artifact_root: Path) -> tuple[Path, str] | None:
+    run = session.get(InspectionRun, run_id)
+    manifest = run.input_artifact if run is not None else None
+    if not isinstance(manifest, dict) or 'previewRelativePath' not in manifest:
+        return None
+    root = artifact_root.resolve()
+    path = (root / str(manifest['previewRelativePath'])).resolve()
+    if not path.is_relative_to(root) or not path.is_file():
+        raise InspectionRunError('Workflow preview artifact path is invalid.')
+    if hashlib.sha256(path.read_bytes()).hexdigest() != manifest.get('previewSha256'):
+        raise InspectionRunError('Workflow preview artifact checksum is invalid.')
+    return path, str(manifest.get('previewMediaType', 'image/png'))
 
 
 def _enqueue_integration_events(session: Session, run: InspectionRun, result_id: int) -> None:

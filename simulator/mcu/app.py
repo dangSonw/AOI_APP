@@ -65,7 +65,7 @@ def create_app() -> FastAPI:
 
     @app.get('/state', response_model=MotionState)
     def state() -> MotionState:
-        return service.state
+        return service.read_state()
 
     @app.post('/commands/home')
     def home(request: HomeRequest):

@@ -1,0 +1,28 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "blend-images",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["opencv", "image-composition"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 384, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "blend-images",
+    "name": "Blend images",
+    "description": "Alpha blends two images with identical dimensions, channels, and dtype.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {"key": "image", "label": "Base image", "direction": "input", "data_type": "image", "required": true, "variadic": false},
+      {"key": "overlay", "label": "Overlay image", "direction": "input", "data_type": "image", "required": true, "variadic": false}
+    ],
+    "outputs": [{"key": "processed-image", "label": "Blended image", "direction": "output", "data_type": "image", "required": true, "variadic": false}],
+    "parameters": [{"key": "alpha", "label": "Overlay alpha", "kind": "number", "default_value": 0.5, "required": true, "minimum": 0.0, "maximum": 1.0, "options": [], "description": "Overlay contribution from zero to one."}],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV addWeighted"
+  },
+  "catalogOrder": 72
+}

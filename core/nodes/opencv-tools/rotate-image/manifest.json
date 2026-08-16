@@ -1,0 +1,32 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "rotate-image",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["opencv", "geometric-transform"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 256, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "rotate-image",
+    "name": "Rotate image",
+    "description": "Rotates and scales an image around its center with optional canvas expansion.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [{"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false}],
+    "outputs": [{"key": "processed-image", "label": "Rotated image", "direction": "output", "data_type": "image", "required": true, "variadic": false}],
+    "parameters": [
+      {"key": "angleDegrees", "label": "Angle degrees", "kind": "number", "default_value": 0.0, "required": true, "minimum": -360.0, "maximum": 360.0, "options": [], "description": "Counter-clockwise angle in degrees."},
+      {"key": "scale", "label": "Scale", "kind": "number", "default_value": 1.0, "required": true, "minimum": 0.01, "maximum": 100.0, "options": [], "description": "Uniform image scale."},
+      {"key": "expandCanvas", "label": "Expand canvas", "kind": "boolean", "default_value": true, "required": true, "minimum": null, "maximum": null, "options": [], "description": "Expand output bounds to retain rotated content."},
+      {"key": "interpolation", "label": "Interpolation", "kind": "select", "default_value": "linear", "required": true, "minimum": null, "maximum": null, "options": ["nearest", "linear", "cubic", "area"], "description": "Pixel resampling method."},
+      {"key": "borderMode", "label": "Border mode", "kind": "select", "default_value": "constant", "required": true, "minimum": null, "maximum": null, "options": ["constant", "replicate", "reflect", "wrap"], "description": "Out-of-bounds pixel policy."},
+      {"key": "borderValue", "label": "Border BGR", "kind": "json", "default_value": [0, 0, 0], "required": true, "minimum": null, "maximum": null, "options": [], "description": "Three BGR channels used by constant borders."}
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV getRotationMatrix2D and warpAffine"
+  },
+  "catalogOrder": 65
+}

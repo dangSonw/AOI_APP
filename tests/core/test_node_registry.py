@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 
 from core.algorithms import get_algorithm_catalog
 from core.nodes import NodeNotImplementedError, NodeUse, get_node_registry
@@ -8,7 +9,7 @@ def test_every_catalog_definition_has_one_runtime_package() -> None:
     catalog = get_algorithm_catalog()
     registry = get_node_registry()
 
-    assert len(registry) == len(catalog) == 58
+    assert len(registry) == len(catalog) == 75
     assert set(registry) == {definition.id for definition in catalog}
 
 
@@ -35,7 +36,7 @@ def test_every_runtime_package_owns_one_versioned_manifest() -> None:
 
     manifests = get_node_manifest_registry()
 
-    assert len(manifests) == 58
+    assert len(manifests) == 75
     assert set(manifests) == set(get_node_registry())
     assert all(manifest.manifest_version == 1 for manifest in manifests.values())
     assert all(manifest.execution_target in {'local-cpu', 'local-gpu', 'adapter'} for manifest in manifests.values())
@@ -72,3 +73,12 @@ def test_production_workflow_rejects_test_or_unsupported_runtimes() -> None:
     assert validate_node_runtime_support('does-not-exist', deployment_mode='production') == (
         'Node does-not-exist is not registered.',
     )
+
+
+def test_every_node_package_has_english_and_vietnamese_documentation() -> None:
+    nodes_root = Path('core/nodes')
+    package_directories = {path.parent for path in nodes_root.glob('*/*/manifest.json')}
+
+    assert len(package_directories) == 75
+    assert all((directory / 'README.md').is_file() for directory in package_directories)
+    assert all((directory / 'README.md.vn').is_file() for directory in package_directories)

@@ -1,0 +1,33 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "draw-contours",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["opencv", "image-annotation", "contour-rendering"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 256, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "draw-contours",
+    "name": "Draw contours",
+    "description": "Draws all contours or one selected contour on a copy of an image.",
+    "category": "Visualization",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false},
+      {"key": "contours", "label": "Contours", "direction": "input", "data_type": "contours", "required": true, "variadic": false}
+    ],
+    "outputs": [{"key": "annotated-image", "label": "Annotated image", "direction": "output", "data_type": "image", "required": true, "variadic": false}],
+    "parameters": [
+      {"key": "color", "label": "Contour BGR", "kind": "json", "default_value": [0, 255, 0], "required": true, "minimum": null, "maximum": null, "options": [], "description": "Three integer BGR channels from 0 to 255."},
+      {"key": "thickness", "label": "Thickness", "kind": "integer", "default_value": 2, "required": true, "minimum": -1, "maximum": 32, "options": [], "description": "Stroke width; minus one fills contours."},
+      {"key": "drawAll", "label": "Draw all", "kind": "boolean", "default_value": true, "required": true, "minimum": null, "maximum": null, "options": [], "description": "Draw every contour instead of one index."},
+      {"key": "contourIndex", "label": "Contour index", "kind": "integer", "default_value": 0, "required": true, "minimum": 0, "maximum": 1000000, "options": [], "description": "Zero-based index used when Draw all is disabled."}
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV drawContours"
+  },
+  "catalogOrder": 74
+}

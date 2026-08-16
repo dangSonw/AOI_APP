@@ -1,0 +1,25 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "mask-coverage-score",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["mask-analysis"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 64, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "none", "customKey": null},
+  "definition": {
+    "id": "mask-coverage-score",
+    "name": "Mask coverage score",
+    "description": "Calculates foreground pixel coverage as a normalized score from zero to one.",
+    "category": "Pipeline",
+    "documentation_group": "Acquisition and pipeline components",
+    "inputs": [{"key": "mask", "label": "Mask", "direction": "input", "data_type": "mask", "required": true, "variadic": false}],
+    "outputs": [{"key": "score", "label": "Coverage score", "direction": "output", "data_type": "score", "required": true, "variadic": false}],
+    "parameters": [],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 60
+}

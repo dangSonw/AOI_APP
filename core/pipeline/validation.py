@@ -2,7 +2,7 @@ import math
 from collections import Counter, defaultdict
 from uuid import UUID
 
-from core.algorithms import ParameterKind, PortDirection, get_algorithm_definition
+from core.algorithms import ParameterKind, PortDirection, get_algorithm_definition, is_json_parameter_value
 
 from .models import PortInstance, ValidationIssue, Workflow
 from .ordering import CycleError, stable_topological_order
@@ -23,6 +23,8 @@ def _parameter_is_valid(kind: ParameterKind, value: object) -> bool:
         return isinstance(value, int) and not isinstance(value, bool)
     if kind is ParameterKind.NUMBER:
         return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    if kind is ParameterKind.JSON:
+        return is_json_parameter_value(value)
     return isinstance(value, str)
 
 

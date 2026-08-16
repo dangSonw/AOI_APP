@@ -1,0 +1,32 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "pad-image",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["opencv", "geometric-transform"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 256, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "pad-image",
+    "name": "Pad image",
+    "description": "Adds independently sized borders around an image.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [{"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false}],
+    "outputs": [{"key": "processed-image", "label": "Padded image", "direction": "output", "data_type": "image", "required": true, "variadic": false}],
+    "parameters": [
+      {"key": "top", "label": "Top", "kind": "integer", "default_value": 0, "required": true, "minimum": 0, "maximum": 100000, "options": [], "description": "Top padding in pixels."},
+      {"key": "right", "label": "Right", "kind": "integer", "default_value": 0, "required": true, "minimum": 0, "maximum": 100000, "options": [], "description": "Right padding in pixels."},
+      {"key": "bottom", "label": "Bottom", "kind": "integer", "default_value": 0, "required": true, "minimum": 0, "maximum": 100000, "options": [], "description": "Bottom padding in pixels."},
+      {"key": "left", "label": "Left", "kind": "integer", "default_value": 0, "required": true, "minimum": 0, "maximum": 100000, "options": [], "description": "Left padding in pixels."},
+      {"key": "borderMode", "label": "Border mode", "kind": "select", "default_value": "constant", "required": true, "minimum": null, "maximum": null, "options": ["constant", "replicate", "reflect", "wrap"], "description": "Border pixel policy."},
+      {"key": "borderValue", "label": "Border BGR", "kind": "json", "default_value": [0, 0, 0], "required": true, "minimum": null, "maximum": null, "options": [], "description": "Three BGR channels used by constant borders."}
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV copyMakeBorder"
+  },
+  "catalogOrder": 66
+}

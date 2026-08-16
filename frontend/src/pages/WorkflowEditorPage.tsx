@@ -3,6 +3,7 @@ import { AlgorithmCatalog } from '../components/workflow/AlgorithmCatalog';
 import { ExecutionOrderRail } from '../components/workflow/ExecutionOrderRail';
 import { NodeInspector } from '../components/workflow/NodeInspector';
 import { WorkflowCanvas } from '../components/workflow/WorkflowCanvas';
+import { NodeDocumentationDialog } from '../components/workflow/NodeDocumentationDialog';
 import { ApiError } from '../services/api-client';
 import { readAlgorithmCatalog, readWorkflow, saveWorkflow } from '../services/workflow-service';
 import type {
@@ -44,6 +45,7 @@ export function WorkflowEditorPage({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [hasConflict, setHasConflict] = useState(false);
+  const [documentationDefinition, setDocumentationDefinition] = useState<AlgorithmDefinition | null>(null);
 
   const loadEditor = useCallback(async () => {
     setIsLoading(true);
@@ -192,7 +194,7 @@ export function WorkflowEditorPage({
       </div>
 
       <div className="workflow-editor__grid">
-        <AlgorithmCatalog catalog={catalog} onAdd={(definition) => addAlgorithm(definition)} onRetry={() => void loadEditor()} />
+        <AlgorithmCatalog catalog={catalog} onAdd={(definition) => addAlgorithm(definition)} onOpenDocumentation={setDocumentationDefinition} onRetry={() => void loadEditor()} />
         <main className="workflow-graph-region">
           <header className="workflow-region-heading"><div><span className="overline">Typed DAG</span><strong>Inspection graph</strong></div><span>{draftWorkflow.nodes.length} nodes · {draftWorkflow.connections.length} edges</span></header>
           <WorkflowCanvas
@@ -221,6 +223,11 @@ export function WorkflowEditorPage({
         onChange={(executionOrder) => updateDraft((workflow) => ({ ...workflow, executionOrder }))}
         onAutoOrder={() => updateDraft((workflow) => ({ ...workflow, executionOrder: stableTopologicalOrder(workflow) }))}
         onSelectNode={setSelectedNodeId}
+      />
+      <NodeDocumentationDialog
+        accessToken={accessToken}
+        definition={documentationDefinition}
+        onClose={() => setDocumentationDefinition(null)}
       />
     </section>
   );

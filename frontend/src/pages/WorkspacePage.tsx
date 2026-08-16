@@ -277,6 +277,7 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
     >
       {activeView === 'dashboard' && (
         <DashboardPage
+          accessToken={session.accessToken}
           inputs={inputs}
           outputs={outputs}
           isLoading={isLoading}

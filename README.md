@@ -275,10 +275,12 @@ Password-reset email delivery is intentionally not implemented in this milestone
 - The Workflow editor is available from the Dashboard Inspection flow settings action and the Project explorer Workflow item.
 - `core/algorithms` owns the ordered catalog, typed ports, and parameter definitions.
 - `core/nodes/<category>/<node-id>/node.py` provides one runtime contract per catalog item, including input keys, output keys, an `execute` entry point, and a `test`, `debug`, or `release` status.
-- `core/pipeline` owns workflow validation and stable topological ordering. Connections require exact type equality, and cycles, self-loops, duplicate connections, missing required inputs, and invalid execution order are rejected.
+- `core/pipeline` owns workflow validation, stable topological ordering, and typed DAG execution. Connections require exact type equality, and cycles, self-loops, duplicate connections, missing required inputs, and invalid execution order are rejected.
 - Recipe workflows are AOI-owned camelCase JSON documents stored under `data/projects/<recipe-slug>/workflow.json`. React Flow presentation objects are never persisted.
 - Successful saves require the submitted revision to match storage, increment the revision once, and use a sibling temporary file, flush, `fsync`, and atomic replacement. A stale save returns HTTP `409` without overwriting the newer file.
-- The current node modules are explicit runtime placeholders: their contracts are loadable, but their algorithm bodies raise a structured not-implemented error. They do not install or run OpenCV, PyTorch, Anomalib, model weights, training, or inference yet.
+- The catalog contains 63 node packages. Thirty-three `debug` runtimes execute acquisition handoff, decision handling, 24 OpenCV tools, mask scoring, visualization, bounded delay, and bounded image-set repeat. Thirty `test` runtimes remain explicit placeholders for algorithms requiring calibration artifacts, reference datasets, model weights, training, or inference support.
+- Project **Run** captures a verified image, executes the saved workflow snapshot in deterministic DAG order, persists one evidence record per node, stores original and workflow-preview artifacts, and exposes the checksum-verified preview to the authenticated 2D optical view. Workflows containing a placeholder node fault at that node; no silent fallback occurs.
+- Every node package contains `README.md` and `README.md.vn` generated from its manifest by `python scripts/generate_node_docs.py`.
 - Local recipe workflow files are runtime data and are ignored by Git; `data/projects/.gitkeep` preserves the directory structure.
 
 ## Repository documentation convention

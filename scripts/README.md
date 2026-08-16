@@ -146,6 +146,24 @@ PYTHONPATH=.:backend conda run -n aoi-app python scripts/operations/pilot-restor
 `scripts/deploy/deploy.sh` now fails closed unless `AOI_PILOT_ACCEPTANCE_REPORT` points to a typed,
 measured target-hardware report with every safety/recovery gate passed. Simulator evidence cannot satisfy it.
 
+### 9. Node Documentation Generator (`scripts/generate_node_docs.py`)
+
+Regenerates one English and one Vietnamese README in every node package from its versioned manifest:
+
+```bash
+python scripts/generate_node_docs.py
+```
+
+Run it after changing node identity, status, ports, parameters, execution target, or capabilities. Generated documentation is UTF-8 and must be committed with the related manifest change.
+
+Migrate an existing local recipe from a placeholder graph to the current executable default DAG:
+
+```bash
+PYTHONPATH=.:backend conda run -n aoi-app python scripts/workflow/migrate_default_workflow.py --recipe-slug rev-c-mainboard
+```
+
+The utility creates `workflow.pre-opencv-backup.json` beside the ignored runtime workflow before its first replacement and increments the persisted revision through `WorkflowRepository`.
+
 ---
 
 ## Important Rules for Writing Scripts

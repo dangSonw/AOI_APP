@@ -57,6 +57,14 @@ export interface AlgorithmDefinition {
   customInspectorKey: string | null;
 }
 
+export type DocumentationLanguage = 'en' | 'vi';
+
+export interface AlgorithmDocumentation {
+  algorithmId: string;
+  language: DocumentationLanguage;
+  content: string;
+}
+
 export interface WorkflowPoint {
   x: number;
   y: number;

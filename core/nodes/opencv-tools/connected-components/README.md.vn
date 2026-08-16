@@ -1,0 +1,50 @@
+# Node Connected components
+
+## Mục đích
+
+Node `connected-components` xử lý bước **Connected components** thuộc nhóm **OpenCV tools** trong workflow AOI. Mô tả contract gốc: “Labels connected mask components.”
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `connected-components` |
+| Nhóm | OpenCV tools |
+| Trạng thái | `debug` |
+| Phiên bản package | `1.0.0` |
+| Đích thực thi | `local-cpu` |
+| Inspector | `none` |
+| Khả năng | Chưa khai báo |
+
+Runtime `debug` có thể thực thi trong phát triển, mô phỏng và nghiên cứu. Node chưa được duyệt cho production.
+
+## Port
+
+| Key | Hướng | Kiểu dữ liệu | Bắt buộc | Variadic | Nhãn |
+|---|---|---|---|---|---|
+| `mask` | đầu vào | `mask` | có | không | Mask |
+| `detections` | đầu ra | `detections` | có | không | Components |
+
+## Tham số
+
+| Key | Kiểu | Mặc định | Nhỏ nhất | Lớn nhất | Lựa chọn | Ý nghĩa |
+|---|---|---|---|---|---|---|
+| — | — | — | — | — | — | No parameters |
+
+## Cách dùng trong workflow
+
+1. Thêm **Connected components** từ nhóm **OpenCV tools** trong Workflow editor.
+2. Nối input đúng kiểu: `mask`.
+3. Cấu hình tham số trong giới hạn đã liệt kê.
+4. Nối output: `detections`.
+5. Lưu workflow trước khi bấm **Run** trong Project workspace.
+
+Connection yêu cầu kiểu dữ liệu trùng tuyệt đối. Workflow vẫn là DAG; cycle và self-loop bị từ chối. `delay` và `bounded-repeat` cung cấp hành vi có giới hạn mà không tạo cycle trong graph.
+
+## Bằng chứng và an toàn
+
+Runtime lưu tham số, tóm tắt input/output, thời lượng, phiên bản, trạng thái và evidence hash. Mảng ảnh không được lưu trong JSON evidence. `image-output` đánh dấu ảnh mới nhất để mã hóa PNG và hiển thị trong 2D optical view.
+
+- Trạng thái `debug` không đồng nghĩa được duyệt cho production.
+- Phải kiểm tra kích thước, thứ tự channel, dtype, threshold, timing và memory trên phần cứng đích.
+- Production mode từ chối mọi node chưa mang trạng thái `release`.

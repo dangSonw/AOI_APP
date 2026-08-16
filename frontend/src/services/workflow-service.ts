@@ -1,9 +1,21 @@
-import type { AlgorithmDefinition, Workflow } from '../types/workflow';
+import type { AlgorithmDefinition, AlgorithmDocumentation, DocumentationLanguage, Workflow } from '../types/workflow';
 import { apiRequest } from './api-client';
 
 
 export function readAlgorithmCatalog(accessToken: string): Promise<AlgorithmDefinition[]> {
   return apiRequest<AlgorithmDefinition[]>('/api/algorithms', {}, accessToken);
+}
+
+export function readAlgorithmDocumentation(
+  accessToken: string,
+  algorithmId: string,
+  language: DocumentationLanguage,
+): Promise<AlgorithmDocumentation> {
+  return apiRequest<AlgorithmDocumentation>(
+    `/api/algorithms/${encodeURIComponent(algorithmId)}/documentation?language=${language}`,
+    {},
+    accessToken,
+  );
 }
 
 export function readWorkflow(accessToken: string, recipeSlug: string): Promise<Workflow> {

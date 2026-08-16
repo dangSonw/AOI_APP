@@ -1,0 +1,30 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "crop-image",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["opencv", "geometric-transform"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 256, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "crop-image",
+    "name": "Crop image",
+    "description": "Copies one axis-aligned rectangular region from an image.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [{"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false}],
+    "outputs": [{"key": "processed-image", "label": "Cropped image", "direction": "output", "data_type": "image", "required": true, "variadic": false}],
+    "parameters": [
+      {"key": "x", "label": "X", "kind": "integer", "default_value": 0, "required": true, "minimum": 0, "maximum": 100000, "options": [], "description": "Left edge in pixels."},
+      {"key": "y", "label": "Y", "kind": "integer", "default_value": 0, "required": true, "minimum": 0, "maximum": 100000, "options": [], "description": "Top edge in pixels."},
+      {"key": "width", "label": "Width", "kind": "integer", "default_value": 256, "required": true, "minimum": 1, "maximum": 100000, "options": [], "description": "Crop width in pixels."},
+      {"key": "height", "label": "Height", "kind": "integer", "default_value": 256, "required": true, "minimum": 1, "maximum": 100000, "options": [], "description": "Crop height in pixels."}
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV matrix regions"
+  },
+  "catalogOrder": 63
+}

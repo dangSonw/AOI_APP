@@ -146,6 +146,24 @@ PYTHONPATH=.:backend conda run -n aoi-app python scripts/operations/pilot-restor
 `scripts/deploy/deploy.sh` giờ fail closed nếu `AOI_PILOT_ACCEPTANCE_REPORT` không trỏ tới report
 target-hardware có measurement typed và mọi safety/recovery gate đã pass. Evidence simulator không đủ điều kiện.
 
+### 9. Trình sinh tài liệu Node (`scripts/generate_node_docs.py`)
+
+Sinh lại một README tiếng Anh và một README tiếng Việt trong mỗi package node từ manifest có phiên bản:
+
+```bash
+python scripts/generate_node_docs.py
+```
+
+Chạy script sau khi đổi identity, trạng thái, port, tham số, execution target hoặc capability của node. Tài liệu sinh ra dùng UTF-8 và phải được commit cùng thay đổi manifest liên quan.
+
+Migrate recipe local hiện có từ graph placeholder sang DAG mặc định có thể thực thi:
+
+```bash
+PYTHONPATH=.:backend conda run -n aoi-app python scripts/workflow/migrate_default_workflow.py --recipe-slug rev-c-mainboard
+```
+
+Utility tạo `workflow.pre-opencv-backup.json` cạnh workflow runtime bị Git bỏ qua trước lần thay thế đầu tiên và tăng revision đã lưu thông qua `WorkflowRepository`.
+
 ---
 
 ## Các Quy tắc Quan trọng khi Viết Script

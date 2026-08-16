@@ -51,23 +51,29 @@ def create_default_workflow(
     recipe_name: str = 'Rev C · Mainboard',
 ) -> Workflow:
     image = _node(1, 'image-input', 0, 180)
-    registration = _node(2, 'ecc-registration', 260, 180)
-    robust = _node(3, 'median-mad-robust-difference', 560, 40)
-    patchcore = _node(4, 'patchcore', 560, 180)
-    components = _node(5, 'golden-component-matching', 560, 320)
-    fusion = _node(6, 'decision-fusion', 860, 180)
-    output = _node(7, 'decision-output', 1120, 180)
-    nodes = (image, registration, robust, patchcore, components, fusion, output)
+    grayscale = _node(2, 'color-conversion', 240, 180)
+    blur = _node(3, 'gaussian-blur', 480, 180)
+    threshold = _node(4, 'otsu-threshold', 720, 180)
+    morphology = _node(5, 'morphology-operation', 960, 180)
+    components = _node(6, 'connected-components', 1200, 80)
+    draw = _node(7, 'draw-detections', 1440, 80)
+    score = _node(8, 'mask-coverage-score', 1200, 300)
+    fusion = _node(9, 'decision-fusion', 1440, 300)
+    decision = _node(10, 'decision-output', 1680, 300)
+    output = _node(11, 'image-output', 1680, 80)
+    nodes = (image, grayscale, blur, threshold, morphology, components, draw, score, fusion, decision, output)
     connections = (
-        _connection(1, image, 'image', registration, 'image'),
-        _connection(2, image, 'image', registration, 'reference'),
-        _connection(3, registration, 'registered-image', robust, 'image'),
-        _connection(4, registration, 'registered-image', patchcore, 'image'),
-        _connection(5, registration, 'registered-image', components, 'image'),
-        _connection(6, robust, 'score', fusion, 'scores'),
-        _connection(7, patchcore, 'score', fusion, 'scores'),
-        _connection(8, components, 'score', fusion, 'scores'),
-        _connection(9, fusion, 'decision', output, 'decision'),
+        _connection(1, image, 'image', grayscale, 'image'),
+        _connection(2, grayscale, 'processed-image', blur, 'image'),
+        _connection(3, blur, 'processed-image', threshold, 'image'),
+        _connection(4, threshold, 'mask', morphology, 'mask'),
+        _connection(5, morphology, 'processed-mask', components, 'mask'),
+        _connection(6, image, 'image', draw, 'image'),
+        _connection(7, components, 'detections', draw, 'detections'),
+        _connection(8, morphology, 'processed-mask', score, 'mask'),
+        _connection(9, score, 'score', fusion, 'scores'),
+        _connection(10, fusion, 'decision', decision, 'decision'),
+        _connection(11, draw, 'annotated-image', output, 'image'),
     )
     workflow = Workflow(recipe_slug, recipe_name, 1, 0, datetime.now(timezone.utc), nodes, connections, ())
     return Workflow(

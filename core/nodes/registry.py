@@ -151,6 +151,23 @@ def get_node_runtime(node_id: str) -> NodeRuntime | None:
     return get_node_registry().get(node_id)
 
 
+def get_node_documentation(node_id: str, language: str) -> tuple[str, str] | None:
+    if node_id not in get_node_manifest_registry() or language not in {'en', 'vi'}:
+        return None
+    package_paths = [path.parent for path in NODES_ROOT.glob('*/*/manifest.json') if path.parent.name == node_id]
+    if len(package_paths) != 1:
+        return None
+    package_path = package_paths[0]
+    documentation_path = package_path / ('README.md.vn' if language == 'vi' else 'README.md')
+    resolved_language = language
+    if not documentation_path.is_file() and language == 'vi':
+        documentation_path = package_path / 'README.md'
+        resolved_language = 'en'
+    if not documentation_path.is_file():
+        return None
+    return resolved_language, documentation_path.read_text(encoding='utf-8')
+
+
 def validate_node_runtime_support(node_id: str, *, deployment_mode: str) -> tuple[str, ...]:
     manifest = get_node_manifest_registry().get(node_id)
     if manifest is None:

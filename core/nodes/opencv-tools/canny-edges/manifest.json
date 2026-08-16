@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "packageVersion": "1.0.0",
   "id": "canny-edges",
-  "use": "test",
+  "use": "debug",
   "executionTarget": "local-cpu",
   "capabilities": [],
   "resourceHints": {
@@ -22,7 +22,7 @@
   "definition": {
     "id": "canny-edges",
     "name": "Canny edges",
-    "description": "Configures Canny edge extraction.",
+    "description": "Runs Canny edge extraction.",
     "category": "OpenCV tools",
     "documentation_group": "OpenCV-supported configurable tools",
     "inputs": [

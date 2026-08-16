@@ -1,0 +1,52 @@
+# Node In-range mask
+
+## Mục đích
+
+Node `in-range-mask` xử lý bước **In-range mask** thuộc nhóm **OpenCV tools** trong workflow AOI. Mô tả contract gốc: “Creates a binary mask from inclusive channel bounds in BGR, HSV, Lab, or grayscale space.”
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `in-range-mask` |
+| Nhóm | OpenCV tools |
+| Trạng thái | `debug` |
+| Phiên bản package | `1.0.0` |
+| Đích thực thi | `local-cpu` |
+| Inspector | `generic` |
+| Khả năng | `opencv`, `color-segmentation` |
+
+Runtime `debug` có thể thực thi trong phát triển, mô phỏng và nghiên cứu. Node chưa được duyệt cho production.
+
+## Port
+
+| Key | Hướng | Kiểu dữ liệu | Bắt buộc | Variadic | Nhãn |
+|---|---|---|---|---|---|
+| `image` | đầu vào | `image` | có | không | Image |
+| `mask` | đầu ra | `mask` | có | không | Mask |
+
+## Tham số
+
+| Key | Kiểu | Mặc định | Nhỏ nhất | Lớn nhất | Lựa chọn | Ý nghĩa |
+|---|---|---|---|---|---|---|
+| `colorSpace` | `select` | `hsv` | — | — | `bgr`, `hsv`, `lab`, `grayscale` | Color space used before range comparison. |
+| `lowerBound` | `json` | `[0, 0, 0]` | — | — | — | Inclusive lower channel values; use one value for grayscale. |
+| `upperBound` | `json` | `[179, 255, 255]` | — | — | — | Inclusive upper channel values; use one value for grayscale. |
+
+## Cách dùng trong workflow
+
+1. Thêm **In-range mask** từ nhóm **OpenCV tools** trong Workflow editor.
+2. Nối input đúng kiểu: `image`.
+3. Cấu hình tham số trong giới hạn đã liệt kê.
+4. Nối output: `mask`.
+5. Lưu workflow trước khi bấm **Run** trong Project workspace.
+
+Connection yêu cầu kiểu dữ liệu trùng tuyệt đối. Workflow vẫn là DAG; cycle và self-loop bị từ chối. `delay` và `bounded-repeat` cung cấp hành vi có giới hạn mà không tạo cycle trong graph.
+
+## Bằng chứng và an toàn
+
+Runtime lưu tham số, tóm tắt input/output, thời lượng, phiên bản, trạng thái và evidence hash. Mảng ảnh không được lưu trong JSON evidence. `image-output` đánh dấu ảnh mới nhất để mã hóa PNG và hiển thị trong 2D optical view.
+
+- Trạng thái `debug` không đồng nghĩa được duyệt cho production.
+- Phải kiểm tra kích thước, thứ tự channel, dtype, threshold, timing và memory trên phần cứng đích.
+- Production mode từ chối mọi node chưa mang trạng thái `release`.

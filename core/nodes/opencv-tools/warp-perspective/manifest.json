@@ -1,0 +1,34 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "warp-perspective",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["opencv", "geometric-transform"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 256, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "warp-perspective",
+    "name": "Warp perspective",
+    "description": "Applies a connected 3 by 3 perspective transform to an image.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [
+      {"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false},
+      {"key": "transform", "label": "Transform", "direction": "input", "data_type": "transform", "required": true, "variadic": false}
+    ],
+    "outputs": [{"key": "processed-image", "label": "Warped image", "direction": "output", "data_type": "image", "required": true, "variadic": false}],
+    "parameters": [
+      {"key": "width", "label": "Width", "kind": "integer", "default_value": 640, "required": true, "minimum": 1, "maximum": 100000, "options": [], "description": "Output width in pixels."},
+      {"key": "height", "label": "Height", "kind": "integer", "default_value": 480, "required": true, "minimum": 1, "maximum": 100000, "options": [], "description": "Output height in pixels."},
+      {"key": "interpolation", "label": "Interpolation", "kind": "select", "default_value": "linear", "required": true, "minimum": null, "maximum": null, "options": ["nearest", "linear", "cubic", "area"], "description": "Pixel resampling method."},
+      {"key": "borderMode", "label": "Border mode", "kind": "select", "default_value": "constant", "required": true, "minimum": null, "maximum": null, "options": ["constant", "replicate", "reflect", "wrap"], "description": "Out-of-bounds pixel policy."},
+      {"key": "borderValue", "label": "Border BGR", "kind": "json", "default_value": [0, 0, 0], "required": true, "minimum": null, "maximum": null, "options": [], "description": "Three BGR channels used by constant borders."}
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV warpPerspective"
+  },
+  "catalogOrder": 67
+}

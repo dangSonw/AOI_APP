@@ -1,6 +1,7 @@
 from threading import Thread
 
 from fastapi import APIRouter, HTTPException, status
+from fastapi.responses import FileResponse
 
 from app.auth.dependencies import CurrentUser, DatabaseSession
 from app.clients.camera_client import CameraClient
@@ -18,6 +19,7 @@ from app.services.inspection_runtime_service import (
     InspectionRunError,
     create_run,
     execute_run,
+    get_preview_artifact,
     get_latest_active_run,
     get_latest_run,
     get_run,
@@ -108,6 +110,18 @@ def read_run(run_id: str, _: CurrentUser, session: DatabaseSession) -> Inspectio
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Inspection run not found.')
     return build_run_response(run)
+
+
+@router.get('/{run_id}/preview', response_class=FileResponse)
+def read_run_preview(run_id: str, _: CurrentUser, session: DatabaseSession) -> FileResponse:
+    try:
+        artifact = get_preview_artifact(session, run_id, get_settings().captures_data_path)
+    except InspectionRunError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+    if artifact is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Inspection preview not found.')
+    path, media_type = artifact
+    return FileResponse(path, media_type=media_type, headers={'Cache-Control': 'private, no-store'})
 
 
 @router.post('/{run_id}/cancel', response_model=InspectionRunResponse)

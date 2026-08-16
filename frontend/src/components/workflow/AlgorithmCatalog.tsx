@@ -9,10 +9,11 @@ export const ALGORITHM_DRAG_TYPE = 'application/x-aoi-algorithm';
 interface AlgorithmCatalogProps {
   catalog: AlgorithmDefinition[];
   onAdd: (definition: AlgorithmDefinition) => void;
+  onOpenDocumentation: (definition: AlgorithmDefinition) => void;
   onRetry: () => void;
 }
 
-export function AlgorithmCatalog({ catalog, onAdd, onRetry }: AlgorithmCatalogProps) {
+export function AlgorithmCatalog({ catalog, onAdd, onOpenDocumentation, onRetry }: AlgorithmCatalogProps) {
   const [query, setQuery] = useState('');
   const filteredCatalog = useMemo(() => filterCatalog(catalog, query), [catalog, query]);
   const categories = useMemo(() => {
@@ -62,11 +63,19 @@ export function AlgorithmCatalog({ catalog, onAdd, onRetry }: AlgorithmCatalogPr
                       event.dataTransfer.setData(ALGORITHM_DRAG_TYPE, definition.id);
                     }}
                   >
-                    <div>
-                      <strong>{definition.name}</strong>
-                      <code>{definition.id}</code>
-                    </div>
-                    <p>{definition.description}</p>
+                    <button
+                      type="button"
+                      className="algorithm-card__documentation"
+                      aria-label={`Open documentation for ${definition.name}`}
+                      onClick={() => onOpenDocumentation(definition)}
+                    >
+                      <span className="algorithm-card__title">
+                        <strong>{definition.name}</strong>
+                        <code>{definition.id}</code>
+                      </span>
+                      <span className="algorithm-card__description">{definition.description}</span>
+                      <span className="algorithm-card__hint">View README</span>
+                    </button>
                     <footer>
                       <RuntimeUseBadge use={definition.use} />
                       <button type="button" onClick={() => onAdd(definition)} aria-label={`Add ${definition.name}`}>Add</button>

@@ -1,0 +1,25 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "bounded-repeat",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["bounded-repeat"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 32, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "bounded-repeat",
+    "name": "Bounded repeat",
+    "description": "Expands one image into a bounded image set without introducing a graph cycle.",
+    "category": "Control",
+    "documentation_group": "Acquisition and pipeline components",
+    "inputs": [{"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false}],
+    "outputs": [{"key": "images", "label": "Repeated images", "direction": "output", "data_type": "image-set", "required": true, "variadic": false}],
+    "parameters": [{"key": "iterations", "label": "Iterations", "kind": "integer", "default_value": 1, "required": true, "minimum": 1, "maximum": 100, "options": [], "description": "Number of references added to the output image set."}],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 62
+}

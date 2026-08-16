@@ -88,6 +88,12 @@ class AlgorithmDefinitionSchema(ApiSchema):
         )
 
 
+class AlgorithmDocumentationSchema(ApiSchema):
+    algorithm_id: str
+    language: str
+    content: str
+
+
 class PointSchema(ApiSchema):
     x: float
     y: float

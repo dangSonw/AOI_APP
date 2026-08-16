@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "packageVersion": "1.0.0",
   "id": "feature-detection-and-matching",
-  "use": "test",
+  "use": "debug",
   "executionTarget": "local-cpu",
   "capabilities": [],
   "resourceHints": {
@@ -22,7 +22,7 @@
   "definition": {
     "id": "feature-detection-and-matching",
     "name": "Feature detection and matching",
-    "description": "Configures feature extraction and correspondence matching.",
+    "description": "Runs feature extraction and correspondence matching.",
     "category": "OpenCV tools",
     "documentation_group": "OpenCV-supported configurable tools",
     "inputs": [

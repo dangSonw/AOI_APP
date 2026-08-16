@@ -169,3 +169,12 @@ Baseline hiện tại gồm 15 backend test, 14 core test, 12 integration test, 
 - JSON preference workstation chỉ là input migration. Dry-run trước `--apply`; checksum bằng nhau là no-op và conflict chặn cả batch.
 - Idempotency key activation khác request ID. Tái dùng request ID vi phạm unique audit; chỉ replay `Idempotency-Key` với request ID mới.
 - Export Settings portable xác minh SHA-256 canonical nhưng không thay PostgreSQL disaster-recovery backup.
+
+## 21. Runtime Workflow có thể Thực thi và Node OpenCV
+
+- Snapshot workflow đã lưu giờ là nguồn sự thật của runtime. Nút Run trong Project phải chạy typed DAG theo execution order đã lưu và không được âm thầm thay bằng deterministic reference slice cũ.
+- Evidence của node chỉ lưu dữ liệu tóm tắt. Mảng NumPy và byte ảnh phải nằm trong artifact, không nằm trong payload input/output JSONB của node.
+- Artifact workflow preview dùng đường dẫn tương đối dưới capture root đã cấu hình, xác minh SHA-256, `FileResponse` có xác thực và cache `private, no-store` trước khi tới 2D optical view.
+- Node OpenCV và node hỗ trợ đã triển khai vẫn mang trạng thái `debug` cho đến khi được đánh giá trên phần cứng đích. Placeholder phụ thuộc model, reference data hoặc calibration vẫn mang trạng thái `test` và fault rõ khi chạy.
+- Giữ workflow graph không có cycle. `bounded-repeat` mở rộng một ảnh thành image set có giới hạn; node này không cho phép lưu cycle trong graph. `delay` bị giới hạn tối đa mười giây.
+- Mỗi package node sở hữu `README.md` và `README.md.vn`. Sinh lại cả hai từ manifest bằng `python scripts/generate_node_docs.py`; không dùng pipeline text PowerShell để ghi output UTF-8 tiếng Việt.

@@ -1,0 +1,25 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "histogram-equalization",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["opencv", "contrast-enhancement"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 256, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "histogram-equalization",
+    "name": "Histogram equalization",
+    "description": "Equalizes grayscale intensity or only luminance in a BGR image.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [{"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false}],
+    "outputs": [{"key": "processed-image", "label": "Equalized image", "direction": "output", "data_type": "image", "required": true, "variadic": false}],
+    "parameters": [{"key": "mode", "label": "Mode", "kind": "select", "default_value": "luminance", "required": true, "minimum": null, "maximum": null, "options": ["grayscale", "luminance"], "description": "Grayscale returns one channel; luminance preserves BGR color."}],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV equalizeHist"
+  },
+  "catalogOrder": 68
+}

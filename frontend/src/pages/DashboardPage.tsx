@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { PhysicalInputState, PhysicalOutputState } from '../types/physical-io';
 import type { InspectionStatus } from '../types/workspace';
 import type { InspectionRun } from '../types/inspection';
@@ -7,8 +8,10 @@ import type { AlgorithmDefinition } from '../types/workflow';
 import type { DashboardPreferences, ViewerPreference } from '../types/workstation-preferences';
 import { CollapsiblePanelHeader } from '../components/CollapsiblePanelHeader';
 import { ViewerSizeControls } from '../components/ViewerSizeControls';
+import { readInspectionPreview } from '../services/inspection-service';
 
 interface DashboardPageProps {
+  accessToken: string;
   inputs: PhysicalInputState | null;
   outputs: PhysicalOutputState | null;
   isLoading: boolean;
@@ -33,7 +36,7 @@ const METRICS = [
   { label: 'Defects', value: '12', unit: 'flagged', delta: '0.96%' },
 ];
 
-export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, inspectionRun, runError, onOutputToggle, workflow, workflowError, onConfigureWorkflow, catalog, preferences, onPreferencesChange }: DashboardPageProps) {
+export function DashboardPage({ accessToken, inputs, outputs, isLoading, error, isRunning, inspectionRun, runError, onOutputToggle, workflow, workflowError, onConfigureWorkflow, catalog, preferences, onPreferencesChange }: DashboardPageProps) {
   const panels = preferences.panels;
   const updatePanel = <K extends keyof typeof panels>(key: K, value: typeof panels[K]) => onPreferencesChange({ panels: { ...panels, [key]: value } });
   const togglePanel = (key: keyof typeof panels) => updatePanel(key, { ...panels[key], isCollapsed: !panels[key].isCollapsed });
@@ -108,15 +111,10 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, in
 
         <section className="viewer-grid" aria-label="Inspection viewers">
           <article className={`inspection-viewer ${panels.optical2D.isCollapsed ? 'dashboard-panel--collapsed' : ''}`} style={{ '--viewer-width': panels.optical2D.widthUnits, '--viewer-height': panels.optical2D.heightUnits } as React.CSSProperties}>
-            <CollapsiblePanelHeader title="2D optical view" isCollapsed={panels.optical2D.isCollapsed} onToggle={() => togglePanel('optical2D')} status={<StatusBadge status="success" label="Live" />} controls={<ViewerSizeControls label="2D optical view" viewer={panels.optical2D} onChange={(viewer: ViewerPreference) => updatePanel('optical2D', viewer)} />} />
+            <CollapsiblePanelHeader title="2D optical view" isCollapsed={panels.optical2D.isCollapsed} onToggle={() => togglePanel('optical2D')} status={<StatusBadge status={inspectionRun?.status === 'completed' ? 'success' : 'warning'} label={inspectionRun?.status === 'completed' ? 'Workflow output' : 'Awaiting output'} />} controls={<ViewerSizeControls label="2D optical view" viewer={panels.optical2D} onChange={(viewer: ViewerPreference) => updatePanel('optical2D', viewer)} />} />
             {!panels.optical2D.isCollapsed && <>
-            <div className="pcb-visual pcb-visual--optical" role="img" aria-label="Simulated top-down PCB optical inspection">
-              <span className="pcb-visual__board" />
-              <span className="pcb-visual__roi pcb-visual__roi--one">ROI 03</span>
-              <span className="pcb-visual__roi pcb-visual__roi--two">ROI 07</span>
-              <span className="viewer-reticle" aria-hidden="true">+</span>
-            </div>
-            <footer><span>Top camera · 12 MP</span><span>8.0 ms · Gain 1.2</span></footer>
+            <InspectionPreview accessToken={accessToken} run={inspectionRun} />
+            <footer><span>Workflow preview evidence</span><span>{inspectionRun?.nodeRuns.length ?? 0} nodes</span></footer>
             </>}
           </article>
 
@@ -187,6 +185,41 @@ export function DashboardPage({ inputs, outputs, isLoading, error, isRunning, in
           <span>{workflow ? `${workflow.nodes.length} nodes · Schema v${workflow.version}` : 'Workflow unavailable'}</span>
         </section>
       </aside>
+    </div>
+  );
+}
+
+function InspectionPreview({ accessToken, run }: { accessToken: string; run: InspectionRun | null }) {
+  const [objectUrl, setObjectUrl] = useState('');
+  const [previewError, setPreviewError] = useState('');
+
+  useEffect(() => {
+    let isCancelled = false;
+    let nextObjectUrl = '';
+    setObjectUrl('');
+    setPreviewError('');
+    if (!run || run.status !== 'completed') return () => undefined;
+    void readInspectionPreview(accessToken, run.id)
+      .then((blob) => {
+        if (isCancelled) return;
+        nextObjectUrl = URL.createObjectURL(blob);
+        setObjectUrl(nextObjectUrl);
+      })
+      .catch((loadError) => {
+        if (!isCancelled) setPreviewError(loadError instanceof Error ? loadError.message : 'Workflow preview is unavailable.');
+      });
+    return () => {
+      isCancelled = true;
+      if (nextObjectUrl) URL.revokeObjectURL(nextObjectUrl);
+    };
+  }, [accessToken, run?.id, run?.status]);
+
+  if (objectUrl) {
+    return <div className="pcb-visual pcb-visual--optical"><img className="pcb-visual__image" src={objectUrl} alt={`Workflow output for ${run?.boardSerial ?? 'inspection'}`} /></div>;
+  }
+  return (
+    <div className="pcb-visual pcb-visual--optical" role="status">
+      <span className="pcb-visual__placeholder">{previewError || (run ? `Preview ${formatRuntimeStep(run.status)}` : 'Run workflow to generate 2D evidence')}</span>
     </div>
   );
 }

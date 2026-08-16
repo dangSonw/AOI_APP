@@ -4,7 +4,7 @@ from core.algorithms import DataType, ParameterKind, get_algorithm_catalog, get_
 def test_catalog_contains_every_approved_configuration_definition() -> None:
     catalog = get_algorithm_catalog()
 
-    assert len(catalog) == 58
+    assert len(catalog) == 75
     assert len({item.id for item in catalog}) == len(catalog)
     assert all(item.availability == 'configuration-only' for item in catalog)
     assert all(item.name and item.description and item.category for item in catalog)

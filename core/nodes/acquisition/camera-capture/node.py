@@ -1,12 +1,13 @@
-from core.nodes.errors import NodeNotImplementedError
 from core.nodes.models import NodeInputs, NodeOutputs, NodeParameters, NodeUse
 
 
 NODE_ID = 'camera-capture'
-USE = NodeUse.TEST
+USE = NodeUse.DEBUG
 INPUT_KEYS = ()
 OUTPUT_KEYS = ('image',)
 
 
 def execute(inputs: NodeInputs, parameters: NodeParameters) -> NodeOutputs:
-    raise NodeNotImplementedError(NODE_ID)
+    if 'source-image' not in inputs:
+        raise ValueError('Camera capture requires an image captured by the adapter boundary.')
+    return {'image': inputs['source-image']}

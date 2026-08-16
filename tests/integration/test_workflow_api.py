@@ -37,13 +37,29 @@ def test_catalog_and_missing_workflow_are_returned_in_camel_case(client: TestCli
     workflow_response = client.get('/api/recipes/rev-c-mainboard/workflow')
 
     assert catalog_response.status_code == 200
-    assert len(catalog_response.json()) == 58
+    assert len(catalog_response.json()) == 75
     assert catalog_response.json()[0]['availability'] == 'configuration-only'
-    assert catalog_response.json()[0]['use'] == 'test'
+    assert catalog_response.json()[0]['use'] == 'debug'
     assert catalog_response.json()[0]['outputs'][0]['dataType'] == 'image'
     assert workflow_response.status_code == 200
     assert workflow_response.json()['recipeSlug'] == 'rev-c-mainboard'
     assert workflow_response.json()['revision'] == 0
+
+
+def test_algorithm_documentation_is_returned_in_requested_language(client: TestClient) -> None:
+    vietnamese_response = client.get('/api/algorithms/camera-capture/documentation?language=vi')
+    english_response = client.get('/api/algorithms/camera-capture/documentation?language=en')
+    missing_response = client.get('/api/algorithms/not-a-node/documentation?language=vi')
+
+    assert vietnamese_response.status_code == 200
+    assert vietnamese_response.json()['algorithmId'] == 'camera-capture'
+    assert vietnamese_response.json()['language'] == 'vi'
+    assert '# Node Camera capture' in vietnamese_response.json()['content']
+    assert '## Cách dùng trong workflow' in vietnamese_response.json()['content']
+    assert english_response.status_code == 200
+    assert english_response.json()['language'] == 'en'
+    assert '## Workflow use' in english_response.json()['content']
+    assert missing_response.status_code == 404
 
 
 def test_save_increments_revision_and_rejects_stale_payload(client: TestClient) -> None:

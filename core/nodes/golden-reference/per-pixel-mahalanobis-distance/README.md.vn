@@ -1,0 +1,51 @@
+# Node Per-pixel Mahalanobis distance
+
+## Mục đích
+
+Node `per-pixel-mahalanobis-distance` xử lý bước **Per-pixel Mahalanobis distance** thuộc nhóm **Golden/reference** trong workflow AOI. Mô tả contract gốc: “Scores pixels against configured multivariate normal statistics.”
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `per-pixel-mahalanobis-distance` |
+| Nhóm | Golden/reference |
+| Trạng thái | `test` |
+| Phiên bản package | `1.0.0` |
+| Đích thực thi | `local-cpu` |
+| Inspector | `generic` |
+| Khả năng | Chưa khai báo |
+
+Runtime `test` mới có contract. Khi chạy, node phát sinh `NodeNotImplementedError`; không dùng trong workflow cần hoàn thành.
+
+## Port
+
+| Key | Hướng | Kiểu dữ liệu | Bắt buộc | Variadic | Nhãn |
+|---|---|---|---|---|---|
+| `image` | đầu vào | `image` | có | không | Image |
+| `anomaly-map` | đầu ra | `anomaly-map` | có | không | Anomaly map |
+| `score` | đầu ra | `score` | có | không | Score |
+
+## Tham số
+
+| Key | Kiểu | Mặc định | Nhỏ nhất | Lớn nhất | Lựa chọn | Ý nghĩa |
+|---|---|---|---|---|---|---|
+| `regularization` | `number` | `0.001` | `1e-07` | `1.0` | — | Regularization |
+
+## Cách dùng trong workflow
+
+1. Thêm **Per-pixel Mahalanobis distance** từ nhóm **Golden/reference** trong Workflow editor.
+2. Nối input đúng kiểu: `image`.
+3. Cấu hình tham số trong giới hạn đã liệt kê.
+4. Nối output: `anomaly-map`, `score`.
+5. Lưu workflow trước khi bấm **Run** trong Project workspace.
+
+Connection yêu cầu kiểu dữ liệu trùng tuyệt đối. Workflow vẫn là DAG; cycle và self-loop bị từ chối. `delay` và `bounded-repeat` cung cấp hành vi có giới hạn mà không tạo cycle trong graph.
+
+## Bằng chứng và an toàn
+
+Runtime lưu tham số, tóm tắt input/output, thời lượng, phiên bản, trạng thái và evidence hash. Mảng ảnh không được lưu trong JSON evidence. `image-output` đánh dấu ảnh mới nhất để mã hóa PNG và hiển thị trong 2D optical view.
+
+- Trạng thái `test` không đồng nghĩa được duyệt cho production.
+- Phải kiểm tra kích thước, thứ tự channel, dtype, threshold, timing và memory trên phần cứng đích.
+- Production mode từ chối mọi node chưa mang trạng thái `release`.

@@ -1,0 +1,50 @@
+# Node Camera capture
+
+## Mục đích
+
+Node `camera-capture` xử lý bước **Camera capture** thuộc nhóm **Acquisition** trong workflow AOI. Mô tả contract gốc: “Describes a configured camera acquisition step.”
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `camera-capture` |
+| Nhóm | Acquisition |
+| Trạng thái | `debug` |
+| Phiên bản package | `1.0.0` |
+| Đích thực thi | `adapter` |
+| Inspector | `custom` |
+| Khả năng | Chưa khai báo |
+
+Runtime `debug` có thể thực thi trong phát triển, mô phỏng và nghiên cứu. Node chưa được duyệt cho production.
+
+## Port
+
+| Key | Hướng | Kiểu dữ liệu | Bắt buộc | Variadic | Nhãn |
+|---|---|---|---|---|---|
+| `image` | đầu ra | `image` | có | không | Image |
+
+## Tham số
+
+| Key | Kiểu | Mặc định | Nhỏ nhất | Lớn nhất | Lựa chọn | Ý nghĩa |
+|---|---|---|---|---|---|---|
+| `cameraId` | `text` | `top-camera` | — | — | — | Camera ID |
+| `exposureUs` | `integer` | `8000` | `1` | `1000000` | — | Exposure (μs) |
+
+## Cách dùng trong workflow
+
+1. Thêm **Camera capture** từ nhóm **Acquisition** trong Workflow editor.
+2. Nối input đúng kiểu: không có.
+3. Cấu hình tham số trong giới hạn đã liệt kê.
+4. Nối output: `image`.
+5. Lưu workflow trước khi bấm **Run** trong Project workspace.
+
+Connection yêu cầu kiểu dữ liệu trùng tuyệt đối. Workflow vẫn là DAG; cycle và self-loop bị từ chối. `delay` và `bounded-repeat` cung cấp hành vi có giới hạn mà không tạo cycle trong graph.
+
+## Bằng chứng và an toàn
+
+Runtime lưu tham số, tóm tắt input/output, thời lượng, phiên bản, trạng thái và evidence hash. Mảng ảnh không được lưu trong JSON evidence. `image-output` đánh dấu ảnh mới nhất để mã hóa PNG và hiển thị trong 2D optical view.
+
+- Trạng thái `debug` không đồng nghĩa được duyệt cho production.
+- Phải kiểm tra kích thước, thứ tự channel, dtype, threshold, timing và memory trên phần cứng đích.
+- Production mode từ chối mọi node chưa mang trạng thái `release`.

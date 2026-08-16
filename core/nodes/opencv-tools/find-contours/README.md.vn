@@ -1,0 +1,50 @@
+# Node Find contours
+
+## Mục đích
+
+Node `find-contours` xử lý bước **Find contours** thuộc nhóm **OpenCV tools** trong workflow AOI. Mô tả contract gốc: “Extracts vector contours from a mask.”
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `find-contours` |
+| Nhóm | OpenCV tools |
+| Trạng thái | `debug` |
+| Phiên bản package | `1.0.0` |
+| Đích thực thi | `local-cpu` |
+| Inspector | `generic` |
+| Khả năng | Chưa khai báo |
+
+Runtime `debug` có thể thực thi trong phát triển, mô phỏng và nghiên cứu. Node chưa được duyệt cho production.
+
+## Port
+
+| Key | Hướng | Kiểu dữ liệu | Bắt buộc | Variadic | Nhãn |
+|---|---|---|---|---|---|
+| `mask` | đầu vào | `mask` | có | không | Mask |
+| `contours` | đầu ra | `contours` | có | không | Contours |
+
+## Tham số
+
+| Key | Kiểu | Mặc định | Nhỏ nhất | Lớn nhất | Lựa chọn | Ý nghĩa |
+|---|---|---|---|---|---|---|
+| `retrieval` | `select` | `external` | — | — | `external`, `list`, `tree` | Retrieval |
+
+## Cách dùng trong workflow
+
+1. Thêm **Find contours** từ nhóm **OpenCV tools** trong Workflow editor.
+2. Nối input đúng kiểu: `mask`.
+3. Cấu hình tham số trong giới hạn đã liệt kê.
+4. Nối output: `contours`.
+5. Lưu workflow trước khi bấm **Run** trong Project workspace.
+
+Connection yêu cầu kiểu dữ liệu trùng tuyệt đối. Workflow vẫn là DAG; cycle và self-loop bị từ chối. `delay` và `bounded-repeat` cung cấp hành vi có giới hạn mà không tạo cycle trong graph.
+
+## Bằng chứng và an toàn
+
+Runtime lưu tham số, tóm tắt input/output, thời lượng, phiên bản, trạng thái và evidence hash. Mảng ảnh không được lưu trong JSON evidence. `image-output` đánh dấu ảnh mới nhất để mã hóa PNG và hiển thị trong 2D optical view.
+
+- Trạng thái `debug` không đồng nghĩa được duyệt cho production.
+- Phải kiểm tra kích thước, thứ tự channel, dtype, threshold, timing và memory trên phần cứng đích.
+- Production mode từ chối mọi node chưa mang trạng thái `release`.

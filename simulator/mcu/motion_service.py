@@ -78,6 +78,11 @@ class VirtualMotionService:
         self.configuration = configuration
         return configuration
 
+    def read_state(self) -> MotionState:
+        if self.state.communication_connected and self.state.fault != 'position-stale':
+            self.state = self.state.model_copy(update={'updated_at': datetime.now(timezone.utc)})
+        return self.state
+
     def reset(self) -> MotionState:
         self._commands.clear()
         self._events.clear()

@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "packageVersion": "1.0.0",
   "id": "clahe",
-  "use": "test",
+  "use": "debug",
   "executionTarget": "local-cpu",
   "capabilities": [],
   "resourceHints": {
@@ -22,7 +22,7 @@
   "definition": {
     "id": "clahe",
     "name": "CLAHE",
-    "description": "Configures contrast-limited adaptive histogram equalization.",
+    "description": "Runs contrast-limited adaptive histogram equalization.",
     "category": "OpenCV tools",
     "documentation_group": "OpenCV-supported configurable tools",
     "inputs": [

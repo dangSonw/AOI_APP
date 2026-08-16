@@ -1,0 +1,25 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "gamma-correction",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["opencv", "intensity-transform"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 256, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "gamma-correction",
+    "name": "Gamma correction",
+    "description": "Applies a bounded 8-bit lookup-table gamma transform.",
+    "category": "OpenCV tools",
+    "documentation_group": "OpenCV-supported configurable tools",
+    "inputs": [{"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false}],
+    "outputs": [{"key": "processed-image", "label": "Corrected image", "direction": "output", "data_type": "image", "required": true, "variadic": false}],
+    "parameters": [{"key": "gamma", "label": "Gamma", "kind": "number", "default_value": 1.0, "required": true, "minimum": 0.01, "maximum": 10.0, "options": [], "description": "Power-law exponent applied to normalized intensity."}],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV LUT"
+  },
+  "catalogOrder": 69
+}
