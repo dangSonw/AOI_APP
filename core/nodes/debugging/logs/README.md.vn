@@ -1,0 +1,107 @@
+# Node Logs
+
+## Mục đích và cách dùng nhanh
+
+`logs` phát một thông báo có cấu trúc và giới hạn tới đúng một đích workflow mà không tuần tự hóa dữ liệu ảnh hoặc thông tin xác thực.
+
+**Dùng khi:** cần popup cho người vận hành, thông báo terminal backend hoặc chẩn đoán dạng văn bản bền vững trong data/logs/workflow-log.txt tại một bước workflow cụ thể.
+
+**Luồng nhanh:** `image-input` → `logs` → `image-output`
+
+## Cấu trúc node
+
+```text
+(no input)
+    │
+    ▼
+[logs]
+    │
+    └── (no output)
+```
+
+System trigger kích hoạt `logs`; gửi thành công phát success, còn lỗi kiểm tra hoặc gửi phát failure. Node không có data port.
+
+## Nguyên lý xử lý
+
+- Kiểm tra đích, mức độ và nội dung thông báo có giới hạn.
+- Định tuyến thông báo tới đúng một đích đã cấu hình.
+- Trả sự kiện có cấu trúc cho popup hoặc file; terminal dùng backend logger.
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `logs` |
+| Nhóm | Debugging |
+| Trạng thái | `debug` |
+| Đích thực thi | `local-cpu` |
+| Khả năng | `structured-logging` |
+
+> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.
+
+## Cách nhập dữ liệu và đọc output
+
+| Key | Hướng | Kiểu | Required | Variadic | Label |
+|---|---|---|---|---|---|
+| — | — | — | — | — | Không có port |
+
+### Nhập input
+
+Node không yêu cầu input.
+
+### Đọc output
+
+- —
+
+## Cách nhập tham số
+
+| Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
+|---|---|---|---|---|---|---|
+| `destination` | `select` | `popup` | — | — | `popup`, `terminal`, `file` | Chọn đúng một đích: popup, terminal hoặc file. |
+| `level` | `select` | `info` | — | — | `info`, `warning`, `error` | Chọn mức info, warning hoặc error. |
+| `message` | `text` | `Workflow reached this node.` | — | — | — | Nhập nội dung không chứa secret, dài từ 1 đến 1000 ký tự. |
+
+## Ví dụ sử dụng có thể làm theo ngay
+
+**Mục tiêu:** Hiển thị cảnh báo cho người vận hành khi execution tới node logs.
+
+**Workflow:** `image-input` → `logs` → `image-output`
+
+- Kéo Logs vào canvas.
+- Nối output success của node trước vào trigger của Logs.
+- Chọn popup, warning và nhập nội dung có giới hạn.
+- Nối success của Logs tới node tiếp theo rồi chạy workflow.
+
+**Nhập trong bảng config:**
+
+```json
+{
+  "destination": "popup",
+  "level": "warning",
+  "message": "Alignment requires review."
+}
+```
+
+**Input ví dụ:** Không cần data input; activation đi qua system trigger port.
+
+**Kết quả mong đợi:** Một warning popup xuất hiện và node phát success.
+
+## Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Không thấy popup | Flow chưa đi tới node hoặc đang chọn đích khác. | Kiểm tra control edge và chọn popup. |
+| Node chuyển đỏ | Nội dung hoặc đích không hợp lệ hay gửi thất bại. | Xem lỗi node và khôi phục các giá trị được hỗ trợ. |
+| Thiếu dòng trong log file | Chưa chọn file hoặc ghi thất bại. | Chọn file và kiểm tra data/logs/workflow-log.txt cùng sức khỏe backend. |
+
+## Giới hạn và kiểm tra trước production
+
+- Node ở trạng thái DEBUG, chưa duyệt production.
+- Nội dung bị giới hạn 1000 ký tự.
+- Không được log byte ảnh, credential, secret hoặc request payload.
+
+### Checklist trước production
+
+- Rà soát mọi thông báo cấu hình để loại dữ liệu nhạy cảm.
+- Xác minh popup với người vận hành và công cụ accessibility.
+- Áp dụng rotation và access control cho data/logs/workflow-log.txt.

@@ -1,8 +1,32 @@
 # Flip image node
 
-## Purpose
+## Purpose and quick use
 
-Flips an image across its horizontal axis, vertical axis, or both axes.
+`flip-image` performs **Flip image** in an AOI pipeline. Flips an image across its horizontal axis, vertical axis, or both axes. Configure it in Node inspector and connect outputs to ports with matching data types.
+
+**Use when:** you need a repeatable flip image step stored in a recipe and inspectable on its own.
+
+**Quick flow:** `image-input` → `flip-image` → `image-output`
+
+## Node structure
+
+```text
+image
+    │
+    ▼
+[flip-image]
+    │
+    └── processed-image
+```
+
+Inputs are `image`:image. The node applies OpenCV flip. Outputs are `processed-image`:image. Each key in the diagram is the exact port name used when connecting edges.
+
+## How the algorithm works
+
+- Validate input presence, data types, and shapes against `flip-image`.
+- Parameters `axis` control processing; change one value at a time to trace its effect.
+- Apply **OpenCV flip**: Flips an image across its horizontal axis, vertical axis, or both axes.
+- Normalize/package results with declared data types so graph compatibility is checked before execution.
 
 ## Runtime contract
 
@@ -11,40 +35,71 @@ Flips an image across its horizontal axis, vertical axis, or both axes.
 | Node ID | `flip-image` |
 | Category | OpenCV tools |
 | Status | `debug` |
-| Package version | `1.0.0` |
 | Execution target | `local-cpu` |
-| Inspector | `generic` |
 | Capabilities | `opencv`, `geometric-transform` |
 
-Executable `debug` runtime for development, simulation, and research. This node is not approved for production.
+> **DEBUG notice:** Executable for development/research, not approved for production.
 
-## Ports
+## How to provide inputs and read outputs
 
-| Key | Direction | Data type | Required | Variadic | Label |
+| Key | Direction | Type | Required | Variadic | Label |
 |---|---|---|---|---|---|
 | `image` | input | `image` | yes | no | Image |
 | `processed-image` | output | `image` | yes | no | Flipped image |
 
-## Parameters
+### Provide inputs
 
-| Key | Kind | Default | Minimum | Maximum | Options | Meaning |
+1. Connect a `image` output to `image`. Provide `image` image data; verify shape, dtype, and channel order.
+
+### Read outputs
+
+- `processed-image` (`image`): Flipped image as `image`; preview it or connect a compatible downstream node.
+
+## How to enter parameters
+
+| Key | Kind | Default | Min | Max | Options | How to enter / Meaning |
 |---|---|---|---|---|---|---|
 | `axis` | `select` | `horizontal` | — | — | `horizontal`, `vertical`, `both` | Axis operation applied to image coordinates. |
 
-## Workflow use
+## Copy-ready usage example
 
-1. Add **Flip image** from **OpenCV tools** in Workflow editor.
-2. Connect typed inputs: `image`.
-3. Configure parameters within listed limits.
-4. Connect outputs: `processed-image`.
-5. Save workflow before pressing **Run** in Project workspace.
+**Goal:** Run flip image with correctly typed input (`image`:image) and inspect its output.
 
-Connections require exact data-type equality. Workflow remains a DAG; cycles and self-loops are rejected. `delay` and `bounded-repeat` provide bounded behavior without graph cycles.
+**Workflow:** `image-input` → `flip-image` → `image-output`
 
-## Evidence and safety
+- Drag **Flip image** onto the canvas.
+- Connect ports as shown in the workflow.
+- Open Node inspector and enter the JSON config below.
+- Run, inspect output, then tune one parameter at a time.
 
-Runtime stores parameters, summarized inputs and outputs, duration, version, status, and evidence hash. Image arrays are not stored in JSON evidence. `image-output` marks latest image for encoded PNG preview in 2D optical view.
+**Paste into the config panel:**
 
-- Status `debug` is not production approval.
-- Validate dimensions, channel order, dtype, thresholds, timing, and memory on target hardware.
-- Production mode rejects every node not marked `release`.
+```json
+{
+  "axis": "horizontal"
+}
+```
+
+**Example input:** Data for `image`:image; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.
+
+**Expected output:** Produce processed-image with the declared type and no error.
+
+## Troubleshooting
+
+| Symptom | Cause | Resolution |
+|---|---|---|
+| Ports cannot connect | Data types differ. | Insert a node producing the exact type in the ports table. |
+| Invalid parameter | Outside Min/Max or malformed JSON. | Copy the example config and change one value at a time. |
+| Empty/noisy output | Input or settings violate assumptions. | Preview input, restore defaults, and tune incrementally. |
+
+## Limitations and production checks
+
+- This node is DEBUG and not production-approved.
+- Results depend on input and assumptions of OpenCV flip.
+- Measure latency/memory on target hardware.
+
+### Production checklist
+
+- Lock camera, illumination, resolution, and channel order.
+- Evaluate representative OK/NG data and false-call/escape rates.
+- Set parameter limits, timeouts, and fail-closed checks.

@@ -119,3 +119,47 @@ def test_workflow_stops_before_node_execution_when_context_is_cancelled() -> Non
     assert len(result.records) == 1
     assert result.records[0].status == 'cancelled'
     assert result.records[0].error_code == 'node-execution-cancelled'
+
+
+def test_workflow_observer_reports_running_and_completed_with_instance_identity() -> None:
+    events = []
+    workflow = create_default_workflow()
+
+    result = execute_workflow(
+        workflow,
+        source_image=np.zeros((8, 8, 3), dtype=np.uint8),
+        observer=events.append,
+    )
+
+    assert events[0].status == 'running'
+    assert events[0].node_instance_id == workflow.nodes[0].id
+    assert events[0].algorithm_id == workflow.nodes[0].algorithm_id
+    assert events[0].duration_ms is None
+    assert events[1].status == 'completed'
+    assert events[1].duration_ms is not None
+    assert events[1].duration_ms >= 0
+    assert tuple(event for event in events if event.status != 'running') == result.records
+
+
+def test_failure_control_output_faults_node_without_emitting_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    from core.pipeline import execution
+
+    workflow = create_default_workflow()
+    original_get_runtime = execution.get_node_runtime
+
+    def get_runtime(node_id: str):
+        runtime = original_get_runtime(node_id)
+        assert runtime is not None
+        if node_id != workflow.nodes[0].algorithm_id:
+            return runtime
+        return replace(runtime, execute=lambda inputs, parameters: {
+            **runtime.execute(inputs, parameters),
+            '__control__': 'failure',
+        })
+
+    monkeypatch.setattr(execution, 'get_node_runtime', get_runtime)
+
+    result = execute_workflow(workflow, source_image=np.zeros((8, 8, 3), dtype=np.uint8))
+
+    assert result.records[0].status == 'faulted'
+    assert result.records[0].error_code == 'node-reported-failure'

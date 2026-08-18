@@ -1,3 +1,107 @@
 # Node Distance transform
 
-Tính distance map float32 từ `mask` nhị phân bằng khoảng cách L1, L2 hoặc chessboard. Trạng thái: `debug`.
+## Mục đích và cách dùng nhanh
+
+`distance-transform` thực hiện **Distance transform** trong pipeline AOI. Computes distance to the nearest zero pixel in a mask. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.
+
+**Dùng khi:** cần bước distance transform có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.
+
+**Luồng nhanh:** `global-threshold` → `distance-transform`
+
+## Cấu trúc node
+
+```text
+mask
+    │
+    ▼
+[distance-transform]
+    │
+    └── distance-map
+```
+
+Input gồm `mask`:mask. Node áp dụng OpenCV distanceTransform. Output gồm `distance-map`:anomaly-map. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.
+
+## Nguyên lý xử lý
+
+- Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `distance-transform`.
+- Các parameter `metric`, `maskSize` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.
+- Áp dụng **OpenCV distanceTransform**: Computes distance to the nearest zero pixel in a mask.
+- Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy.
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `distance-transform` |
+| Nhóm | OpenCV tools |
+| Trạng thái | `debug` |
+| Đích thực thi | `local-cpu` |
+| Khả năng | `opencv`, `distance-transform` |
+
+> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.
+
+## Cách nhập dữ liệu và đọc output
+
+| Key | Hướng | Kiểu | Required | Variadic | Label |
+|---|---|---|---|---|---|
+| `mask` | đầu vào | `mask` | có | không | Mask |
+| `distance-map` | đầu ra | `anomaly-map` | có | không | Distance map |
+
+### Nhập input
+
+1. Nối output `mask` vào `mask`. Cấp ảnh `mask`; kiểm tra shape, dtype và thứ tự kênh.
+
+### Đọc output
+
+- `distance-map` (`anomaly-map`): Distance map kiểu `anomaly-map`; xem preview hoặc nối sang node downstream tương thích.
+
+## Cách nhập tham số
+
+| Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
+|---|---|---|---|---|---|---|
+| `metric` | `select` | `l2` | — | — | `l1`, `l2`, `chessboard` | Distance metric. |
+| `maskSize` | `select` | `3` | — | — | `3`, `5` | Distance approximation mask size. |
+
+## Ví dụ sử dụng có thể làm theo ngay
+
+**Mục tiêu:** Chạy thử distance transform với input đúng kiểu (`mask`:mask) và kiểm tra output.
+
+**Workflow:** `global-threshold` → `distance-transform`
+
+- Kéo **Distance transform** vào canvas.
+- Nối port theo workflow mẫu.
+- Mở Node inspector và nhập config JSON bên dưới.
+- Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần.
+
+**Nhập trong bảng config:**
+
+```json
+{
+  "metric": "l2",
+  "maskSize": 3
+}
+```
+
+**Input ví dụ:** Dữ liệu cho `mask`:mask; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.
+
+**Kết quả mong đợi:** Tạo distance-map đúng kiểu và không báo lỗi.
+
+## Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Không nối được port | Data type không trùng. | Dùng node trung gian tạo đúng kiểu trong bảng port. |
+| Invalid parameter | Ngoài Min/Max hoặc JSON sai. | Copy config ví dụ rồi thay từng giá trị. |
+| Output rỗng/nhiễu | Input hoặc tham số không hợp giả định. | Preview input, khôi phục mặc định, tinh chỉnh từng bước. |
+
+## Giới hạn và kiểm tra trước production
+
+- Node ở trạng thái DEBUG, chưa duyệt production.
+- Kết quả phụ thuộc input và giả định của OpenCV distanceTransform.
+- Cần đo latency/bộ nhớ trên phần cứng đích.
+
+### Checklist trước production
+
+- Khóa camera, ánh sáng, độ phân giải và channel order.
+- Đánh giá tập OK/NG đại diện và đo false-call/escape.
+- Đặt giới hạn parameter, timeout và fail-closed.

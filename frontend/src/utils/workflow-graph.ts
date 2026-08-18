@@ -245,7 +245,8 @@ export function validateDraft(workflow: Workflow, catalog: AlgorithmDefinition[]
   } else {
     const positions = new Map(workflow.executionOrder.map((nodeId, index) => [nodeId, index]));
     for (const connection of workflow.connections) {
-      if ((positions.get(connection.sourceNodeId) ?? Infinity) >= (positions.get(connection.targetNodeId) ?? -1)) {
+      if ((connection.kind ?? 'data') === 'data'
+        && (positions.get(connection.sourceNodeId) ?? Infinity) >= (positions.get(connection.targetNodeId) ?? -1)) {
         issues.push(issue('dependency-order', 'Move dependencies before their consumers.', { connectionId: connection.id }));
       }
     }
@@ -285,6 +286,15 @@ export function isWorkflowDirty(saved: Workflow | null, draft: Workflow | null):
 }
 
 export function addConnection(workflow: Workflow, connection: ConnectionDraft): Workflow {
-  const nextConnection: WorkflowConnection = { id: crypto.randomUUID(), ...connection };
+  const sourcePort = findPort(workflow, connection.sourceNodeId, connection.sourcePortId);
+  const targetPort = findPort(workflow, connection.targetNodeId, connection.targetPortId);
+  if (!sourcePort || !targetPort || sourcePort.channel !== targetPort.channel) {
+    throw new Error('Connection ports must exist and use the same channel.');
+  }
+  const nextConnection: WorkflowConnection = {
+    id: crypto.randomUUID(),
+    ...connection,
+    kind: connection.kind ?? sourcePort.channel,
+  };
   return { ...workflow, connections: [...workflow.connections, nextConnection] };
 }

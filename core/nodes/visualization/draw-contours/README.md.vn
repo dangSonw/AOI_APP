@@ -1,8 +1,32 @@
 # Node Draw contours
 
-## Mục đích
+## Mục đích và cách dùng nhanh
 
-Node `draw-contours` xử lý bước **Draw contours** thuộc nhóm **Visualization** trong workflow AOI. Mô tả contract gốc: “Draws all contours or one selected contour on a copy of an image.”
+`draw-contours` thực hiện **Draw contours** trong pipeline AOI. Draws all contours or one selected contour on a copy of an image. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.
+
+**Dùng khi:** cần bước draw contours có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.
+
+**Luồng nhanh:** `image-input` → `draw-contours` → `image-output`
+
+## Cấu trúc node
+
+```text
+image, contours
+    │
+    ▼
+[draw-contours]
+    │
+    └── annotated-image
+```
+
+Input gồm `image`:image, `contours`:contours. Node áp dụng OpenCV drawContours. Output gồm `annotated-image`:image. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.
+
+## Nguyên lý xử lý
+
+- Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `draw-contours`.
+- Các parameter `color`, `thickness`, `drawAll`, `contourIndex` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.
+- Áp dụng **OpenCV drawContours**: Draws all contours or one selected contour on a copy of an image.
+- Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy.
 
 ## Contract runtime
 
@@ -11,44 +35,83 @@ Node `draw-contours` xử lý bước **Draw contours** thuộc nhóm **Visualiz
 | Node ID | `draw-contours` |
 | Nhóm | Visualization |
 | Trạng thái | `debug` |
-| Phiên bản package | `1.0.0` |
 | Đích thực thi | `local-cpu` |
-| Inspector | `generic` |
 | Khả năng | `opencv`, `image-annotation`, `contour-rendering` |
 
-Runtime `debug` có thể thực thi trong phát triển, mô phỏng và nghiên cứu. Node chưa được duyệt cho production.
+> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.
 
-## Port
+## Cách nhập dữ liệu và đọc output
 
-| Key | Hướng | Kiểu dữ liệu | Bắt buộc | Variadic | Nhãn |
+| Key | Hướng | Kiểu | Required | Variadic | Label |
 |---|---|---|---|---|---|
 | `image` | đầu vào | `image` | có | không | Image |
 | `contours` | đầu vào | `contours` | có | không | Contours |
 | `annotated-image` | đầu ra | `image` | có | không | Annotated image |
 
-## Tham số
+### Nhập input
 
-| Key | Kiểu | Mặc định | Nhỏ nhất | Lớn nhất | Lựa chọn | Ý nghĩa |
+1. Nối output `image` vào `image`. Cấp ảnh `image`; kiểm tra shape, dtype và thứ tự kênh.
+2. Nối output `contours` vào `contours`. Cấp `contours` đúng semantic của Contours; không dùng dữ liệu ảnh thay thế.
+
+### Đọc output
+
+- `annotated-image` (`image`): Annotated image kiểu `image`; xem preview hoặc nối sang node downstream tương thích.
+
+## Cách nhập tham số
+
+| Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
 |---|---|---|---|---|---|---|
 | `color` | `json` | `[0, 255, 0]` | — | — | — | Three integer BGR channels from 0 to 255. |
 | `thickness` | `integer` | `2` | `-1` | `32` | — | Stroke width; minus one fills contours. |
 | `drawAll` | `boolean` | `true` | — | — | — | Draw every contour instead of one index. |
 | `contourIndex` | `integer` | `0` | `0` | `1000000` | — | Zero-based index used when Draw all is disabled. |
 
-## Cách dùng trong workflow
+## Ví dụ sử dụng có thể làm theo ngay
 
-1. Thêm **Draw contours** từ nhóm **Visualization** trong Workflow editor.
-2. Nối input đúng kiểu: `image`, `contours`.
-3. Cấu hình tham số trong giới hạn đã liệt kê.
-4. Nối output: `annotated-image`.
-5. Lưu workflow trước khi bấm **Run** trong Project workspace.
+**Mục tiêu:** Chạy thử draw contours với input đúng kiểu (`image`:image, `contours`:contours) và kiểm tra output.
 
-Connection yêu cầu kiểu dữ liệu trùng tuyệt đối. Workflow vẫn là DAG; cycle và self-loop bị từ chối. `delay` và `bounded-repeat` cung cấp hành vi có giới hạn mà không tạo cycle trong graph.
+**Workflow:** `image-input` → `draw-contours` → `image-output`
 
-## Bằng chứng và an toàn
+- Kéo **Draw contours** vào canvas.
+- Nối port theo workflow mẫu.
+- Mở Node inspector và nhập config JSON bên dưới.
+- Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần.
 
-Runtime lưu tham số, tóm tắt input/output, thời lượng, phiên bản, trạng thái và evidence hash. Mảng ảnh không được lưu trong JSON evidence. `image-output` đánh dấu ảnh mới nhất để mã hóa PNG và hiển thị trong 2D optical view.
+**Nhập trong bảng config:**
 
-- Trạng thái `debug` không đồng nghĩa được duyệt cho production.
-- Phải kiểm tra kích thước, thứ tự channel, dtype, threshold, timing và memory trên phần cứng đích.
-- Production mode từ chối mọi node chưa mang trạng thái `release`.
+```json
+{
+  "color": [
+    0,
+    255,
+    0
+  ],
+  "thickness": 2,
+  "drawAll": true,
+  "contourIndex": 0
+}
+```
+
+**Input ví dụ:** Dữ liệu cho `image`:image, `contours`:contours; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.
+
+**Kết quả mong đợi:** Tạo annotated-image đúng kiểu và không báo lỗi.
+
+## Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Không nối được port | Data type không trùng. | Dùng node trung gian tạo đúng kiểu trong bảng port. |
+| Invalid parameter | Ngoài Min/Max hoặc JSON sai. | Copy config ví dụ rồi thay từng giá trị. |
+| Output rỗng/nhiễu | Input hoặc tham số không hợp giả định. | Preview input, khôi phục mặc định, tinh chỉnh từng bước. |
+
+## Giới hạn và kiểm tra trước production
+
+- Node ở trạng thái DEBUG, chưa duyệt production.
+- Kết quả phụ thuộc input và giả định của OpenCV drawContours.
+- Cần đo latency/bộ nhớ trên phần cứng đích.
+
+### Checklist trước production
+
+- Khóa camera, ánh sáng, độ phân giải và channel order.
+- Đánh giá tập OK/NG đại diện và đo false-call/escape.
+- Đặt giới hạn parameter, timeout và fail-closed.

@@ -1,0 +1,21 @@
+{
+  "manifestVersion": 1, "packageVersion": "1.0.0", "id": "nearest-centroid-object-classifier", "use": "debug", "executionTarget": "local-cpu",
+  "capabilities": ["numpy", "scikit-learn", "classification"], "resourceHints": {"cpuCores": 1, "memoryMegabytes": 256, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []}, "parameterMigrationHooks": [], "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "nearest-centroid-object-classifier", "name": "Nearest-centroid object classifier",
+    "description": "Classifies each detected object by the closest class-average BGR color.", "category": "Classification", "documentation_group": "Classical machine learning",
+    "inputs": [
+      {"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false},
+      {"key": "detections", "label": "Detected objects", "direction": "input", "data_type": "detections", "required": true, "variadic": false}
+    ],
+    "outputs": [{"key": "classified-detections", "label": "Classified objects", "direction": "output", "data_type": "detections", "required": true, "variadic": false}],
+    "parameters": [
+      {"key": "implementation", "label": "Implementation", "kind": "select", "default_value": "scikit-learn", "required": true, "minimum": null, "maximum": null, "options": ["scikit-learn", "manual-python"], "description": "Choose scikit-learn or the manually implemented NumPy algorithm."},
+      {"key": "distanceMetric", "label": "Distance metric", "kind": "select", "default_value": "euclidean", "required": true, "minimum": null, "maximum": null, "options": ["euclidean", "manhattan"], "description": "Euclidean uses straight-line color distance; Manhattan sums channel differences."},
+      {"key": "trainingSamples", "label": "Labeled color samples", "kind": "json", "default_value": [{"label": "dark", "color": [20, 20, 20]}, {"label": "dark", "color": [50, 50, 50]}, {"label": "bright", "color": [205, 205, 205]}, {"label": "bright", "color": [245, 245, 245]}], "required": true, "minimum": null, "maximum": null, "options": [], "description": "JSON list: each item is {\"label\": \"class-name\", \"color\": [B, G, R]}."}
+    ],
+    "availability": "configuration-only", "documentation_reference": "scikit-learn NearestCentroid"
+  },
+  "catalogOrder": 95
+}

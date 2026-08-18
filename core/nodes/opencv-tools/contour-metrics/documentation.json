@@ -1,0 +1,127 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`contour-metrics` performs **Contour metrics** in an AOI pipeline. Measures area, perimeter, centroid, and solidity for contours. Configure it in Node inspector and connect outputs to ports with matching data types.",
+    "whenToUse": "you need a repeatable contour metrics step stored in a recipe and inspectable on its own.",
+    "structure": "Inputs are `contours`:contours. The node applies OpenCV contourArea, arcLength and moments. Outputs are `metrics`:detections. Each key in the diagram is the exact port name used when connecting edges.",
+    "algorithm": [
+      "Validate input presence, data types, and shapes against `contour-metrics`.",
+      "The node has no parameters; behavior is determined by its input and runtime contract.",
+      "Apply **OpenCV contourArea, arcLength and moments**: Measures area, perimeter, centroid, and solidity for contours.",
+      "Normalize/package results with declared data types so graph compatibility is checked before execution."
+    ],
+    "inputGuidance": {
+      "contours": "Provide `contours` matching Contours; do not substitute image data."
+    },
+    "outputGuidance": {
+      "metrics": "Metrics as `detections`; preview it or connect a compatible downstream node."
+    },
+    "parameterGuidance": {},
+    "example": {
+      "goal": "Run contour metrics with correctly typed input (`contours`:contours) and inspect its output.",
+      "workflow": [
+        "find-contours",
+        "contour-metrics",
+        "draw-detections"
+      ],
+      "parameters": {},
+      "steps": [
+        "Drag **Contour metrics** onto the canvas.",
+        "Connect ports as shown in the workflow.",
+        "Open Node inspector and enter the JSON config below.",
+        "Run, inspect output, then tune one parameter at a time."
+      ],
+      "input": "Data for `contours`:contours; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.",
+      "expectedOutput": "Produce metrics with the declared type and no error."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Ports cannot connect",
+        "cause": "Data types differ.",
+        "resolution": "Insert a node producing the exact type in the ports table."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Outside Min/Max or malformed JSON.",
+        "resolution": "Copy the example config and change one value at a time."
+      },
+      {
+        "symptom": "Empty/noisy output",
+        "cause": "Input or settings violate assumptions.",
+        "resolution": "Preview input, restore defaults, and tune incrementally."
+      }
+    ],
+    "limitations": [
+      "This node is DEBUG and not production-approved.",
+      "Results depend on input and assumptions of OpenCV contourArea, arcLength and moments.",
+      "Measure latency/memory on target hardware."
+    ],
+    "productionChecklist": [
+      "Lock camera, illumination, resolution, and channel order.",
+      "Evaluate representative OK/NG data and false-call/escape rates.",
+      "Set parameter limits, timeouts, and fail-closed checks."
+    ]
+  },
+  "vi": {
+    "overview": "`contour-metrics` thực hiện **Contour metrics** trong pipeline AOI. Measures area, perimeter, centroid, and solidity for contours. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.",
+    "whenToUse": "cần bước contour metrics có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.",
+    "structure": "Input gồm `contours`:contours. Node áp dụng OpenCV contourArea, arcLength and moments. Output gồm `metrics`:detections. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.",
+    "algorithm": [
+      "Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `contour-metrics`.",
+      "Node không có parameter; hành vi được quyết định bởi input và contract runtime.",
+      "Áp dụng **OpenCV contourArea, arcLength and moments**: Measures area, perimeter, centroid, and solidity for contours.",
+      "Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy."
+    ],
+    "inputGuidance": {
+      "contours": "Cấp `contours` đúng semantic của Contours; không dùng dữ liệu ảnh thay thế."
+    },
+    "outputGuidance": {
+      "metrics": "Metrics kiểu `detections`; xem preview hoặc nối sang node downstream tương thích."
+    },
+    "parameterGuidance": {},
+    "example": {
+      "goal": "Chạy thử contour metrics với input đúng kiểu (`contours`:contours) và kiểm tra output.",
+      "workflow": [
+        "find-contours",
+        "contour-metrics",
+        "draw-detections"
+      ],
+      "parameters": {},
+      "steps": [
+        "Kéo **Contour metrics** vào canvas.",
+        "Nối port theo workflow mẫu.",
+        "Mở Node inspector và nhập config JSON bên dưới.",
+        "Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần."
+      ],
+      "input": "Dữ liệu cho `contours`:contours; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.",
+      "expectedOutput": "Tạo metrics đúng kiểu và không báo lỗi."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Không nối được port",
+        "cause": "Data type không trùng.",
+        "resolution": "Dùng node trung gian tạo đúng kiểu trong bảng port."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Ngoài Min/Max hoặc JSON sai.",
+        "resolution": "Copy config ví dụ rồi thay từng giá trị."
+      },
+      {
+        "symptom": "Output rỗng/nhiễu",
+        "cause": "Input hoặc tham số không hợp giả định.",
+        "resolution": "Preview input, khôi phục mặc định, tinh chỉnh từng bước."
+      }
+    ],
+    "limitations": [
+      "Node ở trạng thái DEBUG, chưa duyệt production.",
+      "Kết quả phụ thuộc input và giả định của OpenCV contourArea, arcLength and moments.",
+      "Cần đo latency/bộ nhớ trên phần cứng đích."
+    ],
+    "productionChecklist": [
+      "Khóa camera, ánh sáng, độ phân giải và channel order.",
+      "Đánh giá tập OK/NG đại diện và đo false-call/escape.",
+      "Đặt giới hạn parameter, timeout và fail-closed."
+    ]
+  }
+}

@@ -94,6 +94,8 @@ export type InspectionRunStatus =
 export interface InspectionNodeRun {
   sequence: number;
   nodeId: string;
+  algorithmId: string;
+  visitIndex: number;
   nodeVersion: string;
   executionTarget: string;
   status: string;
@@ -107,6 +109,11 @@ export interface InspectionNodeRun {
   startedAt: string;
   completedAt: string | null;
   durationMs: number | null;
+  logEvent: {
+    destination: 'popup' | 'file';
+    level: 'info' | 'warning' | 'error';
+    message: string;
+  } | null;
 }
 
 export interface InspectionRun {

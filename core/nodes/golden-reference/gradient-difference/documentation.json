@@ -1,0 +1,127 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`gradient-difference` performs **Gradient difference** in an AOI pipeline. Compares gradient evidence with a configured reference. Configure it in Node inspector and connect outputs to ports with matching data types.",
+    "whenToUse": "you need a repeatable gradient difference step stored in a recipe and inspectable on its own.",
+    "structure": "Inputs are `image`:image. The node applies Gradient difference. Outputs are `anomaly-map`:anomaly-map, `score`:score. Each key in the diagram is the exact port name used when connecting edges.",
+    "algorithm": [
+      "Validate input presence, data types, and shapes against `gradient-difference`.",
+      "The node has no parameters; behavior is determined by its input and runtime contract.",
+      "Apply **Gradient difference**: Compares gradient evidence with a configured reference.",
+      "Normalize/package results with declared data types so graph compatibility is checked before execution."
+    ],
+    "inputGuidance": {
+      "image": "Provide `image` image data; verify shape, dtype, and channel order."
+    },
+    "outputGuidance": {
+      "anomaly-map": "Anomaly map as `anomaly-map`; preview it or connect a compatible downstream node.",
+      "score": "Score as `score`; preview it or connect a compatible downstream node."
+    },
+    "parameterGuidance": {},
+    "example": {
+      "goal": "Run gradient difference with correctly typed input (`image`:image) and inspect its output.",
+      "workflow": [
+        "image-input",
+        "gradient-difference"
+      ],
+      "parameters": {},
+      "steps": [
+        "Drag **Gradient difference** onto the canvas.",
+        "Connect ports as shown in the workflow.",
+        "Open Node inspector and enter the JSON config below.",
+        "Run, inspect output, then tune one parameter at a time."
+      ],
+      "input": "Data for `image`:image; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.",
+      "expectedOutput": "Produce anomaly-map, score with the declared type and no error."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Ports cannot connect",
+        "cause": "Data types differ.",
+        "resolution": "Insert a node producing the exact type in the ports table."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Outside Min/Max or malformed JSON.",
+        "resolution": "Copy the example config and change one value at a time."
+      },
+      {
+        "symptom": "Empty/noisy output",
+        "cause": "Input or settings violate assumptions.",
+        "resolution": "Preview input, restore defaults, and tune incrementally."
+      }
+    ],
+    "limitations": [
+      "This node is DEBUG and not production-approved.",
+      "Results depend on input and assumptions of Gradient difference.",
+      "Measure latency/memory on target hardware."
+    ],
+    "productionChecklist": [
+      "Lock camera, illumination, resolution, and channel order.",
+      "Evaluate representative OK/NG data and false-call/escape rates.",
+      "Set parameter limits, timeouts, and fail-closed checks."
+    ]
+  },
+  "vi": {
+    "overview": "`gradient-difference` thực hiện **Gradient difference** trong pipeline AOI. Compares gradient evidence with a configured reference. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.",
+    "whenToUse": "cần bước gradient difference có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.",
+    "structure": "Input gồm `image`:image. Node áp dụng Gradient difference. Output gồm `anomaly-map`:anomaly-map, `score`:score. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.",
+    "algorithm": [
+      "Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `gradient-difference`.",
+      "Node không có parameter; hành vi được quyết định bởi input và contract runtime.",
+      "Áp dụng **Gradient difference**: Compares gradient evidence with a configured reference.",
+      "Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy."
+    ],
+    "inputGuidance": {
+      "image": "Cấp ảnh `image`; kiểm tra shape, dtype và thứ tự kênh."
+    },
+    "outputGuidance": {
+      "anomaly-map": "Anomaly map kiểu `anomaly-map`; xem preview hoặc nối sang node downstream tương thích.",
+      "score": "Score kiểu `score`; xem preview hoặc nối sang node downstream tương thích."
+    },
+    "parameterGuidance": {},
+    "example": {
+      "goal": "Chạy thử gradient difference với input đúng kiểu (`image`:image) và kiểm tra output.",
+      "workflow": [
+        "image-input",
+        "gradient-difference"
+      ],
+      "parameters": {},
+      "steps": [
+        "Kéo **Gradient difference** vào canvas.",
+        "Nối port theo workflow mẫu.",
+        "Mở Node inspector và nhập config JSON bên dưới.",
+        "Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần."
+      ],
+      "input": "Dữ liệu cho `image`:image; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.",
+      "expectedOutput": "Tạo anomaly-map, score đúng kiểu và không báo lỗi."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Không nối được port",
+        "cause": "Data type không trùng.",
+        "resolution": "Dùng node trung gian tạo đúng kiểu trong bảng port."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Ngoài Min/Max hoặc JSON sai.",
+        "resolution": "Copy config ví dụ rồi thay từng giá trị."
+      },
+      {
+        "symptom": "Output rỗng/nhiễu",
+        "cause": "Input hoặc tham số không hợp giả định.",
+        "resolution": "Preview input, khôi phục mặc định, tinh chỉnh từng bước."
+      }
+    ],
+    "limitations": [
+      "Node ở trạng thái DEBUG, chưa duyệt production.",
+      "Kết quả phụ thuộc input và giả định của Gradient difference.",
+      "Cần đo latency/bộ nhớ trên phần cứng đích."
+    ],
+    "productionChecklist": [
+      "Khóa camera, ánh sáng, độ phân giải và channel order.",
+      "Đánh giá tập OK/NG đại diện và đo false-call/escape.",
+      "Đặt giới hạn parameter, timeout và fail-closed."
+    ]
+  }
+}

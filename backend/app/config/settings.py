@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     preferences_data_directory: str = 'data/preferences'
     datasets_data_directory: str = 'data/datasets'
     captures_data_directory: str = 'data/captures'
+    workflow_log_file: str = 'data/logs/workflow-log.txt'
     seed_admin_email: str = 'admin@aoi.local'
     seed_admin_password: str = Field(min_length=8)
     seed_admin_full_name: str = 'AOI Administrator'
@@ -73,6 +74,10 @@ class Settings(BaseSettings):
     @property
     def captures_data_path(self) -> Path:
         return PROJECT_ROOT / self.captures_data_directory
+
+    @property
+    def workflow_log_path(self) -> Path:
+        return PROJECT_ROOT / self.workflow_log_file
 
     @property
     def frontend_origins(self) -> list[str]:

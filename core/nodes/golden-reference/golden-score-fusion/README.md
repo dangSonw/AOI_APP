@@ -1,8 +1,32 @@
 # Golden score fusion node
 
-## Purpose
+## Purpose and quick use
 
-Fuses configured golden-reference scores.
+`golden-score-fusion` performs **Golden score fusion** in an AOI pipeline. Fuses configured golden-reference scores. Configure it in Node inspector and connect outputs to ports with matching data types.
+
+**Use when:** you need a repeatable golden score fusion step stored in a recipe and inspectable on its own.
+
+**Quick flow:** `mask-coverage-score` → `golden-score-fusion` → `decision-fusion`
+
+## Node structure
+
+```text
+scores
+    │
+    ▼
+[golden-score-fusion]
+    │
+    └── score
+```
+
+Inputs are `scores`:score. The node applies Golden score fusion. Outputs are `score`:score. Each key in the diagram is the exact port name used when connecting edges.
+
+## How the algorithm works
+
+- Validate input presence, data types, and shapes against `golden-score-fusion`.
+- Parameters `method` control processing; change one value at a time to trace its effect.
+- Apply **Golden score fusion**: Fuses configured golden-reference scores.
+- Normalize/package results with declared data types so graph compatibility is checked before execution.
 
 ## Runtime contract
 
@@ -11,40 +35,71 @@ Fuses configured golden-reference scores.
 | Node ID | `golden-score-fusion` |
 | Category | Golden/reference |
 | Status | `debug` |
-| Package version | `1.0.0` |
 | Execution target | `local-cpu` |
-| Inspector | `generic` |
 | Capabilities | None declared |
 
-Executable `debug` runtime for development, simulation, and research. This node is not approved for production.
+> **DEBUG notice:** Executable for development/research, not approved for production.
 
-## Ports
+## How to provide inputs and read outputs
 
-| Key | Direction | Data type | Required | Variadic | Label |
+| Key | Direction | Type | Required | Variadic | Label |
 |---|---|---|---|---|---|
 | `scores` | input | `score` | yes | yes | Scores |
 | `score` | output | `score` | yes | no | Score |
 
-## Parameters
+### Provide inputs
 
-| Key | Kind | Default | Minimum | Maximum | Options | Meaning |
+1. Connect a `score` output to `scores`. Provide `score` matching Scores; do not substitute image data.
+
+### Read outputs
+
+- `score` (`score`): Score as `score`; preview it or connect a compatible downstream node.
+
+## How to enter parameters
+
+| Key | Kind | Default | Min | Max | Options | How to enter / Meaning |
 |---|---|---|---|---|---|---|
-| `method` | `select` | `maximum` | — | — | `maximum`, `mean`, `weighted-mean` | Method |
+| `method` | `select` | `maximum` | — | — | `maximum`, `mean`, `weighted-mean` | Enter `select` within Min/Max; try the default first. |
 
-## Workflow use
+## Copy-ready usage example
 
-1. Add **Golden score fusion** from **Golden/reference** in Workflow editor.
-2. Connect typed inputs: `scores`.
-3. Configure parameters within listed limits.
-4. Connect outputs: `score`.
-5. Save workflow before pressing **Run** in Project workspace.
+**Goal:** Run golden score fusion with correctly typed input (`scores`:score) and inspect its output.
 
-Connections require exact data-type equality. Workflow remains a DAG; cycles and self-loops are rejected. `delay` and `bounded-repeat` provide bounded behavior without graph cycles.
+**Workflow:** `mask-coverage-score` → `golden-score-fusion` → `decision-fusion`
 
-## Evidence and safety
+- Drag **Golden score fusion** onto the canvas.
+- Connect ports as shown in the workflow.
+- Open Node inspector and enter the JSON config below.
+- Run, inspect output, then tune one parameter at a time.
 
-Runtime stores parameters, summarized inputs and outputs, duration, version, status, and evidence hash. Image arrays are not stored in JSON evidence. `image-output` marks latest image for encoded PNG preview in 2D optical view.
+**Paste into the config panel:**
 
-- Status `debug` is not production approval.
-- Validate dimensions, channel order, dtype, thresholds, timing, and memory on target hardware.
-- Production mode rejects every node not marked `release`.
+```json
+{
+  "method": "maximum"
+}
+```
+
+**Example input:** Data for `scores`:score; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.
+
+**Expected output:** Produce score with the declared type and no error.
+
+## Troubleshooting
+
+| Symptom | Cause | Resolution |
+|---|---|---|
+| Ports cannot connect | Data types differ. | Insert a node producing the exact type in the ports table. |
+| Invalid parameter | Outside Min/Max or malformed JSON. | Copy the example config and change one value at a time. |
+| Empty/noisy output | Input or settings violate assumptions. | Preview input, restore defaults, and tune incrementally. |
+
+## Limitations and production checks
+
+- This node is DEBUG and not production-approved.
+- Results depend on input and assumptions of Golden score fusion.
+- Measure latency/memory on target hardware.
+
+### Production checklist
+
+- Lock camera, illumination, resolution, and channel order.
+- Evaluate representative OK/NG data and false-call/escape rates.
+- Set parameter limits, timeouts, and fail-closed checks.

@@ -1,3 +1,109 @@
 # Node Estimate perspective transform
 
-Ước lượng homography 3×3 từ ít nhất bốn cặp điểm bằng direct, RANSAC hoặc LMeDS. Trạng thái: `debug`.
+## Mục đích và cách dùng nhanh
+
+`estimate-perspective-transform` thực hiện **Estimate perspective transform** trong pipeline AOI. Estimates a 3 by 3 perspective transform from corresponding points. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.
+
+**Dùng khi:** cần bước estimate perspective transform có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.
+
+**Luồng nhanh:** `estimate-perspective-transform`
+
+## Cấu trúc node
+
+```text
+source-points, destination-points
+    │
+    ▼
+[estimate-perspective-transform]
+    │
+    └── transform
+```
+
+Input gồm `source-points`:keypoints, `destination-points`:keypoints. Node áp dụng OpenCV findHomography. Output gồm `transform`:transform. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.
+
+## Nguyên lý xử lý
+
+- Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `estimate-perspective-transform`.
+- Các parameter `method`, `ransacThreshold` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.
+- Áp dụng **OpenCV findHomography**: Estimates a 3 by 3 perspective transform from corresponding points.
+- Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy.
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `estimate-perspective-transform` |
+| Nhóm | OpenCV tools |
+| Trạng thái | `debug` |
+| Đích thực thi | `local-cpu` |
+| Khả năng | `opencv`, `transform-estimation` |
+
+> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.
+
+## Cách nhập dữ liệu và đọc output
+
+| Key | Hướng | Kiểu | Required | Variadic | Label |
+|---|---|---|---|---|---|
+| `source-points` | đầu vào | `keypoints` | có | không | Source points |
+| `destination-points` | đầu vào | `keypoints` | có | không | Destination points |
+| `transform` | đầu ra | `transform` | có | không | Perspective transform |
+
+### Nhập input
+
+1. Nối output `keypoints` vào `source-points`. Cấp `keypoints` đúng semantic của Source points; không dùng dữ liệu ảnh thay thế.
+2. Nối output `keypoints` vào `destination-points`. Cấp `keypoints` đúng semantic của Destination points; không dùng dữ liệu ảnh thay thế.
+
+### Đọc output
+
+- `transform` (`transform`): Perspective transform kiểu `transform`; xem preview hoặc nối sang node downstream tương thích.
+
+## Cách nhập tham số
+
+| Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
+|---|---|---|---|---|---|---|
+| `method` | `select` | `ransac` | — | — | `ransac`, `lmeds`, `direct` | Homography estimation method. |
+| `ransacThreshold` | `number` | `3.0` | `0.01` | `1000.0` | — | Maximum reprojection error. |
+
+## Ví dụ sử dụng có thể làm theo ngay
+
+**Mục tiêu:** Chạy thử estimate perspective transform với input đúng kiểu (`source-points`:keypoints, `destination-points`:keypoints) và kiểm tra output.
+
+**Workflow:** `estimate-perspective-transform`
+
+- Kéo **Estimate perspective transform** vào canvas.
+- Nối port theo workflow mẫu.
+- Mở Node inspector và nhập config JSON bên dưới.
+- Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần.
+
+**Nhập trong bảng config:**
+
+```json
+{
+  "method": "ransac",
+  "ransacThreshold": 3.0
+}
+```
+
+**Input ví dụ:** Dữ liệu cho `source-points`:keypoints, `destination-points`:keypoints; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.
+
+**Kết quả mong đợi:** Tạo transform đúng kiểu và không báo lỗi.
+
+## Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Không nối được port | Data type không trùng. | Dùng node trung gian tạo đúng kiểu trong bảng port. |
+| Invalid parameter | Ngoài Min/Max hoặc JSON sai. | Copy config ví dụ rồi thay từng giá trị. |
+| Output rỗng/nhiễu | Input hoặc tham số không hợp giả định. | Preview input, khôi phục mặc định, tinh chỉnh từng bước. |
+
+## Giới hạn và kiểm tra trước production
+
+- Node ở trạng thái DEBUG, chưa duyệt production.
+- Kết quả phụ thuộc input và giả định của OpenCV findHomography.
+- Cần đo latency/bộ nhớ trên phần cứng đích.
+
+### Checklist trước production
+
+- Khóa camera, ánh sáng, độ phân giải và channel order.
+- Đánh giá tập OK/NG đại diện và đo false-call/escape.
+- Đặt giới hạn parameter, timeout và fail-closed.

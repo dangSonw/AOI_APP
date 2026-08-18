@@ -82,13 +82,18 @@ function CanvasContent(props: WorkflowCanvasProps) {
 
   const toDraft = useCallback((connection: Connection | Edge): ConnectionDraft | null => {
     if (!connection.source || !connection.target || !connection.sourceHandle || !connection.targetHandle) return null;
+    const sourcePort = props.workflow.nodes
+      .find((node) => node.id === connection.source)
+      ?.ports.find((port) => port.id === connection.sourceHandle);
+    if (!sourcePort) return null;
     return {
       sourceNodeId: connection.source,
       sourcePortId: connection.sourceHandle,
       targetNodeId: connection.target,
       targetPortId: connection.targetHandle,
+      kind: sourcePort.channel,
     };
-  }, []);
+  }, [props.workflow.nodes]);
   const isValidConnection: IsValidConnection<Edge> = useCallback((candidate) => {
     const draft = toDraft(candidate);
     return draft !== null && validateConnection(props.workflow, draft) === null;

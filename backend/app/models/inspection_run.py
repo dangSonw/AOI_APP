@@ -53,6 +53,8 @@ class InspectionNodeRun(Base):
     run_id: Mapped[str] = mapped_column(ForeignKey('inspection_runs.id', ondelete='CASCADE'), index=True, nullable=False)
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     node_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    algorithm_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    visit_index: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     node_version: Mapped[str] = mapped_column(String(64), nullable=False)
     execution_target: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -66,6 +68,7 @@ class InspectionNodeRun(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    log_event: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     inspection_run: Mapped[InspectionRun] = relationship('InspectionRun', back_populates='node_runs')
 

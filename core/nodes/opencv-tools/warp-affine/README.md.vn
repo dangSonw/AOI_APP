@@ -1,3 +1,119 @@
 # Node Warp affine
 
-Áp dụng `transform` 2×3 vào `image` với kích thước output, interpolation và border policy có giới hạn. Trạng thái: `debug`.
+## Mục đích và cách dùng nhanh
+
+`warp-affine` thực hiện **Warp affine** trong pipeline AOI. Applies a connected 2 by 3 affine transform to an image. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.
+
+**Dùng khi:** cần bước warp affine có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.
+
+**Luồng nhanh:** `image-input` → `warp-affine` → `image-output`
+
+## Cấu trúc node
+
+```text
+image, transform
+    │
+    ▼
+[warp-affine]
+    │
+    └── processed-image
+```
+
+Input gồm `image`:image, `transform`:transform. Node áp dụng OpenCV warpAffine. Output gồm `processed-image`:image. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.
+
+## Nguyên lý xử lý
+
+- Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `warp-affine`.
+- Các parameter `width`, `height`, `interpolation`, `borderMode`, `borderValue` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.
+- Áp dụng **OpenCV warpAffine**: Applies a connected 2 by 3 affine transform to an image.
+- Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy.
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `warp-affine` |
+| Nhóm | OpenCV tools |
+| Trạng thái | `debug` |
+| Đích thực thi | `local-cpu` |
+| Khả năng | `opencv`, `geometric-transform` |
+
+> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.
+
+## Cách nhập dữ liệu và đọc output
+
+| Key | Hướng | Kiểu | Required | Variadic | Label |
+|---|---|---|---|---|---|
+| `image` | đầu vào | `image` | có | không | Image |
+| `transform` | đầu vào | `transform` | có | không | Transform |
+| `processed-image` | đầu ra | `image` | có | không | Warped image |
+
+### Nhập input
+
+1. Nối output `image` vào `image`. Cấp ảnh `image`; kiểm tra shape, dtype và thứ tự kênh.
+2. Nối output `transform` vào `transform`. Cấp `transform` đúng semantic của Transform; không dùng dữ liệu ảnh thay thế.
+
+### Đọc output
+
+- `processed-image` (`image`): Warped image kiểu `image`; xem preview hoặc nối sang node downstream tương thích.
+
+## Cách nhập tham số
+
+| Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
+|---|---|---|---|---|---|---|
+| `width` | `integer` | `640` | `1` | `100000` | — | Output width. |
+| `height` | `integer` | `480` | `1` | `100000` | — | Output height. |
+| `interpolation` | `select` | `linear` | — | — | `nearest`, `linear`, `cubic` | Pixel resampling method. |
+| `borderMode` | `select` | `constant` | — | — | `constant`, `replicate`, `reflect`, `wrap` | Out-of-bounds pixel policy. |
+| `borderValue` | `json` | `[0, 0, 0]` | — | — | — | Constant border BGR channels. |
+
+## Ví dụ sử dụng có thể làm theo ngay
+
+**Mục tiêu:** Chạy thử warp affine với input đúng kiểu (`image`:image, `transform`:transform) và kiểm tra output.
+
+**Workflow:** `image-input` → `warp-affine` → `image-output`
+
+- Kéo **Warp affine** vào canvas.
+- Nối port theo workflow mẫu.
+- Mở Node inspector và nhập config JSON bên dưới.
+- Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần.
+
+**Nhập trong bảng config:**
+
+```json
+{
+  "width": 640,
+  "height": 480,
+  "interpolation": "linear",
+  "borderMode": "constant",
+  "borderValue": [
+    0,
+    0,
+    0
+  ]
+}
+```
+
+**Input ví dụ:** Dữ liệu cho `image`:image, `transform`:transform; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.
+
+**Kết quả mong đợi:** Tạo processed-image đúng kiểu và không báo lỗi.
+
+## Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Không nối được port | Data type không trùng. | Dùng node trung gian tạo đúng kiểu trong bảng port. |
+| Invalid parameter | Ngoài Min/Max hoặc JSON sai. | Copy config ví dụ rồi thay từng giá trị. |
+| Output rỗng/nhiễu | Input hoặc tham số không hợp giả định. | Preview input, khôi phục mặc định, tinh chỉnh từng bước. |
+
+## Giới hạn và kiểm tra trước production
+
+- Node ở trạng thái DEBUG, chưa duyệt production.
+- Kết quả phụ thuộc input và giả định của OpenCV warpAffine.
+- Cần đo latency/bộ nhớ trên phần cứng đích.
+
+### Checklist trước production
+
+- Khóa camera, ánh sáng, độ phân giải và channel order.
+- Đánh giá tập OK/NG đại diện và đo false-call/escape.
+- Đặt giới hạn parameter, timeout và fail-closed.

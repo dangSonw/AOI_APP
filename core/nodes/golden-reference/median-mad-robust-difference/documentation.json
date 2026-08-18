@@ -1,0 +1,135 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`median-mad-robust-difference` performs **Median–MAD robust difference** in an AOI pipeline. Uses median and MAD reference statistics for robust deviation scoring. Configure it in Node inspector and connect outputs to ports with matching data types.",
+    "whenToUse": "you need a repeatable median–mad robust difference step stored in a recipe and inspectable on its own.",
+    "structure": "Inputs are `image`:image. The node applies Median–MAD robust difference. Outputs are `anomaly-map`:anomaly-map, `score`:score. Each key in the diagram is the exact port name used when connecting edges.",
+    "algorithm": [
+      "Validate input presence, data types, and shapes against `median-mad-robust-difference`.",
+      "Parameters `epsilon` control processing; change one value at a time to trace its effect.",
+      "Apply **Median–MAD robust difference**: Uses median and MAD reference statistics for robust deviation scoring.",
+      "Normalize/package results with declared data types so graph compatibility is checked before execution."
+    ],
+    "inputGuidance": {
+      "image": "Provide `image` image data; verify shape, dtype, and channel order."
+    },
+    "outputGuidance": {
+      "anomaly-map": "Anomaly map as `anomaly-map`; preview it or connect a compatible downstream node.",
+      "score": "Score as `score`; preview it or connect a compatible downstream node."
+    },
+    "parameterGuidance": {
+      "epsilon": "Enter `number` within Min/Max; try the default first."
+    },
+    "example": {
+      "goal": "Run median–mad robust difference with correctly typed input (`image`:image) and inspect its output.",
+      "workflow": [
+        "image-input",
+        "median-mad-robust-difference"
+      ],
+      "parameters": {
+        "epsilon": 0.001
+      },
+      "steps": [
+        "Drag **Median–MAD robust difference** onto the canvas.",
+        "Connect ports as shown in the workflow.",
+        "Open Node inspector and enter the JSON config below.",
+        "Run, inspect output, then tune one parameter at a time."
+      ],
+      "input": "Data for `image`:image; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.",
+      "expectedOutput": "Produce anomaly-map, score with the declared type and no error."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Ports cannot connect",
+        "cause": "Data types differ.",
+        "resolution": "Insert a node producing the exact type in the ports table."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Outside Min/Max or malformed JSON.",
+        "resolution": "Copy the example config and change one value at a time."
+      },
+      {
+        "symptom": "Empty/noisy output",
+        "cause": "Input or settings violate assumptions.",
+        "resolution": "Preview input, restore defaults, and tune incrementally."
+      }
+    ],
+    "limitations": [
+      "This node is DEBUG and not production-approved.",
+      "Results depend on input and assumptions of Median–MAD robust difference.",
+      "Measure latency/memory on target hardware."
+    ],
+    "productionChecklist": [
+      "Lock camera, illumination, resolution, and channel order.",
+      "Evaluate representative OK/NG data and false-call/escape rates.",
+      "Set parameter limits, timeouts, and fail-closed checks."
+    ]
+  },
+  "vi": {
+    "overview": "`median-mad-robust-difference` thực hiện **Median–MAD robust difference** trong pipeline AOI. Uses median and MAD reference statistics for robust deviation scoring. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.",
+    "whenToUse": "cần bước median–mad robust difference có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.",
+    "structure": "Input gồm `image`:image. Node áp dụng Median–MAD robust difference. Output gồm `anomaly-map`:anomaly-map, `score`:score. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.",
+    "algorithm": [
+      "Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `median-mad-robust-difference`.",
+      "Các parameter `epsilon` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.",
+      "Áp dụng **Median–MAD robust difference**: Uses median and MAD reference statistics for robust deviation scoring.",
+      "Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy."
+    ],
+    "inputGuidance": {
+      "image": "Cấp ảnh `image`; kiểm tra shape, dtype và thứ tự kênh."
+    },
+    "outputGuidance": {
+      "anomaly-map": "Anomaly map kiểu `anomaly-map`; xem preview hoặc nối sang node downstream tương thích.",
+      "score": "Score kiểu `score`; xem preview hoặc nối sang node downstream tương thích."
+    },
+    "parameterGuidance": {
+      "epsilon": "Nhập `number` trong Min/Max; thử giá trị mặc định trước."
+    },
+    "example": {
+      "goal": "Chạy thử median–mad robust difference với input đúng kiểu (`image`:image) và kiểm tra output.",
+      "workflow": [
+        "image-input",
+        "median-mad-robust-difference"
+      ],
+      "parameters": {
+        "epsilon": 0.001
+      },
+      "steps": [
+        "Kéo **Median–MAD robust difference** vào canvas.",
+        "Nối port theo workflow mẫu.",
+        "Mở Node inspector và nhập config JSON bên dưới.",
+        "Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần."
+      ],
+      "input": "Dữ liệu cho `image`:image; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.",
+      "expectedOutput": "Tạo anomaly-map, score đúng kiểu và không báo lỗi."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Không nối được port",
+        "cause": "Data type không trùng.",
+        "resolution": "Dùng node trung gian tạo đúng kiểu trong bảng port."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Ngoài Min/Max hoặc JSON sai.",
+        "resolution": "Copy config ví dụ rồi thay từng giá trị."
+      },
+      {
+        "symptom": "Output rỗng/nhiễu",
+        "cause": "Input hoặc tham số không hợp giả định.",
+        "resolution": "Preview input, khôi phục mặc định, tinh chỉnh từng bước."
+      }
+    ],
+    "limitations": [
+      "Node ở trạng thái DEBUG, chưa duyệt production.",
+      "Kết quả phụ thuộc input và giả định của Median–MAD robust difference.",
+      "Cần đo latency/bộ nhớ trên phần cứng đích."
+    ],
+    "productionChecklist": [
+      "Khóa camera, ánh sáng, độ phân giải và channel order.",
+      "Đánh giá tập OK/NG đại diện và đo false-call/escape.",
+      "Đặt giới hạn parameter, timeout và fail-closed."
+    ]
+  }
+}

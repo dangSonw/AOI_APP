@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.clients.camera_client import CameraClient
 from app.clients.device_client import DeviceServiceError
 from app.clients.motion_client import MotionClient
+from app.config.settings import get_settings
 from app.models.defect import Defect
 from app.models.inspection_image import InspectionImage
 from app.models.inspection_result import InspectionResult
@@ -42,7 +43,7 @@ from core.devices.camera import CaptureRequest
 from core.devices.models import DeviceMode
 from core.devices.motion import HomeRequest
 from core.nodes import NodeExecutionCancelled, NodeExecutionContext, get_node_manifest_registry
-from core.pipeline import execute_workflow
+from core.pipeline import WorkflowExecutionRecord, execute_workflow
 
 
 TERMINAL_STATUSES = {'completed', 'faulted', 'cancelled'}
@@ -55,6 +56,25 @@ LOGGER = logging.getLogger(__name__)
 
 class InspectionRunError(RuntimeError):
     pass
+
+
+def _append_workflow_log_line(run_id: str, record: WorkflowExecutionRecord) -> None:
+    event = record.log_event or {}
+    log_path = get_settings().workflow_log_path
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = _now().isoformat(timespec='milliseconds')
+        line = (
+            f'{timestamp} [{str(event.get("level", "info")).upper()}] '
+            f'run={run_id} node={record.node_instance_id} algorithm={record.algorithm_id}: '
+            f'{str(event.get("message", ""))}\n'
+        )
+        with log_path.open('a', encoding='utf-8') as log_file:
+            log_file.write(line)
+            log_file.flush()
+            os.fsync(log_file.fileno())
+    except OSError:
+        LOGGER.exception('The workflow log file could not be written.')
 
 
 def _now() -> datetime:
@@ -454,36 +474,55 @@ def execute_run(
             return bool(run.cancel_requested)
 
         node_context = NodeExecutionContext(is_cancelled=workflow_is_cancelled)
-        workflow_result = execute_workflow(
-            workflow, source_image=_decode_image(image.content), context=node_context,
-        )
-        faulted_record = next((record for record in workflow_result.records if record.status == 'faulted'), None)
-        cancelled_record = next((record for record in workflow_result.records if record.status == 'cancelled'), None)
-        completed = _now()
         manifests = get_node_manifest_registry()
-        for sequence, record in enumerate(workflow_result.records, start=1):
-            manifest = manifests[record.algorithm_id]
-            record_evidence = _canonical_sha256({
+        active_node_runs: dict[int, InspectionNodeRun] = {}
+
+        def observe_node(record: WorkflowExecutionRecord) -> None:
+            sequence = record.activation_sequence or len(active_node_runs) + 1
+            if record.status == 'running' or sequence not in active_node_runs:
+                manifest = manifests[record.algorithm_id]
+                node_run = InspectionNodeRun(
+                    run_id=run.id, sequence=sequence, node_id=record.node_instance_id,
+                    algorithm_id=record.algorithm_id, visit_index=record.visit_index,
+                    node_version=run.effective_versions[record.algorithm_id],
+                    execution_target=manifest.execution_target, status=record.status,
+                    parameters=record.parameters, inputs=record.inputs, outputs=record.outputs,
+                    resources=dict(manifest.resource_hints), started_at=_now(),
+                )
+                session.add(node_run)
+                session.commit()
+                active_node_runs[sequence] = node_run
+                if record.status == 'running':
+                    return
+
+            node_run = active_node_runs[sequence]
+            node_run.status = record.status
+            node_run.outputs = record.outputs
+            node_run.error_code = record.error_code
+            node_run.error_message = record.error_message
+            node_run.completed_at = _now()
+            node_run.duration_ms = record.duration_ms
+            node_run.log_event = record.log_event
+            node_run.evidence_sha256 = _canonical_sha256({
                 'workflowSha256': run.workflow_sha256, 'artifactSha256': image.sha256,
                 'nodeInstanceId': record.node_instance_id, 'algorithmId': record.algorithm_id,
                 'parameters': record.parameters, 'inputs': record.inputs, 'outputs': record.outputs,
                 'status': record.status, 'errorCode': record.error_code,
-                **({
-                    'activationId': record.activation_id,
-                    'activationSequence': record.activation_sequence,
-                    'visitIndex': record.visit_index,
-                } if record.activation_id is not None else {}),
+                'activationId': record.activation_id,
+                'activationSequence': record.activation_sequence,
+                'visitIndex': record.visit_index,
+                'logEvent': record.log_event,
             })
-            session.add(InspectionNodeRun(
-                run_id=run.id, sequence=sequence, node_id=record.algorithm_id,
-                node_version=run.effective_versions[record.algorithm_id],
-                execution_target=manifest.execution_target, status=record.status,
-                parameters=record.parameters, inputs=record.inputs, outputs=record.outputs,
-                resources=dict(manifest.resource_hints), evidence_sha256=record_evidence,
-                error_code=record.error_code, error_message=record.error_message,
-                started_at=completed - timedelta(milliseconds=record.duration_ms), completed_at=completed,
-                duration_ms=record.duration_ms,
-            ))
+            if record.log_event and record.log_event.get('destination') == 'file':
+                _append_workflow_log_line(run.id, record)
+            session.commit()
+
+        workflow_result = execute_workflow(
+            workflow, source_image=_decode_image(image.content), context=node_context,
+            observer=observe_node,
+        )
+        faulted_record = next((record for record in workflow_result.records if record.status == 'faulted'), None)
+        cancelled_record = next((record for record in workflow_result.records if record.status == 'cancelled'), None)
         if faulted_record is not None:
             session.commit()
             return _fault(

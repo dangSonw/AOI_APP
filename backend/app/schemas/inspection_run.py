@@ -27,6 +27,8 @@ class InspectionRunCreateRequest(ApiSchema):
 class InspectionNodeRunResponse(ApiSchema):
     sequence: int
     node_id: str
+    algorithm_id: str
+    visit_index: int
     node_version: str
     execution_target: str
     status: str
@@ -40,6 +42,7 @@ class InspectionNodeRunResponse(ApiSchema):
     started_at: datetime
     completed_at: datetime | None
     duration_ms: int | None
+    log_event: dict | None
 
 
 class InspectionRunResponse(ApiSchema):

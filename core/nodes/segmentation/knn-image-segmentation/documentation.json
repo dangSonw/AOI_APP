@@ -1,0 +1,247 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`knn-image-segmentation` performs **KNN image segmentation** in an AOI pipeline. Segments pixels by representative BGR colors and extracts object contours using OpenCV KNN matching or a manual Python KNN implementation. Configure it in Node inspector and connect outputs to ports with matching data types.",
+    "whenToUse": "you need a repeatable knn image segmentation step stored in a recipe and inspectable on its own.",
+    "structure": "Inputs are `image`:image. The node applies OpenCV DescriptorMatcher.knnMatch and findContours. Outputs are `mask`:mask, `contours`:contours. Each key in the diagram is the exact port name used when connecting edges.",
+    "algorithm": [
+      "Validate input presence, data types, and shapes against `knn-image-segmentation`.",
+      "Parameters `implementation`, `neighbors`, `distanceMetric`, `distanceWeighted`, `minimumConfidence`, `foregroundLabels`, `trainingSamples` control processing; change one value at a time to trace its effect.",
+      "Convert every pixel to a normalized BGR query.",
+      "Find K nearest labeled colors in bounded batches.",
+      "Set pixels whose winning label is in foregroundLabels to 255, then extract external contours.",
+      "Normalize/package results with declared data types so graph compatibility is checked before execution."
+    ],
+    "inputGuidance": {
+      "image": "Provide `image` image data; verify shape, dtype, and channel order."
+    },
+    "outputGuidance": {
+      "mask": "Object mask as `mask`; preview it or connect a compatible downstream node.",
+      "contours": "Object contours as `contours`; preview it or connect a compatible downstream node."
+    },
+    "parameterGuidance": {
+      "implementation": "Use OpenCV BFMatcher KNN matching or the KNN algorithm implemented with Python/NumPy.",
+      "neighbors": "Must not exceed the number of training samples.",
+      "distanceMetric": "OpenCV supports Euclidean; manual Python supports Euclidean and Manhattan.",
+      "distanceWeighted": "Weight closer color samples more strongly.",
+      "minimumConfidence": "Pixels below this winning-vote confidence become background.",
+      "foregroundLabels": "Labels that form the output object mask.",
+      "trainingSamples": "JSON samples with a label and representative BGR color."
+    },
+    "example": {
+      "goal": "Run knn image segmentation with correctly typed input (`image`:image) and inspect its output.",
+      "workflow": [
+        "image-input",
+        "knn-image-segmentation",
+        "overlay-mask"
+      ],
+      "parameters": {
+        "implementation": "opencv",
+        "neighbors": 3,
+        "distanceMetric": "euclidean",
+        "distanceWeighted": true,
+        "minimumConfidence": 0.5,
+        "foregroundLabels": [
+          "object"
+        ],
+        "trainingSamples": [
+          {
+            "label": "background",
+            "color": [
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "label": "background",
+            "color": [
+              32,
+              32,
+              32
+            ]
+          },
+          {
+            "label": "object",
+            "color": [
+              224,
+              224,
+              224
+            ]
+          },
+          {
+            "label": "object",
+            "color": [
+              255,
+              255,
+              255
+            ]
+          }
+        ]
+      },
+      "steps": [
+        "Drag **KNN image segmentation** onto the canvas.",
+        "Connect ports as shown in the workflow.",
+        "Open Node inspector and enter the JSON config below.",
+        "Run, inspect output, then tune one parameter at a time."
+      ],
+      "input": "Data for `image`:image; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.",
+      "expectedOutput": "Produce mask, contours with the declared type and no error."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Ports cannot connect",
+        "cause": "Data types differ.",
+        "resolution": "Insert a node producing the exact type in the ports table."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Outside Min/Max or malformed JSON.",
+        "resolution": "Copy the example config and change one value at a time."
+      },
+      {
+        "symptom": "Empty/noisy output",
+        "cause": "Input or settings violate assumptions.",
+        "resolution": "Preview input, restore defaults, and tune incrementally."
+      },
+      {
+        "symptom": "Implementations give slightly different confidence",
+        "cause": "Solvers and stopping criteria differ.",
+        "resolution": "Compare labels/metrics with tolerance; do not require bit-identical floats."
+      }
+    ],
+    "limitations": [
+      "This node is DEBUG and not production-approved.",
+      "Results depend on input and assumptions of OpenCV DescriptorMatcher.knnMatch and findContours.",
+      "Measure latency/memory on target hardware.",
+      "trainingSamples live in the recipe and are intended only for small, non-sensitive sample sets."
+    ],
+    "productionChecklist": [
+      "Lock camera, illumination, resolution, and channel order.",
+      "Evaluate representative OK/NG data and false-call/escape rates.",
+      "Set parameter limits, timeouts, and fail-closed checks."
+    ]
+  },
+  "vi": {
+    "overview": "`knn-image-segmentation` thực hiện **KNN image segmentation** trong pipeline AOI. Segments pixels by representative BGR colors and extracts object contours using OpenCV KNN matching or a manual Python KNN implementation. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.",
+    "whenToUse": "cần bước knn image segmentation có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.",
+    "structure": "Input gồm `image`:image. Node áp dụng OpenCV DescriptorMatcher.knnMatch and findContours. Output gồm `mask`:mask, `contours`:contours. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.",
+    "algorithm": [
+      "Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `knn-image-segmentation`.",
+      "Các parameter `implementation`, `neighbors`, `distanceMetric`, `distanceWeighted`, `minimumConfidence`, `foregroundLabels`, `trainingSamples` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.",
+      "Chuyển mỗi pixel thành vector BGR chuẩn hóa.",
+      "Tìm K mẫu màu có nhãn gần nhất theo từng batch giới hạn.",
+      "Đặt pixel có nhãn thắng thuộc foregroundLabels thành 255 rồi trích contour ngoài.",
+      "Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy."
+    ],
+    "inputGuidance": {
+      "image": "Cấp ảnh `image`; kiểm tra shape, dtype và thứ tự kênh."
+    },
+    "outputGuidance": {
+      "mask": "Object mask kiểu `mask`; xem preview hoặc nối sang node downstream tương thích.",
+      "contours": "Object contours kiểu `contours`; xem preview hoặc nối sang node downstream tương thích."
+    },
+    "parameterGuidance": {
+      "implementation": "Use OpenCV BFMatcher KNN matching or the KNN algorithm implemented with Python/NumPy.",
+      "neighbors": "Must not exceed the number of training samples.",
+      "distanceMetric": "OpenCV supports Euclidean; manual Python supports Euclidean and Manhattan.",
+      "distanceWeighted": "Weight closer color samples more strongly.",
+      "minimumConfidence": "Pixels below this winning-vote confidence become background.",
+      "foregroundLabels": "Labels that form the output object mask.",
+      "trainingSamples": "JSON samples with a label and representative BGR color."
+    },
+    "example": {
+      "goal": "Chạy thử knn image segmentation với input đúng kiểu (`image`:image) và kiểm tra output.",
+      "workflow": [
+        "image-input",
+        "knn-image-segmentation",
+        "overlay-mask"
+      ],
+      "parameters": {
+        "implementation": "opencv",
+        "neighbors": 3,
+        "distanceMetric": "euclidean",
+        "distanceWeighted": true,
+        "minimumConfidence": 0.5,
+        "foregroundLabels": [
+          "object"
+        ],
+        "trainingSamples": [
+          {
+            "label": "background",
+            "color": [
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "label": "background",
+            "color": [
+              32,
+              32,
+              32
+            ]
+          },
+          {
+            "label": "object",
+            "color": [
+              224,
+              224,
+              224
+            ]
+          },
+          {
+            "label": "object",
+            "color": [
+              255,
+              255,
+              255
+            ]
+          }
+        ]
+      },
+      "steps": [
+        "Kéo **KNN image segmentation** vào canvas.",
+        "Nối port theo workflow mẫu.",
+        "Mở Node inspector và nhập config JSON bên dưới.",
+        "Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần."
+      ],
+      "input": "Dữ liệu cho `image`:image; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.",
+      "expectedOutput": "Tạo mask, contours đúng kiểu và không báo lỗi."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Không nối được port",
+        "cause": "Data type không trùng.",
+        "resolution": "Dùng node trung gian tạo đúng kiểu trong bảng port."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Ngoài Min/Max hoặc JSON sai.",
+        "resolution": "Copy config ví dụ rồi thay từng giá trị."
+      },
+      {
+        "symptom": "Output rỗng/nhiễu",
+        "cause": "Input hoặc tham số không hợp giả định.",
+        "resolution": "Preview input, khôi phục mặc định, tinh chỉnh từng bước."
+      },
+      {
+        "symptom": "Hai implementation cho confidence hơi khác",
+        "cause": "Solver và tiêu chí dừng khác nhau.",
+        "resolution": "So sánh nhãn/metric với tolerance; không yêu cầu số thực giống tuyệt đối."
+      }
+    ],
+    "limitations": [
+      "Node ở trạng thái DEBUG, chưa duyệt production.",
+      "Kết quả phụ thuộc input và giả định của OpenCV DescriptorMatcher.knnMatch and findContours.",
+      "Cần đo latency/bộ nhớ trên phần cứng đích.",
+      "trainingSamples nằm trong recipe, chỉ phù hợp tập mẫu nhỏ và không chứa dữ liệu nhạy cảm."
+    ],
+    "productionChecklist": [
+      "Khóa camera, ánh sáng, độ phân giải và channel order.",
+      "Đánh giá tập OK/NG đại diện và đo false-call/escape.",
+      "Đặt giới hạn parameter, timeout và fail-closed."
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "logs",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["structured-logging"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 16, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "logs",
+    "name": "Logs",
+    "description": "Emits an information, warning, or error message to one configured destination.",
+    "category": "Debugging",
+    "documentation_group": "Debugging and observability",
+    "inputs": [],
+    "outputs": [],
+    "parameters": [
+      {"key": "destination", "label": "Destination", "kind": "select", "default_value": "popup", "required": true, "minimum": null, "maximum": null, "options": ["popup", "terminal", "file"], "description": "Select exactly one message destination."},
+      {"key": "level", "label": "Level", "kind": "select", "default_value": "info", "required": true, "minimum": null, "maximum": null, "options": ["info", "warning", "error"], "description": "Sets the message severity."},
+      {"key": "message", "label": "Message", "kind": "text", "default_value": "Workflow reached this node.", "required": true, "minimum": null, "maximum": null, "options": [], "description": "Message text, limited to 1000 characters at runtime."}
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 99
+}

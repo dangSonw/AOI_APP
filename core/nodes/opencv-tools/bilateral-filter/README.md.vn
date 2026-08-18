@@ -1,8 +1,32 @@
 # Node Bilateral filter
 
-## Mục đích
+## Mục đích và cách dùng nhanh
 
-Node `bilateral-filter` xử lý bước **Bilateral filter** thuộc nhóm **OpenCV tools** trong workflow AOI. Mô tả contract gốc: “Smooths while preserving configured edges.”
+`bilateral-filter` thực hiện **Bilateral filter** trong pipeline AOI. Smooths while preserving configured edges. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.
+
+**Dùng khi:** cần bước bilateral filter có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.
+
+**Luồng nhanh:** `image-input` → `bilateral-filter` → `image-output`
+
+## Cấu trúc node
+
+```text
+image
+    │
+    ▼
+[bilateral-filter]
+    │
+    └── processed-image
+```
+
+Input gồm `image`:image. Node áp dụng Bilateral filter. Output gồm `processed-image`:image. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.
+
+## Nguyên lý xử lý
+
+- Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `bilateral-filter`.
+- Các parameter `diameter`, `sigmaColor`, `sigmaSpace` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.
+- Áp dụng **Bilateral filter**: Smooths while preserving configured edges.
+- Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy.
 
 ## Contract runtime
 
@@ -11,42 +35,75 @@ Node `bilateral-filter` xử lý bước **Bilateral filter** thuộc nhóm **Op
 | Node ID | `bilateral-filter` |
 | Nhóm | OpenCV tools |
 | Trạng thái | `debug` |
-| Phiên bản package | `1.0.0` |
 | Đích thực thi | `local-cpu` |
-| Inspector | `generic` |
 | Khả năng | Chưa khai báo |
 
-Runtime `debug` có thể thực thi trong phát triển, mô phỏng và nghiên cứu. Node chưa được duyệt cho production.
+> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.
 
-## Port
+## Cách nhập dữ liệu và đọc output
 
-| Key | Hướng | Kiểu dữ liệu | Bắt buộc | Variadic | Nhãn |
+| Key | Hướng | Kiểu | Required | Variadic | Label |
 |---|---|---|---|---|---|
 | `image` | đầu vào | `image` | có | không | Image |
 | `processed-image` | đầu ra | `image` | có | không | Processed image |
 
-## Tham số
+### Nhập input
 
-| Key | Kiểu | Mặc định | Nhỏ nhất | Lớn nhất | Lựa chọn | Ý nghĩa |
+1. Nối output `image` vào `image`. Cấp ảnh `image`; kiểm tra shape, dtype và thứ tự kênh.
+
+### Đọc output
+
+- `processed-image` (`image`): Processed image kiểu `image`; xem preview hoặc nối sang node downstream tương thích.
+
+## Cách nhập tham số
+
+| Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
 |---|---|---|---|---|---|---|
-| `diameter` | `integer` | `9` | `1` | `255` | — | Diameter |
-| `sigmaColor` | `number` | `75.0` | `0.0` | `10000.0` | — | Color sigma |
-| `sigmaSpace` | `number` | `75.0` | `0.0` | `10000.0` | — | Space sigma |
+| `diameter` | `integer` | `9` | `1` | `255` | — | Nhập `integer` trong Min/Max; thử giá trị mặc định trước. |
+| `sigmaColor` | `number` | `75.0` | `0.0` | `10000.0` | — | Nhập `number` trong Min/Max; thử giá trị mặc định trước. |
+| `sigmaSpace` | `number` | `75.0` | `0.0` | `10000.0` | — | Nhập `number` trong Min/Max; thử giá trị mặc định trước. |
 
-## Cách dùng trong workflow
+## Ví dụ sử dụng có thể làm theo ngay
 
-1. Thêm **Bilateral filter** từ nhóm **OpenCV tools** trong Workflow editor.
-2. Nối input đúng kiểu: `image`.
-3. Cấu hình tham số trong giới hạn đã liệt kê.
-4. Nối output: `processed-image`.
-5. Lưu workflow trước khi bấm **Run** trong Project workspace.
+**Mục tiêu:** Chạy thử bilateral filter với input đúng kiểu (`image`:image) và kiểm tra output.
 
-Connection yêu cầu kiểu dữ liệu trùng tuyệt đối. Workflow vẫn là DAG; cycle và self-loop bị từ chối. `delay` và `bounded-repeat` cung cấp hành vi có giới hạn mà không tạo cycle trong graph.
+**Workflow:** `image-input` → `bilateral-filter` → `image-output`
 
-## Bằng chứng và an toàn
+- Kéo **Bilateral filter** vào canvas.
+- Nối port theo workflow mẫu.
+- Mở Node inspector và nhập config JSON bên dưới.
+- Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần.
 
-Runtime lưu tham số, tóm tắt input/output, thời lượng, phiên bản, trạng thái và evidence hash. Mảng ảnh không được lưu trong JSON evidence. `image-output` đánh dấu ảnh mới nhất để mã hóa PNG và hiển thị trong 2D optical view.
+**Nhập trong bảng config:**
 
-- Trạng thái `debug` không đồng nghĩa được duyệt cho production.
-- Phải kiểm tra kích thước, thứ tự channel, dtype, threshold, timing và memory trên phần cứng đích.
-- Production mode từ chối mọi node chưa mang trạng thái `release`.
+```json
+{
+  "diameter": 9,
+  "sigmaColor": 75.0,
+  "sigmaSpace": 75.0
+}
+```
+
+**Input ví dụ:** Dữ liệu cho `image`:image; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.
+
+**Kết quả mong đợi:** Tạo processed-image đúng kiểu và không báo lỗi.
+
+## Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Không nối được port | Data type không trùng. | Dùng node trung gian tạo đúng kiểu trong bảng port. |
+| Invalid parameter | Ngoài Min/Max hoặc JSON sai. | Copy config ví dụ rồi thay từng giá trị. |
+| Output rỗng/nhiễu | Input hoặc tham số không hợp giả định. | Preview input, khôi phục mặc định, tinh chỉnh từng bước. |
+
+## Giới hạn và kiểm tra trước production
+
+- Node ở trạng thái DEBUG, chưa duyệt production.
+- Kết quả phụ thuộc input và giả định của Bilateral filter.
+- Cần đo latency/bộ nhớ trên phần cứng đích.
+
+### Checklist trước production
+
+- Khóa camera, ánh sáng, độ phân giải và channel order.
+- Đánh giá tập OK/NG đại diện và đo false-call/escape.
+- Đặt giới hạn parameter, timeout và fail-closed.

@@ -1,3 +1,103 @@
 # Node Contour metrics
 
-Trả area, perimeter, centroid và solidity cho mỗi contour. Contour suy biến nhận centroid hoặc solidity bằng 0 khi không xác định. Trạng thái: `debug`.
+## Mục đích và cách dùng nhanh
+
+`contour-metrics` thực hiện **Contour metrics** trong pipeline AOI. Measures area, perimeter, centroid, and solidity for contours. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.
+
+**Dùng khi:** cần bước contour metrics có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.
+
+**Luồng nhanh:** `find-contours` → `contour-metrics` → `draw-detections`
+
+## Cấu trúc node
+
+```text
+contours
+    │
+    ▼
+[contour-metrics]
+    │
+    └── metrics
+```
+
+Input gồm `contours`:contours. Node áp dụng OpenCV contourArea, arcLength and moments. Output gồm `metrics`:detections. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.
+
+## Nguyên lý xử lý
+
+- Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `contour-metrics`.
+- Node không có parameter; hành vi được quyết định bởi input và contract runtime.
+- Áp dụng **OpenCV contourArea, arcLength and moments**: Measures area, perimeter, centroid, and solidity for contours.
+- Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy.
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `contour-metrics` |
+| Nhóm | OpenCV tools |
+| Trạng thái | `debug` |
+| Đích thực thi | `local-cpu` |
+| Khả năng | `opencv`, `contour-analysis` |
+
+> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.
+
+## Cách nhập dữ liệu và đọc output
+
+| Key | Hướng | Kiểu | Required | Variadic | Label |
+|---|---|---|---|---|---|
+| `contours` | đầu vào | `contours` | có | không | Contours |
+| `metrics` | đầu ra | `detections` | có | không | Metrics |
+
+### Nhập input
+
+1. Nối output `contours` vào `contours`. Cấp `contours` đúng semantic của Contours; không dùng dữ liệu ảnh thay thế.
+
+### Đọc output
+
+- `metrics` (`detections`): Metrics kiểu `detections`; xem preview hoặc nối sang node downstream tương thích.
+
+## Cách nhập tham số
+
+| Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
+|---|---|---|---|---|---|---|
+| — | — | — | — | — | — | Node không có tham số cấu hình. |
+
+## Ví dụ sử dụng có thể làm theo ngay
+
+**Mục tiêu:** Chạy thử contour metrics với input đúng kiểu (`contours`:contours) và kiểm tra output.
+
+**Workflow:** `find-contours` → `contour-metrics` → `draw-detections`
+
+- Kéo **Contour metrics** vào canvas.
+- Nối port theo workflow mẫu.
+- Mở Node inspector và nhập config JSON bên dưới.
+- Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần.
+
+**Nhập trong bảng config:**
+
+```json
+{}
+```
+
+**Input ví dụ:** Dữ liệu cho `contours`:contours; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.
+
+**Kết quả mong đợi:** Tạo metrics đúng kiểu và không báo lỗi.
+
+## Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Không nối được port | Data type không trùng. | Dùng node trung gian tạo đúng kiểu trong bảng port. |
+| Invalid parameter | Ngoài Min/Max hoặc JSON sai. | Copy config ví dụ rồi thay từng giá trị. |
+| Output rỗng/nhiễu | Input hoặc tham số không hợp giả định. | Preview input, khôi phục mặc định, tinh chỉnh từng bước. |
+
+## Giới hạn và kiểm tra trước production
+
+- Node ở trạng thái DEBUG, chưa duyệt production.
+- Kết quả phụ thuộc input và giả định của OpenCV contourArea, arcLength and moments.
+- Cần đo latency/bộ nhớ trên phần cứng đích.
+
+### Checklist trước production
+
+- Khóa camera, ánh sáng, độ phân giải và channel order.
+- Đánh giá tập OK/NG đại diện và đo false-call/escape.
+- Đặt giới hạn parameter, timeout và fail-closed.

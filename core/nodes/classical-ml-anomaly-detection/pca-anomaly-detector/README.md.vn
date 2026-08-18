@@ -1,0 +1,146 @@
+# Node PCA anomaly detector
+
+## Mục đích và cách dùng nhanh
+
+`pca-anomaly-detector` thực hiện **PCA anomaly detector** trong pipeline AOI. Learns a normal BGR subspace and scores each pixel by PCA reconstruction error. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.
+
+**Dùng khi:** cần bước pca anomaly detector có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.
+
+**Luồng nhanh:** `image-input` → `pca-anomaly-detector`
+
+## Cấu trúc node
+
+```text
+image
+    │
+    ▼
+[pca-anomaly-detector]
+    │
+    └── anomaly-map, score
+```
+
+Input gồm `image`:image. Node áp dụng scikit-learn PCA and reconstruction-error anomaly detection. Output gồm `anomaly-map`:anomaly-map, `score`:score. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.
+
+## Nguyên lý xử lý
+
+- Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `pca-anomaly-detector`.
+- Các parameter `implementation`, `components`, `scorePercentile`, `trainingSamples` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.
+- Học không gian con ít chiều từ các mẫu BGR normal.
+- Chiếu từng pixel vào không gian con rồi tái tạo.
+- Dùng reconstruction error chuẩn hóa làm anomaly-map và percentile đã chọn làm score.
+- Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy.
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `pca-anomaly-detector` |
+| Nhóm | Classical ML anomaly detection |
+| Trạng thái | `debug` |
+| Đích thực thi | `local-cpu` |
+| Khả năng | `numpy`, `scikit-learn`, `pca`, `anomaly-detection` |
+
+> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.
+
+## Cách nhập dữ liệu và đọc output
+
+| Key | Hướng | Kiểu | Required | Variadic | Label |
+|---|---|---|---|---|---|
+| `image` | đầu vào | `image` | có | không | Image |
+| `anomaly-map` | đầu ra | `anomaly-map` | có | không | Anomaly map |
+| `score` | đầu ra | `score` | có | không | Anomaly score |
+
+### Nhập input
+
+1. Nối output `image` vào `image`. Cấp ảnh `image`; kiểm tra shape, dtype và thứ tự kênh.
+
+### Đọc output
+
+- `anomaly-map` (`anomaly-map`): Anomaly map kiểu `anomaly-map`; xem preview hoặc nối sang node downstream tương thích.
+- `score` (`score`): Anomaly score kiểu `score`; xem preview hoặc nối sang node downstream tương thích.
+
+## Cách nhập tham số
+
+| Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
+|---|---|---|---|---|---|---|
+| `implementation` | `select` | `scikit-learn` | — | — | `scikit-learn`, `manual-python` | Choose scikit-learn PCA or NumPy singular value decomposition. |
+| `components` | `integer` | `2` | `1` | `3` | — | Number of normal color directions retained; fewer components make the detector more selective. |
+| `scorePercentile` | `number` | `99.0` | `0.0` | `100.0` | — | Image score is this percentile of the normalized anomaly map. |
+| `trainingSamples` | `json` | `[{"features": [20, 20, 20]}, {"features": [40, 40, 40]}, {"features": [60, 60, 60]}, {"features": [80, 80, 80]}]` | — | — | — | JSON list of known-normal colors: each item is {"features": [B, G, R]}. |
+
+## Ví dụ sử dụng có thể làm theo ngay
+
+**Mục tiêu:** Chạy thử pca anomaly detector với input đúng kiểu (`image`:image) và kiểm tra output.
+
+**Workflow:** `image-input` → `pca-anomaly-detector`
+
+- Kéo **PCA anomaly detector** vào canvas.
+- Nối port theo workflow mẫu.
+- Mở Node inspector và nhập config JSON bên dưới.
+- Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần.
+
+**Nhập trong bảng config:**
+
+```json
+{
+  "implementation": "scikit-learn",
+  "components": 2,
+  "scorePercentile": 99.0,
+  "trainingSamples": [
+    {
+      "features": [
+        20,
+        20,
+        20
+      ]
+    },
+    {
+      "features": [
+        40,
+        40,
+        40
+      ]
+    },
+    {
+      "features": [
+        60,
+        60,
+        60
+      ]
+    },
+    {
+      "features": [
+        80,
+        80,
+        80
+      ]
+    }
+  ]
+}
+```
+
+**Input ví dụ:** Dữ liệu cho `image`:image; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.
+
+**Kết quả mong đợi:** Tạo anomaly-map, score đúng kiểu và không báo lỗi.
+
+## Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Không nối được port | Data type không trùng. | Dùng node trung gian tạo đúng kiểu trong bảng port. |
+| Invalid parameter | Ngoài Min/Max hoặc JSON sai. | Copy config ví dụ rồi thay từng giá trị. |
+| Output rỗng/nhiễu | Input hoặc tham số không hợp giả định. | Preview input, khôi phục mặc định, tinh chỉnh từng bước. |
+| Hai implementation cho confidence hơi khác | Solver và tiêu chí dừng khác nhau. | So sánh nhãn/metric với tolerance; không yêu cầu số thực giống tuyệt đối. |
+
+## Giới hạn và kiểm tra trước production
+
+- Node ở trạng thái DEBUG, chưa duyệt production.
+- Kết quả phụ thuộc input và giả định của scikit-learn PCA and reconstruction-error anomaly detection.
+- Cần đo latency/bộ nhớ trên phần cứng đích.
+- trainingSamples nằm trong recipe, chỉ phù hợp tập mẫu nhỏ và không chứa dữ liệu nhạy cảm.
+
+### Checklist trước production
+
+- Khóa camera, ánh sáng, độ phân giải và channel order.
+- Đánh giá tập OK/NG đại diện và đo false-call/escape.
+- Đặt giới hạn parameter, timeout và fail-closed.

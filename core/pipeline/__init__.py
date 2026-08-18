@@ -1,5 +1,7 @@
 from .defaults import create_default_workflow
-from .execution import WorkflowExecutionRecord, WorkflowExecutionResult, execute_workflow
+from .execution import (
+    WorkflowExecutionObserver, WorkflowExecutionRecord, WorkflowExecutionResult, execute_workflow,
+)
 from .models import (
     Connection, ConnectionKind, Point, PortChannel, PortInstance, PortOrigin,
     RuntimeBindingMode, ValidationIssue, Workflow, WorkflowNode,
@@ -19,6 +21,7 @@ __all__ = [
     'ValidationIssue',
     'Workflow',
     'WorkflowExecutionRecord',
+    'WorkflowExecutionObserver',
     'WorkflowExecutionResult',
     'WorkflowNode',
     'create_default_workflow',

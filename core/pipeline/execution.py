@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -25,12 +26,16 @@ class WorkflowExecutionRecord:
     parameters: dict[str, Any]
     inputs: dict[str, Any]
     outputs: dict[str, Any]
-    duration_ms: int
+    duration_ms: int | None
     error_code: str | None = None
     error_message: str | None = None
     activation_id: str | None = None
     activation_sequence: int | None = None
     visit_index: int = 1
+    log_event: dict[str, str] | None = None
+
+
+WorkflowExecutionObserver = Callable[[WorkflowExecutionRecord], None]
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +106,7 @@ def _execute_token_workflow(
     *,
     source_image: np.ndarray,
     context: NodeExecutionContext | None,
+    observer: WorkflowExecutionObserver | None,
 ) -> WorkflowExecutionResult:
     nodes = {node.id: node for node in workflow.nodes}
     manifests = get_node_manifest_registry()
@@ -114,6 +120,10 @@ def _execute_token_workflow(
     score: float | None = None
     next_activation = 0
     executed_steps = 0
+
+    def publish(record: WorkflowExecutionRecord) -> None:
+        if observer is not None:
+            observer(record)
 
     incoming_control = {
         connection.target_node_id
@@ -178,14 +188,16 @@ def _execute_token_workflow(
             )
             node_id, activation_id = queue[0]
             node = nodes[node_id]
-            records.append(WorkflowExecutionRecord(
+            record = WorkflowExecutionRecord(
                 node_instance_id=node.id, algorithm_id=node.algorithm_id, status='faulted',
                 parameters=dict(node.parameters), inputs={}, outputs={}, duration_ms=0,
                 error_code='control-data-deadlock',
                 error_message=f'Control activations cannot resolve required data ports: {blocked_message}'[:500],
                 activation_id=activation_id, activation_sequence=len(records) + 1,
                 visit_index=visits.get(node.id, 0) + 1,
-            ))
+            )
+            records.append(record)
+            publish(record)
             queue.pop(0)
             continue
 
@@ -200,6 +212,11 @@ def _execute_token_workflow(
         executed_steps += 1
         visit_index = visits.get(node.id, 0) + 1
         visits[node.id] = visit_index
+        publish(WorkflowExecutionRecord(
+            node_instance_id=node.id, algorithm_id=node.algorithm_id, status='running',
+            parameters=dict(node.parameters), inputs=_summary(node_inputs), outputs={}, duration_ms=None,
+            activation_id=activation_id, activation_sequence=len(records) + 1, visit_index=visit_index,
+        ))
         try:
             if executed_steps > 10_000:
                 raise ValueError('Workflow exceeded the bounded execution limit of 10000 node steps.')
@@ -207,6 +224,7 @@ def _execute_token_workflow(
                 raise ValueError(f'Node runtime {node.algorithm_id} is not registered.')
             outputs = dict(runtime.invoke(node_inputs, node.parameters, context=context))
             control_branch = str(outputs.pop('__control__', 'success'))
+            log_event = outputs.pop('__log__', None)
             output_ports = [
                 port for port in node.ports
                 if port.channel is PortChannel.DATA and port.direction.value == 'output'
@@ -242,49 +260,63 @@ def _execute_token_workflow(
                     passthrough = input_port_values.get(output_port.passthrough_input_port_id or '')
                     if passthrough is not None:
                         values[(node.id, output_port.id)] = passthrough
-            records.append(WorkflowExecutionRecord(
-                node_instance_id=node.id, algorithm_id=node.algorithm_id, status='completed',
+            record = WorkflowExecutionRecord(
+                node_instance_id=node.id, algorithm_id=node.algorithm_id,
+                status='faulted' if control_branch == 'failure' else 'completed',
                 parameters=dict(node.parameters), inputs=_summary(node_inputs), outputs=_summary(outputs),
                 duration_ms=max(0, int((time.monotonic() - started) * 1000)),
                 activation_id=activation_id, activation_sequence=len(records) + 1,
-                visit_index=visit_index,
-            ))
+                visit_index=visit_index, log_event=log_event,
+                error_code='node-reported-failure' if control_branch == 'failure' else None,
+                error_message='Node emitted its failure control output.' if control_branch == 'failure' else None,
+            )
+            records.append(record)
+            publish(record)
 
-            emit_control(node, {'success'})
-            if control_branch != 'success':
+            if control_branch == 'failure':
+                emit_control(node, {'failure'})
+            else:
+                emit_control(node, {'success'})
+            if control_branch not in {'success', 'failure'}:
                 matched, traversed = emit_control(node, {control_branch})
                 if control_branch in matched and control_branch not in traversed:
                     emit_control(node, {'completed'})
         except NodeExecutionCancelled as error:
-            records.append(WorkflowExecutionRecord(
+            record = WorkflowExecutionRecord(
                 node_instance_id=node.id, algorithm_id=node.algorithm_id, status='cancelled',
                 parameters=dict(node.parameters), inputs=_summary(node_inputs), outputs={},
                 duration_ms=max(0, int((time.monotonic() - started) * 1000)),
                 error_code='node-execution-cancelled', error_message=str(error),
                 activation_id=activation_id, activation_sequence=len(records) + 1,
                 visit_index=visit_index,
-            ))
+            )
+            records.append(record)
+            publish(record)
             break
         except NodeNotImplementedError as error:
-            records.append(WorkflowExecutionRecord(
+            record = WorkflowExecutionRecord(
                 node_instance_id=node.id, algorithm_id=node.algorithm_id, status='faulted',
                 parameters=dict(node.parameters), inputs=_summary(node_inputs), outputs={},
                 duration_ms=max(0, int((time.monotonic() - started) * 1000)),
                 error_code='node-not-implemented', error_message=str(error),
                 activation_id=activation_id, activation_sequence=len(records) + 1,
                 visit_index=visit_index,
-            ))
+            )
+            records.append(record)
+            publish(record)
             emit_control(node, {'failure'})
             continue
         except Exception as error:
-            records.append(WorkflowExecutionRecord(
+            record = WorkflowExecutionRecord(
                 node_instance_id=node.id, algorithm_id=node.algorithm_id, status='faulted',
                 parameters=dict(node.parameters), inputs=_summary(node_inputs), outputs={},
                 duration_ms=max(0, int((time.monotonic() - started) * 1000)),
                 error_code='node-execution-error', error_message=str(error)[:500],
                 activation_id=activation_id, activation_sequence=len(records) + 1,
                 visit_index=visit_index,
-            ))
+            )
+            records.append(record)
+            publish(record)
             if executed_steps > 10_000:
                 break
             emit_control(node, {'failure'})
@@ -297,5 +329,8 @@ def execute_workflow(
     *,
     source_image: np.ndarray,
     context: NodeExecutionContext | None = None,
+    observer: WorkflowExecutionObserver | None = None,
 ) -> WorkflowExecutionResult:
-    return _execute_token_workflow(workflow, source_image=source_image, context=context)
+    return _execute_token_workflow(
+        workflow, source_image=source_image, context=context, observer=observer,
+    )

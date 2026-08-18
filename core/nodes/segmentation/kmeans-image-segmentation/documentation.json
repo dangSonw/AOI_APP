@@ -1,0 +1,185 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`kmeans-image-segmentation` performs **K-means image segmentation** in an AOI pipeline. Clusters pixel colors, selects configured clusters as foreground, and returns a binary mask with contours. Configure it in Node inspector and connect outputs to ports with matching data types.",
+    "whenToUse": "you need a repeatable k-means image segmentation step stored in a recipe and inspectable on its own.",
+    "structure": "Inputs are `image`:image. The node applies scikit-learn KMeans and Lloyd's algorithm. Outputs are `mask`:mask, `contours`:contours. Each key in the diagram is the exact port name used when connecting edges.",
+    "algorithm": [
+      "Validate input presence, data types, and shapes against `kmeans-image-segmentation`.",
+      "Parameters `implementation`, `clusters`, `colorSpace`, `foregroundClusters`, `maximumTrainingPixels`, `maximumIterations`, `tolerance`, `randomSeed` control processing; change one value at a time to trace its effect.",
+      "Represent pixels in BGR, Lab, or HSV color space.",
+      "Repeatedly assign pixels to the nearest centroid and update centroid means.",
+      "Sort learned centroids from darkest ID 0 to brightest ID K-1, then turn foregroundClusters white in the mask.",
+      "Normalize/package results with declared data types so graph compatibility is checked before execution."
+    ],
+    "inputGuidance": {
+      "image": "Provide `image` image data; verify shape, dtype, and channel order."
+    },
+    "outputGuidance": {
+      "mask": "Object mask as `mask`; preview it or connect a compatible downstream node.",
+      "contours": "Object contours as `contours`; preview it or connect a compatible downstream node."
+    },
+    "parameterGuidance": {
+      "implementation": "Choose the maintained library or the project-owned NumPy implementation.",
+      "clusters": "Number of color groups K.",
+      "colorSpace": "Lab is often more stable for separating brightness from color.",
+      "foregroundClusters": "JSON cluster IDs to turn white. IDs are ordered from darkest (0) to brightest (K-1); with K=2, [1] selects bright objects.",
+      "maximumTrainingPixels": "Limits fitting cost; all pixels are still classified.",
+      "maximumIterations": "Upper bound for centroid updates.",
+      "tolerance": "Stop when centroid movement is below this value.",
+      "randomSeed": "Keeps sampling and initialization repeatable."
+    },
+    "example": {
+      "goal": "Run k-means image segmentation with correctly typed input (`image`:image) and inspect its output.",
+      "workflow": [
+        "image-input",
+        "kmeans-image-segmentation",
+        "overlay-mask"
+      ],
+      "parameters": {
+        "implementation": "scikit-learn",
+        "clusters": 2,
+        "colorSpace": "bgr",
+        "foregroundClusters": [
+          1
+        ],
+        "maximumTrainingPixels": 10000,
+        "maximumIterations": 100,
+        "tolerance": 0.0001,
+        "randomSeed": 42
+      },
+      "steps": [
+        "Drag **K-means image segmentation** onto the canvas.",
+        "Connect ports as shown in the workflow.",
+        "Open Node inspector and enter the JSON config below.",
+        "Run, inspect output, then tune one parameter at a time."
+      ],
+      "input": "Data for `image`:image; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.",
+      "expectedOutput": "Produce mask, contours with the declared type and no error."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Ports cannot connect",
+        "cause": "Data types differ.",
+        "resolution": "Insert a node producing the exact type in the ports table."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Outside Min/Max or malformed JSON.",
+        "resolution": "Copy the example config and change one value at a time."
+      },
+      {
+        "symptom": "Empty/noisy output",
+        "cause": "Input or settings violate assumptions.",
+        "resolution": "Preview input, restore defaults, and tune incrementally."
+      },
+      {
+        "symptom": "Implementations give slightly different confidence",
+        "cause": "Solvers and stopping criteria differ.",
+        "resolution": "Compare labels/metrics with tolerance; do not require bit-identical floats."
+      }
+    ],
+    "limitations": [
+      "This node is DEBUG and not production-approved.",
+      "Results depend on input and assumptions of scikit-learn KMeans and Lloyd's algorithm.",
+      "Measure latency/memory on target hardware.",
+      "trainingSamples live in the recipe and are intended only for small, non-sensitive sample sets."
+    ],
+    "productionChecklist": [
+      "Lock camera, illumination, resolution, and channel order.",
+      "Evaluate representative OK/NG data and false-call/escape rates.",
+      "Set parameter limits, timeouts, and fail-closed checks."
+    ]
+  },
+  "vi": {
+    "overview": "`kmeans-image-segmentation` thực hiện **K-means image segmentation** trong pipeline AOI. Clusters pixel colors, selects configured clusters as foreground, and returns a binary mask with contours. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.",
+    "whenToUse": "cần bước k-means image segmentation có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.",
+    "structure": "Input gồm `image`:image. Node áp dụng scikit-learn KMeans and Lloyd's algorithm. Output gồm `mask`:mask, `contours`:contours. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.",
+    "algorithm": [
+      "Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `kmeans-image-segmentation`.",
+      "Các parameter `implementation`, `clusters`, `colorSpace`, `foregroundClusters`, `maximumTrainingPixels`, `maximumIterations`, `tolerance`, `randomSeed` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.",
+      "Biểu diễn pixel trong không gian BGR, Lab hoặc HSV.",
+      "Lặp bước gán pixel vào centroid gần nhất và cập nhật trung bình centroid.",
+      "Sắp centroid học được từ ID 0 tối nhất đến ID K-1 sáng nhất, rồi đưa foregroundClusters vào vùng trắng.",
+      "Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy."
+    ],
+    "inputGuidance": {
+      "image": "Cấp ảnh `image`; kiểm tra shape, dtype và thứ tự kênh."
+    },
+    "outputGuidance": {
+      "mask": "Object mask kiểu `mask`; xem preview hoặc nối sang node downstream tương thích.",
+      "contours": "Object contours kiểu `contours`; xem preview hoặc nối sang node downstream tương thích."
+    },
+    "parameterGuidance": {
+      "implementation": "Choose the maintained library or the project-owned NumPy implementation.",
+      "clusters": "Number of color groups K.",
+      "colorSpace": "Lab is often more stable for separating brightness from color.",
+      "foregroundClusters": "JSON cluster IDs to turn white. IDs are ordered from darkest (0) to brightest (K-1); with K=2, [1] selects bright objects.",
+      "maximumTrainingPixels": "Limits fitting cost; all pixels are still classified.",
+      "maximumIterations": "Upper bound for centroid updates.",
+      "tolerance": "Stop when centroid movement is below this value.",
+      "randomSeed": "Keeps sampling and initialization repeatable."
+    },
+    "example": {
+      "goal": "Chạy thử k-means image segmentation với input đúng kiểu (`image`:image) và kiểm tra output.",
+      "workflow": [
+        "image-input",
+        "kmeans-image-segmentation",
+        "overlay-mask"
+      ],
+      "parameters": {
+        "implementation": "scikit-learn",
+        "clusters": 2,
+        "colorSpace": "bgr",
+        "foregroundClusters": [
+          1
+        ],
+        "maximumTrainingPixels": 10000,
+        "maximumIterations": 100,
+        "tolerance": 0.0001,
+        "randomSeed": 42
+      },
+      "steps": [
+        "Kéo **K-means image segmentation** vào canvas.",
+        "Nối port theo workflow mẫu.",
+        "Mở Node inspector và nhập config JSON bên dưới.",
+        "Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần."
+      ],
+      "input": "Dữ liệu cho `image`:image; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.",
+      "expectedOutput": "Tạo mask, contours đúng kiểu và không báo lỗi."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Không nối được port",
+        "cause": "Data type không trùng.",
+        "resolution": "Dùng node trung gian tạo đúng kiểu trong bảng port."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Ngoài Min/Max hoặc JSON sai.",
+        "resolution": "Copy config ví dụ rồi thay từng giá trị."
+      },
+      {
+        "symptom": "Output rỗng/nhiễu",
+        "cause": "Input hoặc tham số không hợp giả định.",
+        "resolution": "Preview input, khôi phục mặc định, tinh chỉnh từng bước."
+      },
+      {
+        "symptom": "Hai implementation cho confidence hơi khác",
+        "cause": "Solver và tiêu chí dừng khác nhau.",
+        "resolution": "So sánh nhãn/metric với tolerance; không yêu cầu số thực giống tuyệt đối."
+      }
+    ],
+    "limitations": [
+      "Node ở trạng thái DEBUG, chưa duyệt production.",
+      "Kết quả phụ thuộc input và giả định của scikit-learn KMeans and Lloyd's algorithm.",
+      "Cần đo latency/bộ nhớ trên phần cứng đích.",
+      "trainingSamples nằm trong recipe, chỉ phù hợp tập mẫu nhỏ và không chứa dữ liệu nhạy cảm."
+    ],
+    "productionChecklist": [
+      "Khóa camera, ánh sáng, độ phân giải và channel order.",
+      "Đánh giá tập OK/NG đại diện và đo false-call/escape.",
+      "Đặt giới hạn parameter, timeout và fail-closed."
+    ]
+  }
+}

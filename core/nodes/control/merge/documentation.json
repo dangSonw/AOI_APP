@@ -1,0 +1,123 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`merge` performs **Merge** in an AOI pipeline. Merges any or all incoming control branches deterministically. Configure it in Node inspector and connect outputs to ports with matching data types.",
+    "whenToUse": "you need a repeatable merge step stored in a recipe and inspectable on its own.",
+    "structure": "Inputs are none. The node applies Merge. Outputs are none. Each key in the diagram is the exact port name used when connecting edges.",
+    "algorithm": [
+      "Validate input presence, data types, and shapes against `merge`.",
+      "Parameters `policy` control processing; change one value at a time to trace its effect.",
+      "Apply **Merge**: Merges any or all incoming control branches deterministically.",
+      "Normalize/package results with declared data types so graph compatibility is checked before execution."
+    ],
+    "inputGuidance": {},
+    "outputGuidance": {},
+    "parameterGuidance": {
+      "policy": "Run on any arrival or after all incoming edges arrive."
+    },
+    "example": {
+      "goal": "Run merge with correctly typed input (none) and inspect its output.",
+      "workflow": [
+        "merge"
+      ],
+      "parameters": {
+        "policy": "any"
+      },
+      "steps": [
+        "Drag **Merge** onto the canvas.",
+        "Connect ports as shown in the workflow.",
+        "Open Node inspector and enter the JSON config below.",
+        "Run, inspect output, then tune one parameter at a time."
+      ],
+      "input": "Data for none; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.",
+      "expectedOutput": "Produce no output with the declared type and no error."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Ports cannot connect",
+        "cause": "Data types differ.",
+        "resolution": "Insert a node producing the exact type in the ports table."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Outside Min/Max or malformed JSON.",
+        "resolution": "Copy the example config and change one value at a time."
+      },
+      {
+        "symptom": "Empty/noisy output",
+        "cause": "Input or settings violate assumptions.",
+        "resolution": "Preview input, restore defaults, and tune incrementally."
+      }
+    ],
+    "limitations": [
+      "This node is DEBUG and not production-approved.",
+      "Results depend on input and assumptions of Merge.",
+      "Measure latency/memory on target hardware."
+    ],
+    "productionChecklist": [
+      "Lock camera, illumination, resolution, and channel order.",
+      "Evaluate representative OK/NG data and false-call/escape rates.",
+      "Set parameter limits, timeouts, and fail-closed checks."
+    ]
+  },
+  "vi": {
+    "overview": "`merge` thực hiện **Merge** trong pipeline AOI. Merges any or all incoming control branches deterministically. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.",
+    "whenToUse": "cần bước merge có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.",
+    "structure": "Input gồm none. Node áp dụng Merge. Output gồm none. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.",
+    "algorithm": [
+      "Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `merge`.",
+      "Các parameter `policy` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.",
+      "Áp dụng **Merge**: Merges any or all incoming control branches deterministically.",
+      "Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy."
+    ],
+    "inputGuidance": {},
+    "outputGuidance": {},
+    "parameterGuidance": {
+      "policy": "Run on any arrival or after all incoming edges arrive."
+    },
+    "example": {
+      "goal": "Chạy thử merge với input đúng kiểu (none) và kiểm tra output.",
+      "workflow": [
+        "merge"
+      ],
+      "parameters": {
+        "policy": "any"
+      },
+      "steps": [
+        "Kéo **Merge** vào canvas.",
+        "Nối port theo workflow mẫu.",
+        "Mở Node inspector và nhập config JSON bên dưới.",
+        "Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần."
+      ],
+      "input": "Dữ liệu cho none; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.",
+      "expectedOutput": "Tạo không có output đúng kiểu và không báo lỗi."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Không nối được port",
+        "cause": "Data type không trùng.",
+        "resolution": "Dùng node trung gian tạo đúng kiểu trong bảng port."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Ngoài Min/Max hoặc JSON sai.",
+        "resolution": "Copy config ví dụ rồi thay từng giá trị."
+      },
+      {
+        "symptom": "Output rỗng/nhiễu",
+        "cause": "Input hoặc tham số không hợp giả định.",
+        "resolution": "Preview input, khôi phục mặc định, tinh chỉnh từng bước."
+      }
+    ],
+    "limitations": [
+      "Node ở trạng thái DEBUG, chưa duyệt production.",
+      "Kết quả phụ thuộc input và giả định của Merge.",
+      "Cần đo latency/bộ nhớ trên phần cứng đích."
+    ],
+    "productionChecklist": [
+      "Khóa camera, ánh sáng, độ phân giải và channel order.",
+      "Đánh giá tập OK/NG đại diện và đo false-call/escape.",
+      "Đặt giới hạn parameter, timeout và fail-closed."
+    ]
+  }
+}

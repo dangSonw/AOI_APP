@@ -4,7 +4,6 @@ import type { InspectionStatus } from '../types/workspace';
 import type { InspectionRun } from '../types/inspection';
 import { StatusBadge } from '../components/StatusBadge';
 import type { Workflow } from '../types/workflow';
-import type { AlgorithmDefinition } from '../types/workflow';
 import type { DashboardPreferences, ViewerPreference } from '../types/workstation-preferences';
 import { CollapsiblePanelHeader } from '../components/CollapsiblePanelHeader';
 import { ViewerSizeControls } from '../components/ViewerSizeControls';
@@ -23,7 +22,6 @@ interface DashboardPageProps {
   workflow: Workflow | null;
   workflowError: string;
   onConfigureWorkflow: () => void;
-  catalog: AlgorithmDefinition[];
   preferences: DashboardPreferences;
   onPreferencesChange: (preferences: DashboardPreferences) => void;
 }
@@ -36,7 +34,22 @@ const METRICS = [
   { label: 'Defects', value: '12', unit: 'flagged', delta: '0.96%' },
 ];
 
-export function DashboardPage({ accessToken, inputs, outputs, isLoading, error, isRunning, inspectionRun, runError, onOutputToggle, workflow, workflowError, onConfigureWorkflow, catalog, preferences, onPreferencesChange }: DashboardPageProps) {
+const WORKFLOW_POPUP_LIMIT = 3;
+const WORKFLOW_POPUP_TTL_MS = 3000;
+
+interface WorkflowPopupToast {
+  id: string;
+  level: 'info' | 'warning' | 'error';
+  message: string;
+  expiresAt: number;
+}
+
+interface WorkflowPopupState {
+  seen: string[];
+  active: WorkflowPopupToast[];
+}
+
+export function DashboardPage({ accessToken, inputs, outputs, isLoading, error, isRunning, inspectionRun, runError, onOutputToggle, workflow, workflowError, onConfigureWorkflow, preferences, onPreferencesChange }: DashboardPageProps) {
   const panels = preferences.panels;
   const updatePanel = <K extends keyof typeof panels>(key: K, value: typeof panels[K]) => onPreferencesChange({ panels: { ...panels, [key]: value } });
   const togglePanel = (key: keyof typeof panels) => updatePanel(key, { ...panels[key], isCollapsed: !panels[key].isCollapsed });
@@ -54,9 +67,61 @@ export function DashboardPage({ accessToken, inputs, outputs, isLoading, error, 
   const orderedWorkflowNodes = workflow?.executionOrder
     .map((nodeId) => workflowNodes.get(nodeId))
     .filter((node) => node !== undefined) ?? [];
+  const isFlowActive = Boolean(inspectionRun && ['queued', 'precheck', 'capturing', 'executing'].includes(inspectionRun.status));
+  const latestNodeRuns = new Map<string, InspectionRun['nodeRuns'][number]>();
+  if (inspectionRun) {
+    for (const nodeRun of inspectionRun.nodeRuns) {
+      const current = latestNodeRuns.get(nodeRun.nodeId);
+      if (!current || nodeRun.sequence > current.sequence) latestNodeRuns.set(nodeRun.nodeId, nodeRun);
+    }
+  }
+
+  const [popupState, setPopupState] = useState<WorkflowPopupState>({ seen: [], active: [] });
+  if (inspectionRun) {
+    const seen = new Set(popupState.seen);
+    const fresh: WorkflowPopupToast[] = [];
+    for (const nodeRun of inspectionRun.nodeRuns) {
+      if (nodeRun.logEvent?.destination !== 'popup') continue;
+      const id = `${inspectionRun.id}:${nodeRun.sequence}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      fresh.push({
+        id,
+        level: nodeRun.logEvent.level,
+        message: nodeRun.logEvent.message,
+        expiresAt: Date.now() + WORKFLOW_POPUP_TTL_MS,
+      });
+    }
+    if (fresh.length > 0) {
+      setPopupState({
+        seen: [...seen].slice(-256),
+        active: [...fresh.reverse(), ...popupState.active].slice(0, WORKFLOW_POPUP_LIMIT),
+      });
+    }
+  }
+  const workflowPopups = popupState.active;
+
+  useEffect(() => {
+    if (workflowPopups.length === 0) return;
+    const oldest = workflowPopups[workflowPopups.length - 1];
+    const remaining = Math.max(oldest.expiresAt - Date.now(), 0);
+    const timer = window.setTimeout(() => {
+      setPopupState((current) => ({ ...current, active: current.active.filter((toast) => toast.id !== oldest.id) }));
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [workflowPopups]);
 
   return (
     <div className="dashboard-layout" aria-busy={isLoading}>
+      {workflowPopups.length > 0 && (
+        <div className="workflow-log-popups" role="status" aria-live="polite">
+          {workflowPopups.map((toast) => (
+            <div key={toast.id} className={`workflow-log-popup workflow-log-popup--${toast.level}`}>
+              <span><strong>{toast.level.toUpperCase()}</strong> {toast.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="dashboard-main">
         {error && <p className="studio-message studio-message--error" role="alert">{error}</p>}
         {runError && <p className="studio-message studio-message--error" role="alert">{runError}</p>}
@@ -171,13 +236,33 @@ export function DashboardPage({ accessToken, inputs, outputs, isLoading, error, 
         {workflowError && <p className="pipeline-panel__error" role="status">{workflowError}</p>}
         {!workflowError && orderedWorkflowNodes.length === 0 && <p className="pipeline-panel__error">No configured workflow steps.</p>}
         <ol className="pipeline-list">
-          {orderedWorkflowNodes.map((step, index) => (
-            <li className="pipeline-step pipeline-step--configuration" key={step.id}>
-              <span className="pipeline-step__index">{String(index + 1).padStart(2, '0')}</span>
-              <span><strong>{step.displayName}</strong><small>{catalog.find((definition) => definition.id === step.algorithmId)?.use ?? 'test'}</small></span>
-              <code>{step.algorithmId}</code>
-            </li>
-          ))}
+          {orderedWorkflowNodes.map((step, index) => {
+            const nodeRun = latestNodeRuns.get(step.id);
+            const lastRunMs = nodeRun?.durationMs ?? null;
+            const runtimeStatus = isFlowActive && nodeRun
+              ? nodeRun.status === 'completed'
+                ? 'completed'
+                : nodeRun.status === 'running'
+                  ? 'running'
+                  : 'faulted'
+              : null;
+            const timingSuffix = lastRunMs !== null ? ` · ${lastRunMs} ms` : '';
+            const statusLabel = runtimeStatus === 'completed'
+              ? `Completed${timingSuffix}`
+              : runtimeStatus === 'running'
+                ? 'Running'
+                : runtimeStatus === 'faulted'
+                  ? `Failed${timingSuffix}`
+                  : `Not started${timingSuffix}`;
+            const statusIcon = runtimeStatus === 'completed' ? '✓' : runtimeStatus === 'running' ? '●' : runtimeStatus === 'faulted' ? '!' : '○';
+            return (
+              <li className={`pipeline-step pipeline-step--configuration ${runtimeStatus ? `pipeline-step--${runtimeStatus}` : ''}`} key={step.id} aria-label={`${step.displayName}, ${statusLabel}`}>
+                <span className="pipeline-step__index">{String(index + 1).padStart(2, '0')}</span>
+                <span><strong>{step.displayName}</strong><small><span aria-hidden="true">{statusIcon}</span> {statusLabel}</small></span>
+                <code>{step.algorithmId}</code>
+              </li>
+            );
+          })}
         </ol>
         <section className="pipeline-summary">
           <span className="overline">Saved recipe graph</span>

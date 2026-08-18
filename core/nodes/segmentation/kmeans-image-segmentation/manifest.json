@@ -1,0 +1,29 @@
+{
+  "manifestVersion": 1, "packageVersion": "1.0.0", "id": "kmeans-image-segmentation", "use": "debug", "executionTarget": "local-cpu",
+  "capabilities": ["numpy", "scikit-learn", "clustering", "segmentation", "contours"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 512, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []}, "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "kmeans-image-segmentation", "name": "K-means image segmentation",
+    "description": "Clusters pixel colors, selects configured clusters as foreground, and returns a binary mask with contours.",
+    "category": "Segmentation", "documentation_group": "Classical machine learning",
+    "inputs": [{"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false}],
+    "outputs": [
+      {"key": "mask", "label": "Object mask", "direction": "output", "data_type": "mask", "required": true, "variadic": false},
+      {"key": "contours", "label": "Object contours", "direction": "output", "data_type": "contours", "required": true, "variadic": false}
+    ],
+    "parameters": [
+      {"key": "implementation", "label": "Implementation", "kind": "select", "default_value": "scikit-learn", "required": true, "minimum": null, "maximum": null, "options": ["scikit-learn", "manual-python"], "description": "Choose the maintained library or the project-owned NumPy implementation."},
+      {"key": "clusters", "label": "Number of clusters", "kind": "integer", "default_value": 2, "required": true, "minimum": 2, "maximum": 32, "options": [], "description": "Number of color groups K."},
+      {"key": "colorSpace", "label": "Color space", "kind": "select", "default_value": "bgr", "required": true, "minimum": null, "maximum": null, "options": ["bgr", "lab", "hsv"], "description": "Lab is often more stable for separating brightness from color."},
+      {"key": "foregroundClusters", "label": "Foreground cluster IDs", "kind": "json", "default_value": [1], "required": true, "minimum": null, "maximum": null, "options": [], "description": "JSON cluster IDs to turn white. IDs are ordered from darkest (0) to brightest (K-1); with K=2, [1] selects bright objects."},
+      {"key": "maximumTrainingPixels", "label": "Maximum training pixels", "kind": "integer", "default_value": 10000, "required": true, "minimum": 100, "maximum": 1000000, "options": [], "description": "Limits fitting cost; all pixels are still classified."},
+      {"key": "maximumIterations", "label": "Maximum iterations", "kind": "integer", "default_value": 100, "required": true, "minimum": 1, "maximum": 1000, "options": [], "description": "Upper bound for centroid updates."},
+      {"key": "tolerance", "label": "Convergence tolerance", "kind": "number", "default_value": 0.0001, "required": true, "minimum": 0.000000001, "maximum": 1.0, "options": [], "description": "Stop when centroid movement is below this value."},
+      {"key": "randomSeed", "label": "Random seed", "kind": "integer", "default_value": 42, "required": true, "minimum": 0, "maximum": 2147483647, "options": [], "description": "Keeps sampling and initialization repeatable."}
+    ],
+    "availability": "configuration-only", "documentation_reference": "scikit-learn KMeans and Lloyd's algorithm"
+  },
+  "catalogOrder": 94
+}

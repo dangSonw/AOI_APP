@@ -1,3 +1,103 @@
 # Node Logic NOT
 
-Đảo boolean `value`, phát `result`, rồi định tuyến `true` hoặc `false`. Trạng thái: `debug`.
+## Mục đích và cách dùng nhanh
+
+`logic-not` thực hiện **Logic NOT** trong pipeline AOI. Inverts one boolean input and routes true or false. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.
+
+**Dùng khi:** cần bước logic not có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.
+
+**Luồng nhanh:** `logic-not` → `logic-or`
+
+## Cấu trúc node
+
+```text
+value
+    │
+    ▼
+[logic-not]
+    │
+    └── result
+```
+
+Input gồm `value`:boolean. Node áp dụng Logic NOT. Output gồm `result`:boolean. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.
+
+## Nguyên lý xử lý
+
+- Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `logic-not`.
+- Node không có parameter; hành vi được quyết định bởi input và contract runtime.
+- Áp dụng **Logic NOT**: Inverts one boolean input and routes true or false.
+- Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy.
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `logic-not` |
+| Nhóm | Control |
+| Trạng thái | `debug` |
+| Đích thực thi | `local-cpu` |
+| Khả năng | `boolean-logic`, `control-routing` |
+
+> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.
+
+## Cách nhập dữ liệu và đọc output
+
+| Key | Hướng | Kiểu | Required | Variadic | Label |
+|---|---|---|---|---|---|
+| `value` | đầu vào | `boolean` | có | không | Value |
+| `result` | đầu ra | `boolean` | có | không | Result |
+
+### Nhập input
+
+1. Nối output `boolean` vào `value`. Cấp `boolean` đúng semantic của Value; không dùng dữ liệu ảnh thay thế.
+
+### Đọc output
+
+- `result` (`boolean`): Result kiểu `boolean`; xem preview hoặc nối sang node downstream tương thích.
+
+## Cách nhập tham số
+
+| Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
+|---|---|---|---|---|---|---|
+| — | — | — | — | — | — | Node không có tham số cấu hình. |
+
+## Ví dụ sử dụng có thể làm theo ngay
+
+**Mục tiêu:** Chạy thử logic not với input đúng kiểu (`value`:boolean) và kiểm tra output.
+
+**Workflow:** `logic-not` → `logic-or`
+
+- Kéo **Logic NOT** vào canvas.
+- Nối port theo workflow mẫu.
+- Mở Node inspector và nhập config JSON bên dưới.
+- Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần.
+
+**Nhập trong bảng config:**
+
+```json
+{}
+```
+
+**Input ví dụ:** Dữ liệu cho `value`:boolean; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.
+
+**Kết quả mong đợi:** Tạo result đúng kiểu và không báo lỗi.
+
+## Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Không nối được port | Data type không trùng. | Dùng node trung gian tạo đúng kiểu trong bảng port. |
+| Invalid parameter | Ngoài Min/Max hoặc JSON sai. | Copy config ví dụ rồi thay từng giá trị. |
+| Output rỗng/nhiễu | Input hoặc tham số không hợp giả định. | Preview input, khôi phục mặc định, tinh chỉnh từng bước. |
+
+## Giới hạn và kiểm tra trước production
+
+- Node ở trạng thái DEBUG, chưa duyệt production.
+- Kết quả phụ thuộc input và giả định của Logic NOT.
+- Cần đo latency/bộ nhớ trên phần cứng đích.
+
+### Checklist trước production
+
+- Khóa camera, ánh sáng, độ phân giải và channel order.
+- Đánh giá tập OK/NG đại diện và đo false-call/escape.
+- Đặt giới hạn parameter, timeout và fail-closed.

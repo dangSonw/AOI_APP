@@ -1,8 +1,32 @@
 # Morphology operation node
 
-## Purpose
+## Purpose and quick use
 
-Applies a selected morphology operation.
+`morphology-operation` performs **Morphology operation** in an AOI pipeline. Applies a selected morphology operation. Configure it in Node inspector and connect outputs to ports with matching data types.
+
+**Use when:** you need a repeatable morphology operation step stored in a recipe and inspectable on its own.
+
+**Quick flow:** `global-threshold` → `morphology-operation` → `overlay-mask`
+
+## Node structure
+
+```text
+mask
+    │
+    ▼
+[morphology-operation]
+    │
+    └── processed-mask
+```
+
+Inputs are `mask`:mask. The node applies Morphology operation. Outputs are `processed-mask`:mask. Each key in the diagram is the exact port name used when connecting edges.
+
+## How the algorithm works
+
+- Validate input presence, data types, and shapes against `morphology-operation`.
+- Parameters `operation`, `kernelSize` control processing; change one value at a time to trace its effect.
+- Apply **Morphology operation**: Applies a selected morphology operation.
+- Normalize/package results with declared data types so graph compatibility is checked before execution.
 
 ## Runtime contract
 
@@ -11,41 +35,73 @@ Applies a selected morphology operation.
 | Node ID | `morphology-operation` |
 | Category | OpenCV tools |
 | Status | `debug` |
-| Package version | `1.0.0` |
 | Execution target | `local-cpu` |
-| Inspector | `generic` |
 | Capabilities | None declared |
 
-Executable `debug` runtime for development, simulation, and research. This node is not approved for production.
+> **DEBUG notice:** Executable for development/research, not approved for production.
 
-## Ports
+## How to provide inputs and read outputs
 
-| Key | Direction | Data type | Required | Variadic | Label |
+| Key | Direction | Type | Required | Variadic | Label |
 |---|---|---|---|---|---|
 | `mask` | input | `mask` | yes | no | Mask |
 | `processed-mask` | output | `mask` | yes | no | Processed mask |
 
-## Parameters
+### Provide inputs
 
-| Key | Kind | Default | Minimum | Maximum | Options | Meaning |
+1. Connect a `mask` output to `mask`. Provide `mask` image data; verify shape, dtype, and channel order.
+
+### Read outputs
+
+- `processed-mask` (`mask`): Processed mask as `mask`; preview it or connect a compatible downstream node.
+
+## How to enter parameters
+
+| Key | Kind | Default | Min | Max | Options | How to enter / Meaning |
 |---|---|---|---|---|---|---|
-| `operation` | `select` | `open` | — | — | `open`, `close`, `gradient`, `top-hat`, `black-hat` | Operation |
-| `kernelSize` | `integer` | `3` | `1` | `255` | — | Kernel size |
+| `operation` | `select` | `open` | — | — | `open`, `close`, `gradient`, `top-hat`, `black-hat` | Enter `select` within Min/Max; try the default first. |
+| `kernelSize` | `integer` | `3` | `1` | `255` | — | Enter `integer` within Min/Max; try the default first. |
 
-## Workflow use
+## Copy-ready usage example
 
-1. Add **Morphology operation** from **OpenCV tools** in Workflow editor.
-2. Connect typed inputs: `mask`.
-3. Configure parameters within listed limits.
-4. Connect outputs: `processed-mask`.
-5. Save workflow before pressing **Run** in Project workspace.
+**Goal:** Run morphology operation with correctly typed input (`mask`:mask) and inspect its output.
 
-Connections require exact data-type equality. Workflow remains a DAG; cycles and self-loops are rejected. `delay` and `bounded-repeat` provide bounded behavior without graph cycles.
+**Workflow:** `global-threshold` → `morphology-operation` → `overlay-mask`
 
-## Evidence and safety
+- Drag **Morphology operation** onto the canvas.
+- Connect ports as shown in the workflow.
+- Open Node inspector and enter the JSON config below.
+- Run, inspect output, then tune one parameter at a time.
 
-Runtime stores parameters, summarized inputs and outputs, duration, version, status, and evidence hash. Image arrays are not stored in JSON evidence. `image-output` marks latest image for encoded PNG preview in 2D optical view.
+**Paste into the config panel:**
 
-- Status `debug` is not production approval.
-- Validate dimensions, channel order, dtype, thresholds, timing, and memory on target hardware.
-- Production mode rejects every node not marked `release`.
+```json
+{
+  "operation": "open",
+  "kernelSize": 3
+}
+```
+
+**Example input:** Data for `mask`:mask; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.
+
+**Expected output:** Produce processed-mask with the declared type and no error.
+
+## Troubleshooting
+
+| Symptom | Cause | Resolution |
+|---|---|---|
+| Ports cannot connect | Data types differ. | Insert a node producing the exact type in the ports table. |
+| Invalid parameter | Outside Min/Max or malformed JSON. | Copy the example config and change one value at a time. |
+| Empty/noisy output | Input or settings violate assumptions. | Preview input, restore defaults, and tune incrementally. |
+
+## Limitations and production checks
+
+- This node is DEBUG and not production-approved.
+- Results depend on input and assumptions of Morphology operation.
+- Measure latency/memory on target hardware.
+
+### Production checklist
+
+- Lock camera, illumination, resolution, and channel order.
+- Evaluate representative OK/NG data and false-call/escape rates.
+- Set parameter limits, timeouts, and fail-closed checks.

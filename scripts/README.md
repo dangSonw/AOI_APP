@@ -146,15 +146,16 @@ PYTHONPATH=.:backend conda run -n aoi-app python scripts/operations/pilot-restor
 `scripts/deploy/deploy.sh` now fails closed unless `AOI_PILOT_ACCEPTANCE_REPORT` points to a typed,
 measured target-hardware report with every safety/recovery gate passed. Simulator evidence cannot satisfy it.
 
-### 9. Node Documentation Generator (`scripts/generate_node_docs.py`)
+### 9. Node Documentation Generators
 
-Regenerates one English and one Vietnamese README in every node package from its versioned manifest:
+Every executable `DEBUG` node owns bilingual `documentation.json` metadata. Regenerate metadata after changing node identity, ports, parameters, examples, or capabilities, then render detailed English and Vietnamese README files:
 
 ```bash
+python scripts/generate_debug_node_metadata.py
 python scripts/generate_node_docs.py
 ```
 
-Run it after changing node identity, status, ports, parameters, execution target, or capabilities. Generated documentation is UTF-8 and must be committed with the related manifest change.
+The README includes node structure, algorithm explanation, exact input/output types, parameter-entry guidance, copy-ready JSON, a workflow example, troubleshooting, limitations, and a production checklist. Generation is deterministic UTF-8/LF. Commit `documentation.json`, `README.md`, and `README.md.vn` with the related manifest change.
 
 Migrate an existing local recipe from a placeholder graph to the current executable default DAG:
 

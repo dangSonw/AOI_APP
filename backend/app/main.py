@@ -1,5 +1,6 @@
 ﻿from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,8 +24,18 @@ from app.database.bootstrap import initialize_database
 from app.middleware.audit import AuditMiddleware
 
 
+def _configure_workflow_logging() -> None:
+    workflow_logger = logging.getLogger('aoi.workflow')
+    if not workflow_logger.handlers:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s [%(name)s] %(message)s'))
+        workflow_logger.addHandler(console_handler)
+    workflow_logger.setLevel(logging.INFO)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
+    _configure_workflow_logging()
     initialize_database()
     yield
 

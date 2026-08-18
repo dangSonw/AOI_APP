@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AlgorithmDefinition, Workflow, WorkflowConnection } from '../types/workflow';
 import {
+  addConnection,
   createNodeFromDefinition,
   filterCatalog,
   isWorkflowDirty,
@@ -144,6 +145,38 @@ describe('workflow graph helpers', () => {
       targetNodeId: detector.id,
       targetPortId: detector.ports[0].id,
     })?.code).toBe('cycle');
+  });
+
+  it('accepts success control output connected to a Logs trigger without dependency-order errors', () => {
+    const logs: AlgorithmDefinition = {
+      id: 'logs', name: 'Logs', description: 'Writes a message.', category: 'Debugging',
+      documentationGroup: 'Debugging and observability', availability: 'configuration-only', use: 'debug',
+      inputs: [], outputs: [], parameters: [], documentationReference: null,
+      manifestVersion: 1, packageVersion: '1.0.0', executionTarget: 'local-cpu',
+      inspectorKind: 'generic', customInspectorKey: null,
+    };
+    const source = createNodeFromDefinition(imageInput, { x: 0, y: 0 });
+    const logNode = createNodeFromDefinition(logs, { x: 200, y: 0 });
+    const success = source.ports.find((port) => port.templateKey === 'success')!;
+    const trigger = logNode.ports.find((port) => port.templateKey === 'trigger')!;
+    const workflow: Workflow = {
+      recipeSlug: 'logs-control', recipeName: 'Logs control', version: 2, revision: 0,
+      updatedAt: new Date(0).toISOString(), nodes: [source, logNode],
+      connections: [{
+        id: crypto.randomUUID(), sourceNodeId: source.id, sourcePortId: success.id,
+        targetNodeId: logNode.id, targetPortId: trigger.id, kind: 'control',
+      }],
+      executionOrder: [logNode.id, source.id], migrationNotices: [],
+    };
+
+    expect(validateConnection({ ...workflow, connections: [] }, workflow.connections[0])).toBeNull();
+    expect(validateDraft(workflow, [imageInput, logs]).map((item) => item.code)).not.toContain('dependency-order');
+
+    const persisted = addConnection({ ...workflow, connections: [] }, {
+      sourceNodeId: source.id, sourcePortId: success.id,
+      targetNodeId: logNode.id, targetPortId: trigger.id,
+    });
+    expect(persisted.connections[0].kind).toBe('control');
   });
 
   it('orders deterministically, validates dependencies, and moves one execution item', () => {

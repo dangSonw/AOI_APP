@@ -16,174 +16,171 @@ def display_value(value: object) -> str:
     return f'`{value}`'
 
 
-def parameter_rows(parameters: list[dict]) -> str:
+def parameter_rows(parameters: list[dict], guidance: dict[str, str], *, vietnamese: bool) -> str:
     if not parameters:
-        return '| — | — | — | — | — | — | No parameters |'
+        return '| — | — | — | — | — | — | Node không có tham số cấu hình. |' if vietnamese else '| — | — | — | — | — | — | Node has no configurable parameters. |'
     return '\n'.join(
         '| `{key}` | `{kind}` | {default} | {minimum} | {maximum} | {options} | {meaning} |'.format(
-            key=parameter['key'],
-            kind=parameter['kind'],
-            default=display_value(parameter.get('default_value')),
-            minimum=display_value(parameter.get('minimum')),
-            maximum=display_value(parameter.get('maximum')),
+            key=parameter['key'], kind=parameter['kind'], default=display_value(parameter.get('default_value')),
+            minimum=display_value(parameter.get('minimum')), maximum=display_value(parameter.get('maximum')),
             options=', '.join(display_value(value) for value in parameter.get('options', [])) or '—',
-            meaning=parameter.get('description') or parameter['label'],
-        )
-        for parameter in parameters
+            meaning=guidance.get(parameter['key']) or parameter.get('description') or parameter['label'],
+        ) for parameter in parameters
     )
 
 
-def port_rows(ports: list[dict], *, vietnamese: bool = False) -> str:
-    if not ports:
-        return '| — | — | — | — | — | Không có port |' if vietnamese else '| — | — | — | — | — | No ports |'
+def port_rows(ports: list[dict], *, vietnamese: bool) -> str:
     return '\n'.join(
         '| `{key}` | {direction} | `{data_type}` | {required} | {variadic} | {label} |'.format(
-            key=port['key'],
-            direction=('đầu vào' if port['direction'] == 'input' else 'đầu ra') if vietnamese else port['direction'],
-            data_type=port['data_type'],
-            required=('có' if port.get('required', True) else 'không') if vietnamese else ('yes' if port.get('required', True) else 'no'),
-            variadic=('có' if port.get('variadic', False) else 'không') if vietnamese else ('yes' if port.get('variadic', False) else 'no'),
-            label=port['label'],
-        )
-        for port in ports
-    )
+            key=port['key'], direction=('đầu vào' if port['direction'] == 'input' else 'đầu ra') if vietnamese else port['direction'],
+            data_type=port['data_type'], required=('có' if port.get('required', True) else 'không') if vietnamese else ('yes' if port.get('required', True) else 'no'),
+            variadic=('có' if port.get('variadic', False) else 'không') if vietnamese else ('yes' if port.get('variadic', False) else 'no'), label=port['label'],
+        ) for port in ports
+    ) or ('| — | — | — | — | — | Không có port |' if vietnamese else '| — | — | — | — | — | No ports |')
 
 
-def runtime_notice(status: str, *, vietnamese: bool = False) -> str:
-    if vietnamese:
-        if status == 'debug':
-            return 'Runtime `debug` có thể thực thi trong phát triển, mô phỏng và nghiên cứu. Node chưa được duyệt cho production.'
-        return 'Runtime `test` mới có contract. Khi chạy, node phát sinh `NodeNotImplementedError`; không dùng trong workflow cần hoàn thành.'
-    if status == 'debug':
-        return 'Executable `debug` runtime for development, simulation, and research. This node is not approved for production.'
-    return 'Contract-only `test` runtime. Execution raises `NodeNotImplementedError`; do not use it in a workflow expected to complete.'
+def bullets(values: list[str]) -> str:
+    return '\n'.join(f'- {value}' for value in values)
 
 
-def render_english(manifest: dict) -> str:
-    definition = manifest['definition']
-    inputs = definition.get('inputs', [])
-    outputs = definition.get('outputs', [])
-    capabilities = ', '.join(f'`{item}`' for item in manifest.get('capabilities', [])) or 'None declared'
-    input_keys = ', '.join(f"`{port['key']}`" for port in inputs) or 'none'
-    output_keys = ', '.join(f"`{port['key']}`" for port in outputs) or 'none'
-    return f'''# {definition['name']} node
+def chain(values: list[str]) -> str:
+    return ' → '.join(f'`{value}`' for value in values)
 
-## Purpose
 
-{definition['description']}
+def troubleshooting(values: list[dict[str, str]], *, vietnamese: bool) -> str:
+    header = '| Hiện tượng | Nguyên nhân | Cách xử lý |\n|---|---|---|' if vietnamese else '| Symptom | Cause | Resolution |\n|---|---|---|'
+    return header + '\n' + '\n'.join(f"| {item['symptom']} | {item['cause']} | {item['resolution']} |" for item in values)
 
-## Runtime contract
 
-| Field | Value |
+def render(manifest: dict, documentation: dict, language: str) -> str:
+    vi = language == 'vi'
+    definition, content = manifest['definition'], documentation[language]
+    inputs, outputs, parameters = definition.get('inputs', []), definition.get('outputs', []), definition.get('parameters', [])
+    capabilities = ', '.join(f'`{item}`' for item in manifest.get('capabilities', [])) or ('Chưa khai báo' if vi else 'None declared')
+    parameter_json = json.dumps(content['example']['parameters'], ensure_ascii=False, indent=2)
+    input_steps = '\n'.join(
+        (f"{i}. Nối output `{port['data_type']}` vào `{port['key']}`. " if vi else f"{i}. Connect a `{port['data_type']}` output to `{port['key']}`. ") + content['inputGuidance'].get(port['key'], '')
+        for i, port in enumerate(inputs, 1)
+    ) or ('Node không yêu cầu input.' if vi else 'This node has no input.')
+    output_steps = '\n'.join(f"- `{port['key']}` (`{port['data_type']}`): {content['outputGuidance'].get(port['key'], port['label'])}" for port in outputs) or '- —'
+    title = f"Node {definition['name']}" if vi else f"{definition['name']} node"
+    debug_notice = '> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.' if vi else '> **DEBUG notice:** Executable for development/research, not approved for production.'
+    return f'''# {title}
+
+## {'Mục đích và cách dùng nhanh' if vi else 'Purpose and quick use'}
+
+{content['overview']}
+
+**{'Dùng khi' if vi else 'Use when'}:** {content['whenToUse']}
+
+**{'Luồng nhanh' if vi else 'Quick flow'}:** {chain(content['example']['workflow'])}
+
+## {'Cấu trúc node' if vi else 'Node structure'}
+
+```text
+{', '.join(port['key'] for port in inputs) or '(no input)'}
+    │
+    ▼
+[{manifest['id']}]
+    │
+    └── {', '.join(port['key'] for port in outputs) or '(no output)'}
+```
+
+{content['structure']}
+
+## {'Nguyên lý xử lý' if vi else 'How the algorithm works'}
+
+{bullets(content['algorithm'])}
+
+## {'Contract runtime' if vi else 'Runtime contract'}
+
+| {'Trường' if vi else 'Field'} | {'Giá trị' if vi else 'Value'} |
 |---|---|
 | Node ID | `{manifest['id']}` |
-| Category | {definition['category']} |
-| Status | `{manifest['use']}` |
-| Package version | `{manifest['packageVersion']}` |
-| Execution target | `{manifest['executionTarget']}` |
-| Inspector | `{manifest['inspector']['kind']}` |
-| Capabilities | {capabilities} |
+| {'Nhóm' if vi else 'Category'} | {definition['category']} |
+| {'Trạng thái' if vi else 'Status'} | `{manifest['use']}` |
+| {'Đích thực thi' if vi else 'Execution target'} | `{manifest['executionTarget']}` |
+| {'Khả năng' if vi else 'Capabilities'} | {capabilities} |
 
-{runtime_notice(manifest['use'])}
+{debug_notice}
 
-## Ports
+## {'Cách nhập dữ liệu và đọc output' if vi else 'How to provide inputs and read outputs'}
 
-| Key | Direction | Data type | Required | Variadic | Label |
+| Key | {'Hướng' if vi else 'Direction'} | {'Kiểu' if vi else 'Type'} | Required | Variadic | Label |
 |---|---|---|---|---|---|
-{port_rows([*inputs, *outputs])}
+{port_rows([*inputs, *outputs], vietnamese=vi)}
 
-## Parameters
+### {'Nhập input' if vi else 'Provide inputs'}
 
-| Key | Kind | Default | Minimum | Maximum | Options | Meaning |
+{input_steps}
+
+### {'Đọc output' if vi else 'Read outputs'}
+
+{output_steps}
+
+## {'Cách nhập tham số' if vi else 'How to enter parameters'}
+
+| Key | Kind | Default | Min | Max | Options | {'Cách nhập / Ý nghĩa' if vi else 'How to enter / Meaning'} |
 |---|---|---|---|---|---|---|
-{parameter_rows(definition.get('parameters', []))}
+{parameter_rows(parameters, content['parameterGuidance'], vietnamese=vi)}
 
-## Workflow use
+## {'Ví dụ sử dụng có thể làm theo ngay' if vi else 'Copy-ready usage example'}
 
-1. Add **{definition['name']}** from **{definition['category']}** in Workflow editor.
-2. Connect typed inputs: {input_keys}.
-3. Configure parameters within listed limits.
-4. Connect outputs: {output_keys}.
-5. Save workflow before pressing **Run** in Project workspace.
+**{'Mục tiêu' if vi else 'Goal'}:** {content['example']['goal']}
 
-Connections require exact data-type equality. Workflow remains a DAG; cycles and self-loops are rejected. `delay` and `bounded-repeat` provide bounded behavior without graph cycles.
+**Workflow:** {chain(content['example']['workflow'])}
 
-## Evidence and safety
+{bullets(content['example']['steps'])}
 
-Runtime stores parameters, summarized inputs and outputs, duration, version, status, and evidence hash. Image arrays are not stored in JSON evidence. `image-output` marks latest image for encoded PNG preview in 2D optical view.
+**{'Nhập trong bảng config' if vi else 'Paste into the config panel'}:**
 
-- Status `{manifest['use']}` is not production approval.
-- Validate dimensions, channel order, dtype, thresholds, timing, and memory on target hardware.
-- Production mode rejects every node not marked `release`.
+```json
+{parameter_json}
+```
+
+**{'Input ví dụ' if vi else 'Example input'}:** {content['example']['input']}
+
+**{'Kết quả mong đợi' if vi else 'Expected output'}:** {content['example']['expectedOutput']}
+
+## {'Lỗi thường gặp' if vi else 'Troubleshooting'}
+
+{troubleshooting(content['troubleshooting'], vietnamese=vi)}
+
+## {'Giới hạn và kiểm tra trước production' if vi else 'Limitations and production checks'}
+
+{bullets(content['limitations'])}
+
+### {'Checklist trước production' if vi else 'Production checklist'}
+
+{bullets(content['productionChecklist'])}
 '''
 
 
-def render_vietnamese(manifest: dict) -> str:
-    definition = manifest['definition']
-    inputs = definition.get('inputs', [])
-    outputs = definition.get('outputs', [])
-    capabilities = ', '.join(f'`{item}`' for item in manifest.get('capabilities', [])) or 'Chưa khai báo'
-    input_keys = ', '.join(f"`{port['key']}`" for port in inputs) or 'không có'
-    output_keys = ', '.join(f"`{port['key']}`" for port in outputs) or 'không có'
-    return f'''# Node {definition['name']}
+def render_english(manifest: dict, documentation: dict) -> str:
+    return render(manifest, documentation, 'en')
 
-## Mục đích
 
-Node `{manifest['id']}` xử lý bước **{definition['name']}** thuộc nhóm **{definition['category']}** trong workflow AOI. Mô tả contract gốc: “{definition['description']}”
-
-## Contract runtime
-
-| Trường | Giá trị |
-|---|---|
-| Node ID | `{manifest['id']}` |
-| Nhóm | {definition['category']} |
-| Trạng thái | `{manifest['use']}` |
-| Phiên bản package | `{manifest['packageVersion']}` |
-| Đích thực thi | `{manifest['executionTarget']}` |
-| Inspector | `{manifest['inspector']['kind']}` |
-| Khả năng | {capabilities} |
-
-{runtime_notice(manifest['use'], vietnamese=True)}
-
-## Port
-
-| Key | Hướng | Kiểu dữ liệu | Bắt buộc | Variadic | Nhãn |
-|---|---|---|---|---|---|
-{port_rows([*inputs, *outputs], vietnamese=True)}
-
-## Tham số
-
-| Key | Kiểu | Mặc định | Nhỏ nhất | Lớn nhất | Lựa chọn | Ý nghĩa |
-|---|---|---|---|---|---|---|
-{parameter_rows(definition.get('parameters', []))}
-
-## Cách dùng trong workflow
-
-1. Thêm **{definition['name']}** từ nhóm **{definition['category']}** trong Workflow editor.
-2. Nối input đúng kiểu: {input_keys}.
-3. Cấu hình tham số trong giới hạn đã liệt kê.
-4. Nối output: {output_keys}.
-5. Lưu workflow trước khi bấm **Run** trong Project workspace.
-
-Connection yêu cầu kiểu dữ liệu trùng tuyệt đối. Workflow vẫn là DAG; cycle và self-loop bị từ chối. `delay` và `bounded-repeat` cung cấp hành vi có giới hạn mà không tạo cycle trong graph.
-
-## Bằng chứng và an toàn
-
-Runtime lưu tham số, tóm tắt input/output, thời lượng, phiên bản, trạng thái và evidence hash. Mảng ảnh không được lưu trong JSON evidence. `image-output` đánh dấu ảnh mới nhất để mã hóa PNG và hiển thị trong 2D optical view.
-
-- Trạng thái `{manifest['use']}` không đồng nghĩa được duyệt cho production.
-- Phải kiểm tra kích thước, thứ tự channel, dtype, threshold, timing và memory trên phần cứng đích.
-- Production mode từ chối mọi node chưa mang trạng thái `release`.
-'''
+def render_vietnamese(manifest: dict, documentation: dict) -> str:
+    return render(manifest, documentation, 'vi')
 
 
 def main() -> None:
     manifests = sorted(NODES_ROOT.glob('*/*/manifest.json'))
+    generated = 0
     for manifest_path in manifests:
         manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
-        manifest_path.with_name('README.md').write_text(render_english(manifest), encoding='utf-8')
-        manifest_path.with_name('README.md.vn').write_text(render_vietnamese(manifest), encoding='utf-8')
-    print(f'Generated bilingual documentation for {len(manifests)} node packages.')
+        documentation_path = manifest_path.with_name('documentation.json')
+        if manifest['use'] == 'debug' and not documentation_path.is_file():
+            raise ValueError(f'DEBUG node {manifest["id"]} is missing documentation.json.')
+        if not documentation_path.is_file():
+            continue
+        documentation = json.loads(documentation_path.read_text(encoding='utf-8'))
+        with manifest_path.with_name('README.md').open('w', encoding='utf-8', newline='\n') as stream:
+            stream.write(render_english(manifest, documentation))
+        with manifest_path.with_name('README.md.vn').open('w', encoding='utf-8', newline='\n') as stream:
+            stream.write(render_vietnamese(manifest, documentation))
+        generated += 1
+    print(f'Generated detailed bilingual documentation for {generated} node packages.')
 
 
 if __name__ == '__main__':

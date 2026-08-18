@@ -1,0 +1,148 @@
+# Node Gaussian Naive Bayes object classifier
+
+## Mục đích và cách dùng nhanh
+
+`gaussian-naive-bayes-object-classifier` thực hiện **Gaussian Naive Bayes object classifier** trong pipeline AOI. Classifies detected objects from Gaussian color distributions learned per class. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.
+
+**Dùng khi:** cần bước gaussian naive bayes object classifier có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.
+
+**Luồng nhanh:** `image-input` → `global-threshold` → `connected-components` → `gaussian-naive-bayes-object-classifier` → `draw-detections`
+
+## Cấu trúc node
+
+```text
+image, detections
+    │
+    ▼
+[gaussian-naive-bayes-object-classifier]
+    │
+    └── classified-detections
+```
+
+Input gồm `image`:image, `detections`:detections. Node áp dụng scikit-learn GaussianNB. Output gồm `classified-detections`:detections. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.
+
+## Nguyên lý xử lý
+
+- Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `gaussian-naive-bayes-object-classifier`.
+- Các parameter `implementation`, `varianceSmoothing`, `trainingSamples` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.
+- Ước lượng mean, variance BGR và prior cho từng lớp.
+- Cộng varianceSmoothing để tránh variance bằng 0.
+- Tính log-posterior Gaussian rồi chuẩn hóa thành xác suất lớp.
+- Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy.
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `gaussian-naive-bayes-object-classifier` |
+| Nhóm | Classification |
+| Trạng thái | `debug` |
+| Đích thực thi | `local-cpu` |
+| Khả năng | `numpy`, `scikit-learn`, `classification`, `probabilistic-model` |
+
+> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.
+
+## Cách nhập dữ liệu và đọc output
+
+| Key | Hướng | Kiểu | Required | Variadic | Label |
+|---|---|---|---|---|---|
+| `image` | đầu vào | `image` | có | không | Image |
+| `detections` | đầu vào | `detections` | có | không | Detected objects |
+| `classified-detections` | đầu ra | `detections` | có | không | Classified objects |
+
+### Nhập input
+
+1. Nối output `image` vào `image`. Cấp ảnh `image`; kiểm tra shape, dtype và thứ tự kênh.
+2. Nối output `detections` vào `detections`. Cấp `detections` đúng semantic của Detected objects; không dùng dữ liệu ảnh thay thế.
+
+### Đọc output
+
+- `classified-detections` (`detections`): Classified objects kiểu `detections`; xem preview hoặc nối sang node downstream tương thích.
+
+## Cách nhập tham số
+
+| Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
+|---|---|---|---|---|---|---|
+| `implementation` | `select` | `scikit-learn` | — | — | `scikit-learn`, `manual-python` | Choose scikit-learn or the manually implemented Gaussian log-posterior. |
+| `varianceSmoothing` | `number` | `1e-09` | `1e-12` | `1.0` | — | Prevents division by zero when samples in a class have nearly identical colors. |
+| `trainingSamples` | `json` | `[{"label": "dark", "color": [20, 20, 20]}, {"label": "dark", "color": [50, 50, 50]}, {"label": "bright", "color": [205, 205, 205]}, {"label": "bright", "color": [245, 245, 245]}]` | — | — | — | JSON list: each item is {"label": "class-name", "color": [B, G, R]}. |
+
+## Ví dụ sử dụng có thể làm theo ngay
+
+**Mục tiêu:** Chạy thử gaussian naive bayes object classifier với input đúng kiểu (`image`:image, `detections`:detections) và kiểm tra output.
+
+**Workflow:** `image-input` → `global-threshold` → `connected-components` → `gaussian-naive-bayes-object-classifier` → `draw-detections`
+
+- Kéo **Gaussian Naive Bayes object classifier** vào canvas.
+- Nối port theo workflow mẫu.
+- Mở Node inspector và nhập config JSON bên dưới.
+- Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần.
+
+**Nhập trong bảng config:**
+
+```json
+{
+  "implementation": "scikit-learn",
+  "varianceSmoothing": 1e-09,
+  "trainingSamples": [
+    {
+      "label": "dark",
+      "color": [
+        20,
+        20,
+        20
+      ]
+    },
+    {
+      "label": "dark",
+      "color": [
+        50,
+        50,
+        50
+      ]
+    },
+    {
+      "label": "bright",
+      "color": [
+        205,
+        205,
+        205
+      ]
+    },
+    {
+      "label": "bright",
+      "color": [
+        245,
+        245,
+        245
+      ]
+    }
+  ]
+}
+```
+
+**Input ví dụ:** Dữ liệu cho `image`:image, `detections`:detections; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.
+
+**Kết quả mong đợi:** Tạo classified-detections đúng kiểu và không báo lỗi.
+
+## Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Không nối được port | Data type không trùng. | Dùng node trung gian tạo đúng kiểu trong bảng port. |
+| Invalid parameter | Ngoài Min/Max hoặc JSON sai. | Copy config ví dụ rồi thay từng giá trị. |
+| Output rỗng/nhiễu | Input hoặc tham số không hợp giả định. | Preview input, khôi phục mặc định, tinh chỉnh từng bước. |
+| Hai implementation cho confidence hơi khác | Solver và tiêu chí dừng khác nhau. | So sánh nhãn/metric với tolerance; không yêu cầu số thực giống tuyệt đối. |
+
+## Giới hạn và kiểm tra trước production
+
+- Node ở trạng thái DEBUG, chưa duyệt production.
+- Kết quả phụ thuộc input và giả định của scikit-learn GaussianNB.
+- Cần đo latency/bộ nhớ trên phần cứng đích.
+- trainingSamples nằm trong recipe, chỉ phù hợp tập mẫu nhỏ và không chứa dữ liệu nhạy cảm.
+
+### Checklist trước production
+
+- Khóa camera, ánh sáng, độ phân giải và channel order.
+- Đánh giá tập OK/NG đại diện và đo false-call/escape.
+- Đặt giới hạn parameter, timeout và fail-closed.

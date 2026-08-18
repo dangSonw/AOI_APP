@@ -1,0 +1,231 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`gaussian-naive-bayes-object-classifier` performs **Gaussian Naive Bayes object classifier** in an AOI pipeline. Classifies detected objects from Gaussian color distributions learned per class. Configure it in Node inspector and connect outputs to ports with matching data types.",
+    "whenToUse": "you need a repeatable gaussian naive bayes object classifier step stored in a recipe and inspectable on its own.",
+    "structure": "Inputs are `image`:image, `detections`:detections. The node applies scikit-learn GaussianNB. Outputs are `classified-detections`:detections. Each key in the diagram is the exact port name used when connecting edges.",
+    "algorithm": [
+      "Validate input presence, data types, and shapes against `gaussian-naive-bayes-object-classifier`.",
+      "Parameters `implementation`, `varianceSmoothing`, `trainingSamples` control processing; change one value at a time to trace its effect.",
+      "Estimate per-class BGR mean, variance, and prior.",
+      "Add varianceSmoothing to avoid zero variance.",
+      "Evaluate Gaussian log posterior and normalize it into class probabilities.",
+      "Normalize/package results with declared data types so graph compatibility is checked before execution."
+    ],
+    "inputGuidance": {
+      "image": "Provide `image` image data; verify shape, dtype, and channel order.",
+      "detections": "Provide `detections` matching Detected objects; do not substitute image data."
+    },
+    "outputGuidance": {
+      "classified-detections": "Classified objects as `detections`; preview it or connect a compatible downstream node."
+    },
+    "parameterGuidance": {
+      "implementation": "Choose scikit-learn or the manually implemented Gaussian log-posterior.",
+      "varianceSmoothing": "Prevents division by zero when samples in a class have nearly identical colors.",
+      "trainingSamples": "JSON list: each item is {\"label\": \"class-name\", \"color\": [B, G, R]}."
+    },
+    "example": {
+      "goal": "Run gaussian naive bayes object classifier with correctly typed input (`image`:image, `detections`:detections) and inspect its output.",
+      "workflow": [
+        "image-input",
+        "global-threshold",
+        "connected-components",
+        "gaussian-naive-bayes-object-classifier",
+        "draw-detections"
+      ],
+      "parameters": {
+        "implementation": "scikit-learn",
+        "varianceSmoothing": 1e-09,
+        "trainingSamples": [
+          {
+            "label": "dark",
+            "color": [
+              20,
+              20,
+              20
+            ]
+          },
+          {
+            "label": "dark",
+            "color": [
+              50,
+              50,
+              50
+            ]
+          },
+          {
+            "label": "bright",
+            "color": [
+              205,
+              205,
+              205
+            ]
+          },
+          {
+            "label": "bright",
+            "color": [
+              245,
+              245,
+              245
+            ]
+          }
+        ]
+      },
+      "steps": [
+        "Drag **Gaussian Naive Bayes object classifier** onto the canvas.",
+        "Connect ports as shown in the workflow.",
+        "Open Node inspector and enter the JSON config below.",
+        "Run, inspect output, then tune one parameter at a time."
+      ],
+      "input": "Data for `image`:image, `detections`:detections; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.",
+      "expectedOutput": "Produce classified-detections with the declared type and no error."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Ports cannot connect",
+        "cause": "Data types differ.",
+        "resolution": "Insert a node producing the exact type in the ports table."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Outside Min/Max or malformed JSON.",
+        "resolution": "Copy the example config and change one value at a time."
+      },
+      {
+        "symptom": "Empty/noisy output",
+        "cause": "Input or settings violate assumptions.",
+        "resolution": "Preview input, restore defaults, and tune incrementally."
+      },
+      {
+        "symptom": "Implementations give slightly different confidence",
+        "cause": "Solvers and stopping criteria differ.",
+        "resolution": "Compare labels/metrics with tolerance; do not require bit-identical floats."
+      }
+    ],
+    "limitations": [
+      "This node is DEBUG and not production-approved.",
+      "Results depend on input and assumptions of scikit-learn GaussianNB.",
+      "Measure latency/memory on target hardware.",
+      "trainingSamples live in the recipe and are intended only for small, non-sensitive sample sets."
+    ],
+    "productionChecklist": [
+      "Lock camera, illumination, resolution, and channel order.",
+      "Evaluate representative OK/NG data and false-call/escape rates.",
+      "Set parameter limits, timeouts, and fail-closed checks."
+    ]
+  },
+  "vi": {
+    "overview": "`gaussian-naive-bayes-object-classifier` thực hiện **Gaussian Naive Bayes object classifier** trong pipeline AOI. Classifies detected objects from Gaussian color distributions learned per class. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.",
+    "whenToUse": "cần bước gaussian naive bayes object classifier có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.",
+    "structure": "Input gồm `image`:image, `detections`:detections. Node áp dụng scikit-learn GaussianNB. Output gồm `classified-detections`:detections. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.",
+    "algorithm": [
+      "Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `gaussian-naive-bayes-object-classifier`.",
+      "Các parameter `implementation`, `varianceSmoothing`, `trainingSamples` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.",
+      "Ước lượng mean, variance BGR và prior cho từng lớp.",
+      "Cộng varianceSmoothing để tránh variance bằng 0.",
+      "Tính log-posterior Gaussian rồi chuẩn hóa thành xác suất lớp.",
+      "Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy."
+    ],
+    "inputGuidance": {
+      "image": "Cấp ảnh `image`; kiểm tra shape, dtype và thứ tự kênh.",
+      "detections": "Cấp `detections` đúng semantic của Detected objects; không dùng dữ liệu ảnh thay thế."
+    },
+    "outputGuidance": {
+      "classified-detections": "Classified objects kiểu `detections`; xem preview hoặc nối sang node downstream tương thích."
+    },
+    "parameterGuidance": {
+      "implementation": "Choose scikit-learn or the manually implemented Gaussian log-posterior.",
+      "varianceSmoothing": "Prevents division by zero when samples in a class have nearly identical colors.",
+      "trainingSamples": "JSON list: each item is {\"label\": \"class-name\", \"color\": [B, G, R]}."
+    },
+    "example": {
+      "goal": "Chạy thử gaussian naive bayes object classifier với input đúng kiểu (`image`:image, `detections`:detections) và kiểm tra output.",
+      "workflow": [
+        "image-input",
+        "global-threshold",
+        "connected-components",
+        "gaussian-naive-bayes-object-classifier",
+        "draw-detections"
+      ],
+      "parameters": {
+        "implementation": "scikit-learn",
+        "varianceSmoothing": 1e-09,
+        "trainingSamples": [
+          {
+            "label": "dark",
+            "color": [
+              20,
+              20,
+              20
+            ]
+          },
+          {
+            "label": "dark",
+            "color": [
+              50,
+              50,
+              50
+            ]
+          },
+          {
+            "label": "bright",
+            "color": [
+              205,
+              205,
+              205
+            ]
+          },
+          {
+            "label": "bright",
+            "color": [
+              245,
+              245,
+              245
+            ]
+          }
+        ]
+      },
+      "steps": [
+        "Kéo **Gaussian Naive Bayes object classifier** vào canvas.",
+        "Nối port theo workflow mẫu.",
+        "Mở Node inspector và nhập config JSON bên dưới.",
+        "Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần."
+      ],
+      "input": "Dữ liệu cho `image`:image, `detections`:detections; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.",
+      "expectedOutput": "Tạo classified-detections đúng kiểu và không báo lỗi."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Không nối được port",
+        "cause": "Data type không trùng.",
+        "resolution": "Dùng node trung gian tạo đúng kiểu trong bảng port."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Ngoài Min/Max hoặc JSON sai.",
+        "resolution": "Copy config ví dụ rồi thay từng giá trị."
+      },
+      {
+        "symptom": "Output rỗng/nhiễu",
+        "cause": "Input hoặc tham số không hợp giả định.",
+        "resolution": "Preview input, khôi phục mặc định, tinh chỉnh từng bước."
+      },
+      {
+        "symptom": "Hai implementation cho confidence hơi khác",
+        "cause": "Solver và tiêu chí dừng khác nhau.",
+        "resolution": "So sánh nhãn/metric với tolerance; không yêu cầu số thực giống tuyệt đối."
+      }
+    ],
+    "limitations": [
+      "Node ở trạng thái DEBUG, chưa duyệt production.",
+      "Kết quả phụ thuộc input và giả định của scikit-learn GaussianNB.",
+      "Cần đo latency/bộ nhớ trên phần cứng đích.",
+      "trainingSamples nằm trong recipe, chỉ phù hợp tập mẫu nhỏ và không chứa dữ liệu nhạy cảm."
+    ],
+    "productionChecklist": [
+      "Khóa camera, ánh sáng, độ phân giải và channel order.",
+      "Đánh giá tập OK/NG đại diện và đo false-call/escape.",
+      "Đặt giới hạn parameter, timeout và fail-closed."
+    ]
+  }
+}

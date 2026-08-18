@@ -5,7 +5,7 @@ import {
   readPhysicalOutputs,
   writePhysicalOutputs,
 } from '../services/physical-io-service';
-import { readAlgorithmCatalog, readWorkflow } from '../services/workflow-service';
+import { readWorkflow } from '../services/workflow-service';
 import { readDeviceSnapshot } from '../services/device-service';
 import {
   cancelInspectionRun,
@@ -19,7 +19,7 @@ import type { AuthSession } from '../types/auth';
 import type { PhysicalInputState, PhysicalOutputState } from '../types/physical-io';
 import type { DeviceSnapshot } from '../types/devices';
 import type { InspectionRun } from '../types/inspection';
-import type { AlgorithmDefinition, Workflow } from '../types/workflow';
+import type { Workflow } from '../types/workflow';
 import type { WorkstationPreferences } from '../types/workstation-preferences';
 import { createDefaultPreferences } from '../utils/workstation-preferences';
 import type { WorkspaceView } from '../types/workspace';
@@ -54,7 +54,6 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
   const [savedWorkflow, setSavedWorkflow] = useState<Workflow | null>(null);
   const [workflowError, setWorkflowError] = useState('');
   const [isWorkflowDirty, setIsWorkflowDirty] = useState(false);
-  const [catalog, setCatalog] = useState<AlgorithmDefinition[]>([]);
   const [savedPreferences, setSavedPreferences] = useState<WorkstationPreferences>(() => createDefaultPreferences(session.user.id, DEFAULT_WORKSTATION_ID));
   const [draftPreferences, setDraftPreferences] = useState<WorkstationPreferences>(() => createDefaultPreferences(session.user.id, DEFAULT_WORKSTATION_ID));
   const [preferenceError, setPreferenceError] = useState('');
@@ -108,12 +107,8 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
   const loadSavedWorkflow = useCallback(async () => {
     setWorkflowError('');
     try {
-      const [nextWorkflow, nextCatalog] = await Promise.all([
-        readWorkflow(session.accessToken, ACTIVE_RECIPE_SLUG),
-        readAlgorithmCatalog(session.accessToken),
-      ]);
+      const nextWorkflow = await readWorkflow(session.accessToken, ACTIVE_RECIPE_SLUG);
       setSavedWorkflow(nextWorkflow);
-      setCatalog(nextCatalog);
     } catch (loadError) {
       setWorkflowError(loadError instanceof Error ? loadError.message : 'The saved inspection workflow could not be loaded.');
     }
@@ -288,7 +283,6 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
           workflow={savedWorkflow}
           workflowError={workflowError}
           onConfigureWorkflow={() => requestViewChange('workflow-editor')}
-          catalog={catalog}
           preferences={draftPreferences.dashboard}
           onPreferencesChange={(dashboard) => setDraftPreferences((current) => ({ ...current, dashboard }))}
           onOutputToggle={(signalName, currentValue) => void toggleOutput(signalName, currentValue)}

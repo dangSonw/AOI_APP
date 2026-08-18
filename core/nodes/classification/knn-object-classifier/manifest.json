@@ -1,0 +1,36 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "knn-object-classifier",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["opencv", "numpy", "knn", "object-classification"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 256, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "knn-object-classifier",
+    "name": "KNN object classifier",
+    "description": "Classifies detected objects from their mean BGR color using OpenCV KNN matching or a manual Python KNN implementation.",
+    "category": "Classification",
+    "documentation_group": "Classical machine learning",
+    "inputs": [
+      {"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false},
+      {"key": "detections", "label": "Detected objects", "direction": "input", "data_type": "detections", "required": true, "variadic": false}
+    ],
+    "outputs": [
+      {"key": "classified-detections", "label": "Classified objects", "direction": "output", "data_type": "detections", "required": true, "variadic": false}
+    ],
+    "parameters": [
+      {"key": "implementation", "label": "Implementation", "kind": "select", "default_value": "opencv", "required": true, "minimum": null, "maximum": null, "options": ["opencv", "manual-python"], "description": "Use OpenCV BFMatcher KNN matching or the KNN algorithm implemented with Python/NumPy."},
+      {"key": "neighbors", "label": "K neighbors", "kind": "integer", "default_value": 3, "required": true, "minimum": 1, "maximum": 1000, "options": [], "description": "Must not exceed the number of training samples."},
+      {"key": "distanceMetric", "label": "Distance metric", "kind": "select", "default_value": "euclidean", "required": true, "minimum": null, "maximum": null, "options": ["euclidean", "manhattan"], "description": "OpenCV supports Euclidean; manual Python supports Euclidean and Manhattan."},
+      {"key": "distanceWeighted", "label": "Distance-weighted vote", "kind": "boolean", "default_value": true, "required": true, "minimum": null, "maximum": null, "options": [], "description": "Weight closer neighbors more strongly."},
+      {"key": "trainingSamples", "label": "Training samples", "kind": "json", "default_value": [{"label": "dark", "color": [32, 32, 32]}, {"label": "dark", "color": [64, 64, 64]}, {"label": "bright", "color": [192, 192, 192]}, {"label": "bright", "color": [224, 224, 224]}], "required": true, "minimum": null, "maximum": null, "options": [], "description": "JSON samples with a label and representative BGR color."}
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV DescriptorMatcher.knnMatch"
+  },
+  "catalogOrder": 92
+}

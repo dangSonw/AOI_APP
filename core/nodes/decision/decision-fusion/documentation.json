@@ -1,0 +1,139 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`decision-fusion` performs **Decision fusion** in an AOI pipeline. Combines one or more scores into a review decision. Configure it in Node inspector and connect outputs to ports with matching data types.",
+    "whenToUse": "you need a repeatable decision fusion step stored in a recipe and inspectable on its own.",
+    "structure": "Inputs are `scores`:score. The node applies Decision fusion. Outputs are `decision`:decision. Each key in the diagram is the exact port name used when connecting edges.",
+    "algorithm": [
+      "Validate input presence, data types, and shapes against `decision-fusion`.",
+      "Parameters `reviewThreshold`, `failThreshold` control processing; change one value at a time to trace its effect.",
+      "Apply **Decision fusion**: Combines one or more scores into a review decision.",
+      "Normalize/package results with declared data types so graph compatibility is checked before execution."
+    ],
+    "inputGuidance": {
+      "scores": "Provide `score` matching Scores; do not substitute image data."
+    },
+    "outputGuidance": {
+      "decision": "Decision as `decision`; preview it or connect a compatible downstream node."
+    },
+    "parameterGuidance": {
+      "reviewThreshold": "Enter `number` within Min/Max; try the default first.",
+      "failThreshold": "Enter `number` within Min/Max; try the default first."
+    },
+    "example": {
+      "goal": "Run decision fusion with correctly typed input (`scores`:score) and inspect its output.",
+      "workflow": [
+        "mask-coverage-score",
+        "decision-fusion",
+        "decision-output"
+      ],
+      "parameters": {
+        "reviewThreshold": 0.5,
+        "failThreshold": 0.8
+      },
+      "steps": [
+        "Drag **Decision fusion** onto the canvas.",
+        "Connect ports as shown in the workflow.",
+        "Open Node inspector and enter the JSON config below.",
+        "Run, inspect output, then tune one parameter at a time."
+      ],
+      "input": "Data for `scores`:score; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.",
+      "expectedOutput": "Produce decision with the declared type and no error."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Ports cannot connect",
+        "cause": "Data types differ.",
+        "resolution": "Insert a node producing the exact type in the ports table."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Outside Min/Max or malformed JSON.",
+        "resolution": "Copy the example config and change one value at a time."
+      },
+      {
+        "symptom": "Empty/noisy output",
+        "cause": "Input or settings violate assumptions.",
+        "resolution": "Preview input, restore defaults, and tune incrementally."
+      }
+    ],
+    "limitations": [
+      "This node is DEBUG and not production-approved.",
+      "Results depend on input and assumptions of Decision fusion.",
+      "Measure latency/memory on target hardware."
+    ],
+    "productionChecklist": [
+      "Lock camera, illumination, resolution, and channel order.",
+      "Evaluate representative OK/NG data and false-call/escape rates.",
+      "Set parameter limits, timeouts, and fail-closed checks."
+    ]
+  },
+  "vi": {
+    "overview": "`decision-fusion` thực hiện **Decision fusion** trong pipeline AOI. Combines one or more scores into a review decision. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.",
+    "whenToUse": "cần bước decision fusion có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.",
+    "structure": "Input gồm `scores`:score. Node áp dụng Decision fusion. Output gồm `decision`:decision. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.",
+    "algorithm": [
+      "Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `decision-fusion`.",
+      "Các parameter `reviewThreshold`, `failThreshold` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.",
+      "Áp dụng **Decision fusion**: Combines one or more scores into a review decision.",
+      "Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy."
+    ],
+    "inputGuidance": {
+      "scores": "Cấp `score` đúng semantic của Scores; không dùng dữ liệu ảnh thay thế."
+    },
+    "outputGuidance": {
+      "decision": "Decision kiểu `decision`; xem preview hoặc nối sang node downstream tương thích."
+    },
+    "parameterGuidance": {
+      "reviewThreshold": "Nhập `number` trong Min/Max; thử giá trị mặc định trước.",
+      "failThreshold": "Nhập `number` trong Min/Max; thử giá trị mặc định trước."
+    },
+    "example": {
+      "goal": "Chạy thử decision fusion với input đúng kiểu (`scores`:score) và kiểm tra output.",
+      "workflow": [
+        "mask-coverage-score",
+        "decision-fusion",
+        "decision-output"
+      ],
+      "parameters": {
+        "reviewThreshold": 0.5,
+        "failThreshold": 0.8
+      },
+      "steps": [
+        "Kéo **Decision fusion** vào canvas.",
+        "Nối port theo workflow mẫu.",
+        "Mở Node inspector và nhập config JSON bên dưới.",
+        "Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần."
+      ],
+      "input": "Dữ liệu cho `scores`:score; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.",
+      "expectedOutput": "Tạo decision đúng kiểu và không báo lỗi."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Không nối được port",
+        "cause": "Data type không trùng.",
+        "resolution": "Dùng node trung gian tạo đúng kiểu trong bảng port."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Ngoài Min/Max hoặc JSON sai.",
+        "resolution": "Copy config ví dụ rồi thay từng giá trị."
+      },
+      {
+        "symptom": "Output rỗng/nhiễu",
+        "cause": "Input hoặc tham số không hợp giả định.",
+        "resolution": "Preview input, khôi phục mặc định, tinh chỉnh từng bước."
+      }
+    ],
+    "limitations": [
+      "Node ở trạng thái DEBUG, chưa duyệt production.",
+      "Kết quả phụ thuộc input và giả định của Decision fusion.",
+      "Cần đo latency/bộ nhớ trên phần cứng đích."
+    ],
+    "productionChecklist": [
+      "Khóa camera, ánh sáng, độ phân giải và channel order.",
+      "Đánh giá tập OK/NG đại diện và đo false-call/escape.",
+      "Đặt giới hạn parameter, timeout và fail-closed."
+    ]
+  }
+}

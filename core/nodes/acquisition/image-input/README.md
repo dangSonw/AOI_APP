@@ -1,8 +1,32 @@
 # Image input node
 
-## Purpose
+## Purpose and quick use
 
-Provides an image selected by the recipe.
+`image-input` performs **Image input** in an AOI pipeline. Provides an image selected by the recipe. Configure it in Node inspector and connect outputs to ports with matching data types.
+
+**Use when:** you need a repeatable image input step stored in a recipe and inspectable on its own.
+
+**Quick flow:** `image-input` → `image-output`
+
+## Node structure
+
+```text
+(no input)
+    │
+    ▼
+[image-input]
+    │
+    └── image
+```
+
+Inputs are none. The node applies Image input. Outputs are `image`:image. Each key in the diagram is the exact port name used when connecting edges.
+
+## How the algorithm works
+
+- Validate input presence, data types, and shapes against `image-input`.
+- Parameters `source` control processing; change one value at a time to trace its effect.
+- Apply **Image input**: Provides an image selected by the recipe.
+- Normalize/package results with declared data types so graph compatibility is checked before execution.
 
 ## Runtime contract
 
@@ -11,39 +35,70 @@ Provides an image selected by the recipe.
 | Node ID | `image-input` |
 | Category | Acquisition |
 | Status | `debug` |
-| Package version | `1.0.0` |
 | Execution target | `local-cpu` |
-| Inspector | `generic` |
 | Capabilities | None declared |
 
-Executable `debug` runtime for development, simulation, and research. This node is not approved for production.
+> **DEBUG notice:** Executable for development/research, not approved for production.
 
-## Ports
+## How to provide inputs and read outputs
 
-| Key | Direction | Data type | Required | Variadic | Label |
+| Key | Direction | Type | Required | Variadic | Label |
 |---|---|---|---|---|---|
 | `image` | output | `image` | yes | no | Image |
 
-## Parameters
+### Provide inputs
 
-| Key | Kind | Default | Minimum | Maximum | Options | Meaning |
+This node has no input.
+
+### Read outputs
+
+- `image` (`image`): Image as `image`; preview it or connect a compatible downstream node.
+
+## How to enter parameters
+
+| Key | Kind | Default | Min | Max | Options | How to enter / Meaning |
 |---|---|---|---|---|---|---|
-| `source` | `text` | `recipe-image` | — | — | — | Source |
+| `source` | `text` | `recipe-image` | — | — | — | Enter `text` within Min/Max; try the default first. |
 
-## Workflow use
+## Copy-ready usage example
 
-1. Add **Image input** from **Acquisition** in Workflow editor.
-2. Connect typed inputs: none.
-3. Configure parameters within listed limits.
-4. Connect outputs: `image`.
-5. Save workflow before pressing **Run** in Project workspace.
+**Goal:** Run image input with correctly typed input (none) and inspect its output.
 
-Connections require exact data-type equality. Workflow remains a DAG; cycles and self-loops are rejected. `delay` and `bounded-repeat` provide bounded behavior without graph cycles.
+**Workflow:** `image-input` → `image-output`
 
-## Evidence and safety
+- Drag **Image input** onto the canvas.
+- Connect ports as shown in the workflow.
+- Open Node inspector and enter the JSON config below.
+- Run, inspect output, then tune one parameter at a time.
 
-Runtime stores parameters, summarized inputs and outputs, duration, version, status, and evidence hash. Image arrays are not stored in JSON evidence. `image-output` marks latest image for encoded PNG preview in 2D optical view.
+**Paste into the config panel:**
 
-- Status `debug` is not production approval.
-- Validate dimensions, channel order, dtype, thresholds, timing, and memory on target hardware.
-- Production mode rejects every node not marked `release`.
+```json
+{
+  "source": "recipe-image"
+}
+```
+
+**Example input:** Data for none; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.
+
+**Expected output:** Produce image with the declared type and no error.
+
+## Troubleshooting
+
+| Symptom | Cause | Resolution |
+|---|---|---|
+| Ports cannot connect | Data types differ. | Insert a node producing the exact type in the ports table. |
+| Invalid parameter | Outside Min/Max or malformed JSON. | Copy the example config and change one value at a time. |
+| Empty/noisy output | Input or settings violate assumptions. | Preview input, restore defaults, and tune incrementally. |
+
+## Limitations and production checks
+
+- This node is DEBUG and not production-approved.
+- Results depend on input and assumptions of Image input.
+- Measure latency/memory on target hardware.
+
+### Production checklist
+
+- Lock camera, illumination, resolution, and channel order.
+- Evaluate representative OK/NG data and false-call/escape rates.
+- Set parameter limits, timeouts, and fail-closed checks.

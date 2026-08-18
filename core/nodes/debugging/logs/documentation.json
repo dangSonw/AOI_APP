@@ -1,0 +1,93 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`logs` emits one bounded structured message to exactly one workflow destination without serializing image data or credentials.",
+    "whenToUse": "you need an operator popup, a backend terminal message, or a durable plain-text diagnostic in data/logs/workflow-log.txt at a specific workflow step.",
+    "structure": "The system trigger activates `logs`; successful delivery emits success and validation or delivery errors emit failure. The node has no data ports.",
+    "algorithm": [
+      "Validate destination, severity, and bounded message text.",
+      "Route the message to exactly one configured destination.",
+      "Return a structured event for popup or file delivery while terminal delivery uses the backend logger."
+    ],
+    "inputGuidance": {},
+    "outputGuidance": {},
+    "parameterGuidance": {
+      "destination": "Choose exactly one destination: popup, terminal, or file.",
+      "level": "Choose info, warning, or error severity.",
+      "message": "Enter non-secret text between 1 and 1000 characters."
+    },
+    "example": {
+      "goal": "Display an operator warning when execution reaches the logs node.",
+      "workflow": ["image-input", "logs", "image-output"],
+      "parameters": {"destination": "popup", "level": "warning", "message": "Alignment requires review."},
+      "steps": [
+        "Drag Logs onto the canvas.",
+        "Connect the upstream success output to the Logs trigger.",
+        "Select popup, warning, and enter the bounded message.",
+        "Connect Logs success to the next node and run the workflow."
+      ],
+      "input": "No data input is required; activation arrives through the system trigger port.",
+      "expectedOutput": "One warning popup appears and the node emits success."
+    },
+    "troubleshooting": [
+      {"symptom": "No popup appears", "cause": "The node was not reached or another destination is selected.", "resolution": "Check the control edge and select popup."},
+      {"symptom": "The node is red", "cause": "The message or destination failed validation or delivery.", "resolution": "Inspect the node error and restore supported values."},
+      {"symptom": "A log file line is missing", "cause": "File was not selected or the write failed.", "resolution": "Select file and inspect data/logs/workflow-log.txt plus backend health."}
+    ],
+    "limitations": [
+      "The node is DEBUG and not production-approved.",
+      "Messages are limited to 1000 characters.",
+      "Image bytes, credentials, secrets, and request payloads must never be logged."
+    ],
+    "productionChecklist": [
+      "Review every configured message for sensitive information.",
+      "Verify popup behavior with operators and accessibility tools.",
+      "Apply rotation and access controls to data/logs/workflow-log.txt."
+    ]
+  },
+  "vi": {
+    "overview": "`logs` phát một thông báo có cấu trúc và giới hạn tới đúng một đích workflow mà không tuần tự hóa dữ liệu ảnh hoặc thông tin xác thực.",
+    "whenToUse": "cần popup cho người vận hành, thông báo terminal backend hoặc chẩn đoán dạng văn bản bền vững trong data/logs/workflow-log.txt tại một bước workflow cụ thể.",
+    "structure": "System trigger kích hoạt `logs`; gửi thành công phát success, còn lỗi kiểm tra hoặc gửi phát failure. Node không có data port.",
+    "algorithm": [
+      "Kiểm tra đích, mức độ và nội dung thông báo có giới hạn.",
+      "Định tuyến thông báo tới đúng một đích đã cấu hình.",
+      "Trả sự kiện có cấu trúc cho popup hoặc file; terminal dùng backend logger."
+    ],
+    "inputGuidance": {},
+    "outputGuidance": {},
+    "parameterGuidance": {
+      "destination": "Chọn đúng một đích: popup, terminal hoặc file.",
+      "level": "Chọn mức info, warning hoặc error.",
+      "message": "Nhập nội dung không chứa secret, dài từ 1 đến 1000 ký tự."
+    },
+    "example": {
+      "goal": "Hiển thị cảnh báo cho người vận hành khi execution tới node logs.",
+      "workflow": ["image-input", "logs", "image-output"],
+      "parameters": {"destination": "popup", "level": "warning", "message": "Alignment requires review."},
+      "steps": [
+        "Kéo Logs vào canvas.",
+        "Nối output success của node trước vào trigger của Logs.",
+        "Chọn popup, warning và nhập nội dung có giới hạn.",
+        "Nối success của Logs tới node tiếp theo rồi chạy workflow."
+      ],
+      "input": "Không cần data input; activation đi qua system trigger port.",
+      "expectedOutput": "Một warning popup xuất hiện và node phát success."
+    },
+    "troubleshooting": [
+      {"symptom": "Không thấy popup", "cause": "Flow chưa đi tới node hoặc đang chọn đích khác.", "resolution": "Kiểm tra control edge và chọn popup."},
+      {"symptom": "Node chuyển đỏ", "cause": "Nội dung hoặc đích không hợp lệ hay gửi thất bại.", "resolution": "Xem lỗi node và khôi phục các giá trị được hỗ trợ."},
+      {"symptom": "Thiếu dòng trong log file", "cause": "Chưa chọn file hoặc ghi thất bại.", "resolution": "Chọn file và kiểm tra data/logs/workflow-log.txt cùng sức khỏe backend."}
+    ],
+    "limitations": [
+      "Node ở trạng thái DEBUG, chưa duyệt production.",
+      "Nội dung bị giới hạn 1000 ký tự.",
+      "Không được log byte ảnh, credential, secret hoặc request payload."
+    ],
+    "productionChecklist": [
+      "Rà soát mọi thông báo cấu hình để loại dữ liệu nhạy cảm.",
+      "Xác minh popup với người vận hành và công cụ accessibility.",
+      "Áp dụng rotation và access control cho data/logs/workflow-log.txt."
+    ]
+  }
+}

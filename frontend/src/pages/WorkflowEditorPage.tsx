@@ -46,7 +46,6 @@ export function WorkflowEditorPage({
   const [notice, setNotice] = useState('');
   const [hasConflict, setHasConflict] = useState(false);
   const [documentationDefinition, setDocumentationDefinition] = useState<AlgorithmDefinition | null>(null);
-
   const loadEditor = useCallback(async () => {
     setIsLoading(true);
     setError('');

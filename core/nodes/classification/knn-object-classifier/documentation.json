@@ -1,0 +1,239 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`knn-object-classifier` performs **KNN object classifier** in an AOI pipeline. Classifies detected objects from their mean BGR color using OpenCV KNN matching or a manual Python KNN implementation. Configure it in Node inspector and connect outputs to ports with matching data types.",
+    "whenToUse": "you need a repeatable knn object classifier step stored in a recipe and inspectable on its own.",
+    "structure": "Inputs are `image`:image, `detections`:detections. The node applies OpenCV DescriptorMatcher.knnMatch. Outputs are `classified-detections`:detections. Each key in the diagram is the exact port name used when connecting edges.",
+    "algorithm": [
+      "Validate input presence, data types, and shapes against `knn-object-classifier`.",
+      "Parameters `implementation`, `neighbors`, `distanceMetric`, `distanceWeighted`, `trainingSamples` control processing; change one value at a time to trace its effect.",
+      "Compute the mean BGR vector inside every detection box.",
+      "Find K closest configured color samples; vote by count or inverse distance.",
+      "Return the winning label, confidence, and neighbor distances without changing input detections.",
+      "Normalize/package results with declared data types so graph compatibility is checked before execution."
+    ],
+    "inputGuidance": {
+      "image": "Provide `image` image data; verify shape, dtype, and channel order.",
+      "detections": "Provide `detections` matching Detected objects; do not substitute image data."
+    },
+    "outputGuidance": {
+      "classified-detections": "Classified objects as `detections`; preview it or connect a compatible downstream node."
+    },
+    "parameterGuidance": {
+      "implementation": "Use OpenCV BFMatcher KNN matching or the KNN algorithm implemented with Python/NumPy.",
+      "neighbors": "Must not exceed the number of training samples.",
+      "distanceMetric": "OpenCV supports Euclidean; manual Python supports Euclidean and Manhattan.",
+      "distanceWeighted": "Weight closer neighbors more strongly.",
+      "trainingSamples": "JSON samples with a label and representative BGR color."
+    },
+    "example": {
+      "goal": "Run knn object classifier with correctly typed input (`image`:image, `detections`:detections) and inspect its output.",
+      "workflow": [
+        "image-input",
+        "global-threshold",
+        "connected-components",
+        "knn-object-classifier",
+        "draw-detections"
+      ],
+      "parameters": {
+        "implementation": "opencv",
+        "neighbors": 3,
+        "distanceMetric": "euclidean",
+        "distanceWeighted": true,
+        "trainingSamples": [
+          {
+            "label": "dark",
+            "color": [
+              32,
+              32,
+              32
+            ]
+          },
+          {
+            "label": "dark",
+            "color": [
+              64,
+              64,
+              64
+            ]
+          },
+          {
+            "label": "bright",
+            "color": [
+              192,
+              192,
+              192
+            ]
+          },
+          {
+            "label": "bright",
+            "color": [
+              224,
+              224,
+              224
+            ]
+          }
+        ]
+      },
+      "steps": [
+        "Drag **KNN object classifier** onto the canvas.",
+        "Connect ports as shown in the workflow.",
+        "Open Node inspector and enter the JSON config below.",
+        "Run, inspect output, then tune one parameter at a time."
+      ],
+      "input": "Data for `image`:image, `detections`:detections; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.",
+      "expectedOutput": "Produce classified-detections with the declared type and no error."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Ports cannot connect",
+        "cause": "Data types differ.",
+        "resolution": "Insert a node producing the exact type in the ports table."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Outside Min/Max or malformed JSON.",
+        "resolution": "Copy the example config and change one value at a time."
+      },
+      {
+        "symptom": "Empty/noisy output",
+        "cause": "Input or settings violate assumptions.",
+        "resolution": "Preview input, restore defaults, and tune incrementally."
+      },
+      {
+        "symptom": "Implementations give slightly different confidence",
+        "cause": "Solvers and stopping criteria differ.",
+        "resolution": "Compare labels/metrics with tolerance; do not require bit-identical floats."
+      }
+    ],
+    "limitations": [
+      "This node is DEBUG and not production-approved.",
+      "Results depend on input and assumptions of OpenCV DescriptorMatcher.knnMatch.",
+      "Measure latency/memory on target hardware.",
+      "trainingSamples live in the recipe and are intended only for small, non-sensitive sample sets."
+    ],
+    "productionChecklist": [
+      "Lock camera, illumination, resolution, and channel order.",
+      "Evaluate representative OK/NG data and false-call/escape rates.",
+      "Set parameter limits, timeouts, and fail-closed checks."
+    ]
+  },
+  "vi": {
+    "overview": "`knn-object-classifier` thực hiện **KNN object classifier** trong pipeline AOI. Classifies detected objects from their mean BGR color using OpenCV KNN matching or a manual Python KNN implementation. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.",
+    "whenToUse": "cần bước knn object classifier có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.",
+    "structure": "Input gồm `image`:image, `detections`:detections. Node áp dụng OpenCV DescriptorMatcher.knnMatch. Output gồm `classified-detections`:detections. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.",
+    "algorithm": [
+      "Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `knn-object-classifier`.",
+      "Các parameter `implementation`, `neighbors`, `distanceMetric`, `distanceWeighted`, `trainingSamples` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.",
+      "Tính vector BGR trung bình bên trong từng bounding box.",
+      "Tìm K mẫu màu gần nhất; bỏ phiếu theo số lượng hoặc nghịch đảo khoảng cách.",
+      "Trả nhãn thắng, confidence và khoảng cách láng giềng mà không sửa detection đầu vào.",
+      "Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy."
+    ],
+    "inputGuidance": {
+      "image": "Cấp ảnh `image`; kiểm tra shape, dtype và thứ tự kênh.",
+      "detections": "Cấp `detections` đúng semantic của Detected objects; không dùng dữ liệu ảnh thay thế."
+    },
+    "outputGuidance": {
+      "classified-detections": "Classified objects kiểu `detections`; xem preview hoặc nối sang node downstream tương thích."
+    },
+    "parameterGuidance": {
+      "implementation": "Use OpenCV BFMatcher KNN matching or the KNN algorithm implemented with Python/NumPy.",
+      "neighbors": "Must not exceed the number of training samples.",
+      "distanceMetric": "OpenCV supports Euclidean; manual Python supports Euclidean and Manhattan.",
+      "distanceWeighted": "Weight closer neighbors more strongly.",
+      "trainingSamples": "JSON samples with a label and representative BGR color."
+    },
+    "example": {
+      "goal": "Chạy thử knn object classifier với input đúng kiểu (`image`:image, `detections`:detections) và kiểm tra output.",
+      "workflow": [
+        "image-input",
+        "global-threshold",
+        "connected-components",
+        "knn-object-classifier",
+        "draw-detections"
+      ],
+      "parameters": {
+        "implementation": "opencv",
+        "neighbors": 3,
+        "distanceMetric": "euclidean",
+        "distanceWeighted": true,
+        "trainingSamples": [
+          {
+            "label": "dark",
+            "color": [
+              32,
+              32,
+              32
+            ]
+          },
+          {
+            "label": "dark",
+            "color": [
+              64,
+              64,
+              64
+            ]
+          },
+          {
+            "label": "bright",
+            "color": [
+              192,
+              192,
+              192
+            ]
+          },
+          {
+            "label": "bright",
+            "color": [
+              224,
+              224,
+              224
+            ]
+          }
+        ]
+      },
+      "steps": [
+        "Kéo **KNN object classifier** vào canvas.",
+        "Nối port theo workflow mẫu.",
+        "Mở Node inspector và nhập config JSON bên dưới.",
+        "Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần."
+      ],
+      "input": "Dữ liệu cho `image`:image, `detections`:detections; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.",
+      "expectedOutput": "Tạo classified-detections đúng kiểu và không báo lỗi."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Không nối được port",
+        "cause": "Data type không trùng.",
+        "resolution": "Dùng node trung gian tạo đúng kiểu trong bảng port."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Ngoài Min/Max hoặc JSON sai.",
+        "resolution": "Copy config ví dụ rồi thay từng giá trị."
+      },
+      {
+        "symptom": "Output rỗng/nhiễu",
+        "cause": "Input hoặc tham số không hợp giả định.",
+        "resolution": "Preview input, khôi phục mặc định, tinh chỉnh từng bước."
+      },
+      {
+        "symptom": "Hai implementation cho confidence hơi khác",
+        "cause": "Solver và tiêu chí dừng khác nhau.",
+        "resolution": "So sánh nhãn/metric với tolerance; không yêu cầu số thực giống tuyệt đối."
+      }
+    ],
+    "limitations": [
+      "Node ở trạng thái DEBUG, chưa duyệt production.",
+      "Kết quả phụ thuộc input và giả định của OpenCV DescriptorMatcher.knnMatch.",
+      "Cần đo latency/bộ nhớ trên phần cứng đích.",
+      "trainingSamples nằm trong recipe, chỉ phù hợp tập mẫu nhỏ và không chứa dữ liệu nhạy cảm."
+    ],
+    "productionChecklist": [
+      "Khóa camera, ánh sáng, độ phân giải và channel order.",
+      "Đánh giá tập OK/NG đại diện và đo false-call/escape.",
+      "Đặt giới hạn parameter, timeout và fail-closed."
+    ]
+  }
+}

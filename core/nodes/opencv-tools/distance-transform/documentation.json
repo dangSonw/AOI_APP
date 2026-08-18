@@ -1,0 +1,137 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`distance-transform` performs **Distance transform** in an AOI pipeline. Computes distance to the nearest zero pixel in a mask. Configure it in Node inspector and connect outputs to ports with matching data types.",
+    "whenToUse": "you need a repeatable distance transform step stored in a recipe and inspectable on its own.",
+    "structure": "Inputs are `mask`:mask. The node applies OpenCV distanceTransform. Outputs are `distance-map`:anomaly-map. Each key in the diagram is the exact port name used when connecting edges.",
+    "algorithm": [
+      "Validate input presence, data types, and shapes against `distance-transform`.",
+      "Parameters `metric`, `maskSize` control processing; change one value at a time to trace its effect.",
+      "Apply **OpenCV distanceTransform**: Computes distance to the nearest zero pixel in a mask.",
+      "Normalize/package results with declared data types so graph compatibility is checked before execution."
+    ],
+    "inputGuidance": {
+      "mask": "Provide `mask` image data; verify shape, dtype, and channel order."
+    },
+    "outputGuidance": {
+      "distance-map": "Distance map as `anomaly-map`; preview it or connect a compatible downstream node."
+    },
+    "parameterGuidance": {
+      "metric": "Distance metric.",
+      "maskSize": "Distance approximation mask size."
+    },
+    "example": {
+      "goal": "Run distance transform with correctly typed input (`mask`:mask) and inspect its output.",
+      "workflow": [
+        "global-threshold",
+        "distance-transform"
+      ],
+      "parameters": {
+        "metric": "l2",
+        "maskSize": 3
+      },
+      "steps": [
+        "Drag **Distance transform** onto the canvas.",
+        "Connect ports as shown in the workflow.",
+        "Open Node inspector and enter the JSON config below.",
+        "Run, inspect output, then tune one parameter at a time."
+      ],
+      "input": "Data for `mask`:mask; use uint8 BGR 640×480 for images and direct typed output from the shown source node for other types.",
+      "expectedOutput": "Produce distance-map with the declared type and no error."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Ports cannot connect",
+        "cause": "Data types differ.",
+        "resolution": "Insert a node producing the exact type in the ports table."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Outside Min/Max or malformed JSON.",
+        "resolution": "Copy the example config and change one value at a time."
+      },
+      {
+        "symptom": "Empty/noisy output",
+        "cause": "Input or settings violate assumptions.",
+        "resolution": "Preview input, restore defaults, and tune incrementally."
+      }
+    ],
+    "limitations": [
+      "This node is DEBUG and not production-approved.",
+      "Results depend on input and assumptions of OpenCV distanceTransform.",
+      "Measure latency/memory on target hardware."
+    ],
+    "productionChecklist": [
+      "Lock camera, illumination, resolution, and channel order.",
+      "Evaluate representative OK/NG data and false-call/escape rates.",
+      "Set parameter limits, timeouts, and fail-closed checks."
+    ]
+  },
+  "vi": {
+    "overview": "`distance-transform` thực hiện **Distance transform** trong pipeline AOI. Computes distance to the nearest zero pixel in a mask. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.",
+    "whenToUse": "cần bước distance transform có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.",
+    "structure": "Input gồm `mask`:mask. Node áp dụng OpenCV distanceTransform. Output gồm `distance-map`:anomaly-map. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.",
+    "algorithm": [
+      "Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `distance-transform`.",
+      "Các parameter `metric`, `maskSize` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.",
+      "Áp dụng **OpenCV distanceTransform**: Computes distance to the nearest zero pixel in a mask.",
+      "Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy."
+    ],
+    "inputGuidance": {
+      "mask": "Cấp ảnh `mask`; kiểm tra shape, dtype và thứ tự kênh."
+    },
+    "outputGuidance": {
+      "distance-map": "Distance map kiểu `anomaly-map`; xem preview hoặc nối sang node downstream tương thích."
+    },
+    "parameterGuidance": {
+      "metric": "Distance metric.",
+      "maskSize": "Distance approximation mask size."
+    },
+    "example": {
+      "goal": "Chạy thử distance transform với input đúng kiểu (`mask`:mask) và kiểm tra output.",
+      "workflow": [
+        "global-threshold",
+        "distance-transform"
+      ],
+      "parameters": {
+        "metric": "l2",
+        "maskSize": 3
+      },
+      "steps": [
+        "Kéo **Distance transform** vào canvas.",
+        "Nối port theo workflow mẫu.",
+        "Mở Node inspector và nhập config JSON bên dưới.",
+        "Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần."
+      ],
+      "input": "Dữ liệu cho `mask`:mask; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.",
+      "expectedOutput": "Tạo distance-map đúng kiểu và không báo lỗi."
+    },
+    "troubleshooting": [
+      {
+        "symptom": "Không nối được port",
+        "cause": "Data type không trùng.",
+        "resolution": "Dùng node trung gian tạo đúng kiểu trong bảng port."
+      },
+      {
+        "symptom": "Invalid parameter",
+        "cause": "Ngoài Min/Max hoặc JSON sai.",
+        "resolution": "Copy config ví dụ rồi thay từng giá trị."
+      },
+      {
+        "symptom": "Output rỗng/nhiễu",
+        "cause": "Input hoặc tham số không hợp giả định.",
+        "resolution": "Preview input, khôi phục mặc định, tinh chỉnh từng bước."
+      }
+    ],
+    "limitations": [
+      "Node ở trạng thái DEBUG, chưa duyệt production.",
+      "Kết quả phụ thuộc input và giả định của OpenCV distanceTransform.",
+      "Cần đo latency/bộ nhớ trên phần cứng đích."
+    ],
+    "productionChecklist": [
+      "Khóa camera, ánh sáng, độ phân giải và channel order.",
+      "Đánh giá tập OK/NG đại diện và đo false-call/escape.",
+      "Đặt giới hạn parameter, timeout và fail-closed."
+    ]
+  }
+}

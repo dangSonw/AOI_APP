@@ -1,0 +1,25 @@
+{
+  "manifestVersion": 1, "packageVersion": "1.0.0", "id": "logistic-object-classifier", "use": "debug", "executionTarget": "local-cpu",
+  "capabilities": ["numpy", "scikit-learn", "classification", "linear-model"], "resourceHints": {"cpuCores": 1, "memoryMegabytes": 256, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": [], "outputs": []}, "parameterMigrationHooks": [], "inspector": {"kind": "generic", "customKey": null},
+  "definition": {
+    "id": "logistic-object-classifier", "name": "Logistic object classifier",
+    "description": "Fits a linear softmax classifier to labeled object-color samples and returns class probabilities.", "category": "Classification", "documentation_group": "Classical machine learning",
+    "inputs": [
+      {"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false},
+      {"key": "detections", "label": "Detected objects", "direction": "input", "data_type": "detections", "required": true, "variadic": false}
+    ],
+    "outputs": [{"key": "classified-detections", "label": "Classified objects", "direction": "output", "data_type": "detections", "required": true, "variadic": false}],
+    "parameters": [
+      {"key": "implementation", "label": "Implementation", "kind": "select", "default_value": "scikit-learn", "required": true, "minimum": null, "maximum": null, "options": ["scikit-learn", "manual-python"], "description": "Choose scikit-learn or manual softmax gradient descent."},
+      {"key": "regularizationStrength", "label": "L2 regularization", "kind": "number", "default_value": 0.01, "required": true, "minimum": 0.0, "maximum": 1000.0, "options": [], "description": "Higher values reduce large coefficients and may improve generalization."},
+      {"key": "learningRate", "label": "Manual learning rate", "kind": "number", "default_value": 0.1, "required": true, "minimum": 0.000001, "maximum": 10.0, "options": [], "description": "Step size used only by manual-python."},
+      {"key": "maximumIterations", "label": "Maximum iterations", "kind": "integer", "default_value": 500, "required": true, "minimum": 1, "maximum": 10000, "options": [], "description": "Maximum optimization updates."},
+      {"key": "tolerance", "label": "Convergence tolerance", "kind": "number", "default_value": 0.000001, "required": true, "minimum": 0.000000001, "maximum": 1.0, "options": [], "description": "Stops when coefficient changes are sufficiently small."},
+      {"key": "randomSeed", "label": "Random seed", "kind": "integer", "default_value": 42, "required": true, "minimum": 0, "maximum": 2147483647, "options": [], "description": "Keeps the library solver repeatable."},
+      {"key": "trainingSamples", "label": "Labeled color samples", "kind": "json", "default_value": [{"label": "dark", "color": [20, 20, 20]}, {"label": "dark", "color": [50, 50, 50]}, {"label": "bright", "color": [205, 205, 205]}, {"label": "bright", "color": [245, 245, 245]}], "required": true, "minimum": null, "maximum": null, "options": [], "description": "JSON list: each item is {\"label\": \"class-name\", \"color\": [B, G, R]}."}
+    ],
+    "availability": "configuration-only", "documentation_reference": "scikit-learn LogisticRegression and softmax regression"
+  },
+  "catalogOrder": 97
+}

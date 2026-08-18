@@ -1,3 +1,103 @@
 # Node Convex hull
 
-Tính một convex hull cho mỗi contour input và trả `contours` có kiểu. Trạng thái: `debug`.
+## Mục đích và cách dùng nhanh
+
+`convex-hull` thực hiện **Convex hull** trong pipeline AOI. Computes the convex hull of every input contour. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.
+
+**Dùng khi:** cần bước convex hull có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.
+
+**Luồng nhanh:** `find-contours` → `convex-hull` → `draw-contours`
+
+## Cấu trúc node
+
+```text
+contours
+    │
+    ▼
+[convex-hull]
+    │
+    └── hulls
+```
+
+Input gồm `contours`:contours. Node áp dụng OpenCV convexHull. Output gồm `hulls`:contours. Mỗi key trên sơ đồ chính là tên port phải chọn khi nối dây.
+
+## Nguyên lý xử lý
+
+- Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `convex-hull`.
+- Node không có parameter; hành vi được quyết định bởi input và contract runtime.
+- Áp dụng **OpenCV convexHull**: Computes the convex hull of every input contour.
+- Chuẩn hóa/đóng gói kết quả theo data type đã khai báo để graph kiểm tra kết nối trước khi chạy.
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `convex-hull` |
+| Nhóm | OpenCV tools |
+| Trạng thái | `debug` |
+| Đích thực thi | `local-cpu` |
+| Khả năng | `opencv`, `contour-analysis` |
+
+> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.
+
+## Cách nhập dữ liệu và đọc output
+
+| Key | Hướng | Kiểu | Required | Variadic | Label |
+|---|---|---|---|---|---|
+| `contours` | đầu vào | `contours` | có | không | Contours |
+| `hulls` | đầu ra | `contours` | có | không | Convex hulls |
+
+### Nhập input
+
+1. Nối output `contours` vào `contours`. Cấp `contours` đúng semantic của Contours; không dùng dữ liệu ảnh thay thế.
+
+### Đọc output
+
+- `hulls` (`contours`): Convex hulls kiểu `contours`; xem preview hoặc nối sang node downstream tương thích.
+
+## Cách nhập tham số
+
+| Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
+|---|---|---|---|---|---|---|
+| — | — | — | — | — | — | Node không có tham số cấu hình. |
+
+## Ví dụ sử dụng có thể làm theo ngay
+
+**Mục tiêu:** Chạy thử convex hull với input đúng kiểu (`contours`:contours) và kiểm tra output.
+
+**Workflow:** `find-contours` → `convex-hull` → `draw-contours`
+
+- Kéo **Convex hull** vào canvas.
+- Nối port theo workflow mẫu.
+- Mở Node inspector và nhập config JSON bên dưới.
+- Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần.
+
+**Nhập trong bảng config:**
+
+```json
+{}
+```
+
+**Input ví dụ:** Dữ liệu cho `contours`:contours; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.
+
+**Kết quả mong đợi:** Tạo hulls đúng kiểu và không báo lỗi.
+
+## Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Không nối được port | Data type không trùng. | Dùng node trung gian tạo đúng kiểu trong bảng port. |
+| Invalid parameter | Ngoài Min/Max hoặc JSON sai. | Copy config ví dụ rồi thay từng giá trị. |
+| Output rỗng/nhiễu | Input hoặc tham số không hợp giả định. | Preview input, khôi phục mặc định, tinh chỉnh từng bước. |
+
+## Giới hạn và kiểm tra trước production
+
+- Node ở trạng thái DEBUG, chưa duyệt production.
+- Kết quả phụ thuộc input và giả định của OpenCV convexHull.
+- Cần đo latency/bộ nhớ trên phần cứng đích.
+
+### Checklist trước production
+
+- Khóa camera, ánh sáng, độ phân giải và channel order.
+- Đánh giá tập OK/NG đại diện và đo false-call/escape.
+- Đặt giới hạn parameter, timeout và fail-closed.

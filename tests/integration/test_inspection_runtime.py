@@ -153,7 +153,9 @@ def test_persisted_run_completes_with_replayable_node_and_artifact_evidence(tmp_
         assert len(completed.evidence_sha256 or '') == 64
         assert len(completed.node_runs) == 11
         assert all(node.status == 'completed' for node in completed.node_runs)
-        assert completed.node_runs[-1].node_id == 'image-output'
+        assert completed.node_runs[-1].node_id == completed.workflow_snapshot['executionOrder'][-1]
+        assert completed.node_runs[-1].algorithm_id == 'image-output'
+        assert all(node.visit_index >= 1 for node in completed.node_runs)
         assert completed.input_artifact['previewRelativePath'].endswith('.png')
         preview = get_preview_artifact(session, run.id, tmp_path / 'captures')
         assert preview is not None
@@ -257,7 +259,7 @@ def test_live_workflow_passes_refreshing_cancellation_context(
             board_serial=f'PCB-{uuid4().hex}', recipe_id=recipe_id,
         ), operator_id, tmp_path / 'projects')
 
-        def cancelled_workflow(workflow, *, source_image, context):
+        def cancelled_workflow(workflow, *, source_image, context, observer=None):
             received_contexts.append(context)
             run.cancel_requested = True
             session.commit()
