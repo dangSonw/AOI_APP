@@ -37,6 +37,33 @@ def test_protected_inputs_reject_anonymous_requests() -> None:
     assert response.status_code == 401
 
 
+def test_debug_session_is_hidden_when_debug_auto_login_is_disabled() -> None:
+    settings = get_settings()
+    original = settings.debug_auto_login
+    settings.debug_auto_login = False
+    try:
+        with TestClient(app) as client:
+            response = client.post('/api/auth/debug-session')
+    finally:
+        settings.debug_auto_login = original
+
+    assert response.status_code == 404
+
+
+def test_debug_session_uses_seed_account_without_receiving_credentials() -> None:
+    settings = get_settings()
+    original = settings.debug_auto_login
+    settings.debug_auto_login = True
+    try:
+        with TestClient(app) as client:
+            response = client.post('/api/auth/debug-session')
+    finally:
+        settings.debug_auto_login = original
+
+    assert response.status_code == 200
+    assert response.json()['user']['email'] == settings.seed_admin_email
+
+
 def test_public_registration_is_disabled() -> None:
     with TestClient(app) as client:
         response = client.post(

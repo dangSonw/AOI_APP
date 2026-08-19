@@ -81,6 +81,7 @@ class Connection:
     target_port_id: str
     kind: ConnectionKind = ConnectionKind.DATA
     max_traversals: int | None = None
+    waypoints: tuple[Point, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, 'kind', ConnectionKind(self.kind))

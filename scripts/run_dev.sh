@@ -11,11 +11,24 @@ require_ubuntu_runtime
 
 ACTION="${1:-start}"
 RUNTIME_MODE="hardware"
+DEBUG_MODE=false
 if [ "$ACTION" = "simulation" ]; then
     ACTION="start"
     RUNTIME_MODE="simulation"
+    if [ "${2:-}" = "debug" ] || [ "${VITE_AOI_SIMULATOR_NO_BROWSER:-0}" = "1" ]; then
+        DEBUG_MODE=true
+    elif [ -n "${2:-}" ]; then
+        echo "Error: simulation accepts only the optional 'debug' argument." >&2
+        exit 2
+    fi
 elif [ "$ACTION" = "start" ] && [ "${2:-}" = "--mode" ]; then
     RUNTIME_MODE="${3:-}"
+    if [ "${4:-}" = "debug" ]; then
+        DEBUG_MODE=true
+    elif [ -n "${4:-}" ]; then
+        echo "Error: start --mode accepts only the optional 'debug' argument." >&2
+        exit 2
+    fi
 fi
 CONDA_ENV_NAME="aoi-app"
 RUNTIME_BASE="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"
@@ -34,10 +47,12 @@ print_usage() {
 Usage: bash scripts/run_dev.sh [start|stop|status|simulation]
 
   start   Start hardware adapters, backend, and frontend (default).
-  start --mode simulation
+  start --mode simulation [debug]
           Start simulator adapters, backend, and frontend.
-  simulation
+  simulation [debug]
           Alias for start --mode simulation.
+  simulation debug
+           Open the local development workspace with a server-issued debug session.
   stop    Stop AOI Studio processes started for this repository.
   status  Show whether this repository's development servers are running.
 EOF
@@ -389,13 +404,17 @@ MOTION_PROCESS_GROUP=$!
 
 echo "Starting Backend API (FastAPI) on http://127.0.0.1:8000..."
 cd "$PROJECT_ROOT/backend"
-setsid env PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/backend" conda run --no-capture-output -n "$CONDA_ENV_NAME" \
+setsid env PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/backend" DEBUG_AUTO_LOGIN="$DEBUG_MODE" conda run --no-capture-output -n "$CONDA_ENV_NAME" \
     python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 &
 BACKEND_PROCESS_GROUP=$!
 
 echo "Starting Frontend Development Server (Vite)..."
 cd "$PROJECT_ROOT/frontend"
-setsid npm run dev -- --strictPort &
+if [ "$DEBUG_MODE" = true ]; then
+    setsid env VITE_AOI_DEBUG_AUTO_LOGIN=1 npm run dev -- --strictPort &
+else
+    setsid npm run dev -- --strictPort &
+fi
 FRONTEND_PROCESS_GROUP=$!
 
 CONSOLE_PROCESS_GROUP=""
@@ -417,6 +436,9 @@ fi
 echo "========================================="
 echo "AOI Development environment running!"
 echo "Runtime mode: $RUNTIME_MODE"
+if [ "$DEBUG_MODE" = true ]; then
+    echo "Debug auto-login: enabled"
+fi
 echo "Press Ctrl+C to stop all services."
 echo "You can also run: bash scripts/run_dev.sh stop"
 if [ "${AOI_SIMULATOR_NO_BROWSER:-0}" != "1" ]; then

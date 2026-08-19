@@ -216,4 +216,4 @@ def segment_image(inputs: NodeInputs, parameters: NodeParameters) -> NodeOutputs
         )
     mask = mask_values.reshape(image.shape[:2])
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    return {'mask': mask, 'contours': contours}
+    return {'mask': mask, 'contours': list(contours)}

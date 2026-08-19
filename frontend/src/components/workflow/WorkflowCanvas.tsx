@@ -12,14 +12,16 @@ import {
   type Connection,
   type Edge,
   type EdgeChange,
+  type EdgeTypes,
   type IsValidConnection,
   type NodeChange,
   type NodeTypes,
 } from '@xyflow/react';
-import type { AlgorithmDefinition, ConnectionDraft, Workflow } from '../../types/workflow';
+import type { AlgorithmDefinition, ConnectionDraft, Workflow, WorkflowPoint } from '../../types/workflow';
 import { validateConnection } from '../../utils/workflow-graph';
 import { ALGORITHM_DRAG_TYPE } from './AlgorithmCatalog';
 import { WorkflowNode, type WorkflowFlowNode } from './WorkflowNode';
+import { EditableWorkflowEdge, type EditableEdge } from './EditableWorkflowEdge';
 
 
 interface WorkflowCanvasProps {
@@ -32,13 +34,15 @@ interface WorkflowCanvasProps {
   onConnect: (connection: ConnectionDraft) => void;
   onRemoveNode: (nodeId: string) => void;
   onRemoveConnection: (connectionId: string) => void;
+  onMoveConnection: (connectionId: string, waypoints: WorkflowPoint[]) => void;
   onConnectionRejected: (message: string) => void;
 }
 
 const nodeTypes: NodeTypes = { workflow: WorkflowNode };
+const edgeTypes: EdgeTypes = { editable: EditableWorkflowEdge };
 
 function CanvasContent(props: WorkflowCanvasProps) {
-  const { screenToFlowPosition } = useReactFlow<WorkflowFlowNode, Edge>();
+  const { screenToFlowPosition } = useReactFlow<WorkflowFlowNode, EditableEdge>();
   const updateNodeInternals = useUpdateNodeInternals();
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const removeNodeRef = useRef(props.onRemoveNode);
@@ -56,14 +60,18 @@ function CanvasContent(props: WorkflowCanvasProps) {
     },
   })).filter((node) => node.data.definition), [props.workflow.nodes, props.catalog, props.selectedNodeId, handleRemoveNode]);
   const [nodes, setNodes] = useState<WorkflowFlowNode[]>(mappedNodes);
-  const edges = useMemo<Edge[]>(() => props.workflow.connections.map((connection) => ({
+  const edges = useMemo<EditableEdge[]>(() => props.workflow.connections.map((connection) => ({
     id: connection.id,
     source: connection.sourceNodeId,
     sourceHandle: connection.sourcePortId,
     target: connection.targetNodeId,
     targetHandle: connection.targetPortId,
-    type: 'smoothstep',
+    type: 'editable',
     selected: connection.id === selectedEdgeId,
+    data: {
+      waypoints: connection.waypoints ?? [],
+      onWaypointsChange: props.onMoveConnection,
+    },
   })), [props.workflow.connections, selectedEdgeId]);
 
   useEffect(() => {
@@ -113,7 +121,7 @@ function CanvasContent(props: WorkflowCanvasProps) {
   const handleNodesChange = useCallback((changes: NodeChange<WorkflowFlowNode>[]) => {
     setNodes((currentNodes) => applyNodeChanges(changes, currentNodes));
     for (const change of changes) {
-      if (change.type === 'position' && change.position) props.onMoveNode(change.id, change.position);
+      if (change.type === 'position' && change.position && change.dragging !== true) props.onMoveNode(change.id, change.position);
       if (change.type === 'remove') props.onRemoveNode(change.id);
       if (change.type === 'select' && change.selected) props.onSelectNode(change.id);
     }
@@ -151,10 +159,11 @@ function CanvasContent(props: WorkflowCanvasProps) {
         }
       }}
     >
-      <ReactFlow<WorkflowFlowNode, Edge>
+      <ReactFlow<WorkflowFlowNode, EditableEdge>
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}

@@ -167,6 +167,7 @@ class ConnectionSchema(ApiSchema):
     target_port_id: str
     kind: ConnectionKind = ConnectionKind.DATA
     max_traversals: int | None = Field(default=None, ge=1)
+    waypoints: tuple[PointSchema, ...] = ()
 
     def to_core(self) -> Connection:
         return Connection(
@@ -177,6 +178,7 @@ class ConnectionSchema(ApiSchema):
             target_port_id=self.target_port_id,
             kind=self.kind,
             max_traversals=self.max_traversals,
+            waypoints=tuple(point.to_core() for point in self.waypoints),
         )
 
 

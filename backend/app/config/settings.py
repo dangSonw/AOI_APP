@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     seed_admin_email: str = 'admin@aoi.local'
     seed_admin_password: str = Field(min_length=8)
     seed_admin_full_name: str = 'AOI Administrator'
+    debug_auto_login: bool = False
 
     @field_validator('camera_adapter_url', 'motion_adapter_url')
     @classmethod

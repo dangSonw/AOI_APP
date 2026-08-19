@@ -44,6 +44,17 @@ def login(credentials: LoginRequest, session: DatabaseSession) -> AuthSessionRes
     return build_auth_response(user)
 
 
+@router.post('/debug-session', response_model=AuthSessionResponse)
+def create_debug_session(session: DatabaseSession) -> AuthSessionResponse:
+    settings = get_settings()
+    if settings.app_environment.lower() != 'development' or not settings.debug_auto_login:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Not found.')
+    user = get_user_by_email(session, settings.seed_admin_email)
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail='The debug account is unavailable.')
+    return build_auth_response(user)
+
+
 @router.post('/register', response_model=AuthSessionResponse, status_code=status.HTTP_201_CREATED)
 def register(account: RegisterRequest, session: DatabaseSession) -> AuthSessionResponse:
     if not get_settings().allow_public_registration:

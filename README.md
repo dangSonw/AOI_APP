@@ -108,6 +108,20 @@ bash scripts/run_dev.sh simulation
 
 Simulation mode starts five managed processes: camera adapter, motion adapter, backend, frontend, and Simulator Console. It opens AOI Studio at `http://127.0.0.1:5173` and the commissioning console at `http://127.0.0.1:9200` in the Windows browser. Use `AOI_SIMULATOR_NO_BROWSER=1` for automation. `status` and `stop` include the console process.
 
+For local simulation debugging, start the stack with a server-issued debug session:
+
+```bash
+bash scripts/run_dev.sh simulation debug
+```
+
+This development-only mode opens the dashboard without displaying the sign-in form. The backend resolves the configured seed operator from the untracked `.env`; no password is embedded in the frontend bundle, command line, README, or logs. The legacy command below is also accepted for compatibility and enables the same debug auto-login behavior:
+
+```bash
+VITE_AOI_SIMULATOR_NO_BROWSER=1 bash scripts/run_dev.sh simulation
+```
+
+To stop browsers from opening without enabling auto-login, use `AOI_SIMULATOR_NO_BROWSER=1` instead. Debug auto-login is unavailable outside the development environment and normal `simulation` or hardware startup continues to require sign-in.
+
 Hardware mode starts the four production-boundary services without port `9200`. Disconnected CSI/UART adapters report `unavailable`; the launcher still starts the HMI in a diagnostic-safe state and never falls back to simulation.
 
 From PowerShell while the current directory is this repository, use the portable WSL launcher instead:

@@ -190,3 +190,8 @@ Baseline hiện tại gồm 15 backend test, 14 core test, 12 integration test, 
 - Popup log event không được ràng buộc vào cờ active-run vì run kết thúc nhanh hơn chu kỳ poll 500 ms. `DashboardPage` thu thập popup toast ngay trong render (chống lặp bằng khóa `runId:nodeRunSequence`), chồng tối đa ba toast cố định phía trên cùng với cái mới nhất nằm đầu, và mỗi toast tự tắt sau ba giây mà không ảnh hưởng trạng thái flow hay thời gian node.
 - Validation dependency của execution order chỉ áp dụng cho data edge. Control edge như `success` tới `trigger` điều khiển token scheduling và không được bị từ chối chỉ vì node nằm ở vị trí khác trong execution order đã lưu.
 - React Flow không tự mang AOI channel trong connection. Phải resolve và lưu `kind` từ source port trước khi save; nếu không, edge hợp lệ `success` tới `trigger` được serialize thiếu `kind`, API mặc định thành `data` và backend validation sẽ từ chối các control port.
+
+## 23. Tự đăng nhập khi Debug Simulation
+
+- Dùng `bash scripts/run_dev.sh simulation debug` để tự đăng nhập chỉ trong development. Lệnh tương thích `VITE_AOI_SIMULATOR_NO_BROWSER=1 bash scripts/run_dev.sh simulation` được ánh xạ sang cùng chế độ; `AOI_SIMULATOR_NO_BROWSER=1` chỉ ngăn tự mở trình duyệt.
+- Debug auto-login dùng session do server cấp cho seed account và không gửi hoặc nhúng `SEED_ADMIN_PASSWORD` vào Vite, source code, tài liệu, đối số dòng lệnh hay log. Endpoint bị ẩn trừ khi đồng thời chạy development environment và cờ debug do launcher kiểm soát.

@@ -190,3 +190,8 @@ The current baseline is 15 backend tests, 14 core tests, 12 integration tests, 1
 - Popup log events must not be gated on the active-run flag because runs finish faster than the 500 ms poll. `DashboardPage` collects popup toasts during render (dedupe key `runId:nodeRunSequence`), stacks at most three fixed-top toasts with the newest first, and each toast self-dismisses after three seconds without touching flow state or node timing.
 - Execution-order dependency validation applies only to data edges. Control edges such as `success` to `trigger` drive token scheduling and must not be rejected because their nodes appear in a different persisted execution-order position.
 - React Flow connections do not carry the AOI channel automatically. Resolve and persist `kind` from the source port before saving; otherwise a valid `success` to `trigger` edge serializes without `kind`, the API defaults it to `data`, and backend validation rejects the control ports.
+
+## 23. Simulation Debug Auto-login
+
+- Use `bash scripts/run_dev.sh simulation debug` for development-only auto-login. The compatibility command `VITE_AOI_SIMULATOR_NO_BROWSER=1 bash scripts/run_dev.sh simulation` maps to the same mode; `AOI_SIMULATOR_NO_BROWSER=1` only suppresses browser launch.
+- Debug auto-login uses a server-issued session for the seed account and never sends or embeds `SEED_ADMIN_PASSWORD` in Vite, source code, documentation, command arguments, or logs. The endpoint remains hidden unless both the development environment and launcher-controlled debug flag are active.

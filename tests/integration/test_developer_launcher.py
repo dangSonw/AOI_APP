@@ -29,6 +29,17 @@ def test_launcher_uses_hardware_by_default_and_supports_explicit_simulation() ->
     assert 'Simulator console: http://127.0.0.1:9200/' in launcher
 
 
+def test_simulation_debug_enables_server_issued_auto_login_without_credentials() -> None:
+    launcher = (PROJECT_ROOT / 'scripts' / 'run_dev.sh').read_text(encoding='utf-8')
+
+    assert 'simulation debug' in launcher
+    assert 'VITE_AOI_SIMULATOR_NO_BROWSER' in launcher
+    assert 'DEBUG_AUTO_LOGIN="$DEBUG_MODE"' in launcher
+    assert 'AOI_DEBUG_AUTO_LOGIN="$DEBUG_MODE"' not in launcher
+    assert 'VITE_AOI_DEBUG_AUTO_LOGIN=1' in launcher
+    assert 'SEED_ADMIN_PASSWORD' not in launcher
+
+
 def test_launcher_manages_adapter_ports_and_never_declares_a_fallback() -> None:
     launcher = (PROJECT_ROOT / 'scripts' / 'run_dev.sh').read_text(encoding='utf-8')
 

@@ -1970,12 +1970,24 @@ button:disabled {
 .workflow-canvas .react-flow__edge-path {
   stroke: #527ba6;
   stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .workflow-canvas .react-flow__edge.selected .react-flow__edge-path {
   stroke: var(--workflow-blue);
   stroke-width: 3;
 }
+
+.workflow-edge-handle {
+  fill: #fff;
+  stroke: var(--workflow-blue);
+  stroke-width: 2;
+  pointer-events: all;
+}
+
+.workflow-edge-handle--horizontal { cursor: ns-resize; }
+.workflow-edge-handle--vertical { cursor: ew-resize; }
 
 .workflow-canvas .react-flow__controls {
   border: 1px solid var(--studio-border);

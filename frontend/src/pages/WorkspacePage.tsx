@@ -35,6 +35,7 @@ import { WorkflowEditorPage } from './WorkflowEditorPage';
 
 const ACTIVE_RECIPE_SLUG = 'rev-c-mainboard';
 const DEFAULT_WORKSTATION_ID = 'station-01';
+const WORKSPACE_SHORTCUT_VIEWS: WorkspaceView[] = ['dashboard', 'database', 'research', 'hardware', 'settings'];
 
 interface WorkspacePageProps {
   session: AuthSession;
@@ -257,6 +258,28 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
     }
     setActiveView(nextView);
   }, [activeView, isWorkflowDirty]);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((!event.ctrlKey && !event.metaKey) || event.altKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+      let nextView: WorkspaceView | undefined;
+      if (event.key === 'Tab') {
+        const currentIndex = WORKSPACE_SHORTCUT_VIEWS.indexOf(activeView);
+        const offset = event.shiftKey ? -1 : 1;
+        nextView = WORKSPACE_SHORTCUT_VIEWS[(Math.max(currentIndex, 0) + offset + WORKSPACE_SHORTCUT_VIEWS.length) % WORKSPACE_SHORTCUT_VIEWS.length];
+      } else if (/^[1-5]$/.test(event.key)) {
+        nextView = WORKSPACE_SHORTCUT_VIEWS[Number(event.key) - 1];
+      }
+      if (nextView) {
+        event.preventDefault();
+        requestViewChange(nextView);
+      }
+    };
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, [activeView, requestViewChange]);
 
   return (
     <StudioChrome

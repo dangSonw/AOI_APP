@@ -108,6 +108,20 @@ bash scripts/run_dev.sh simulation
 
 Simulation mode khởi động năm tiến trình được quản lý: camera adapter, motion adapter, backend, frontend và Simulator Console. Chế độ này mở AOI Studio tại `http://127.0.0.1:5173` cùng commissioning console tại `http://127.0.0.1:9200` trong trình duyệt Windows. Dùng `AOI_SIMULATOR_NO_BROWSER=1` cho automation. Lệnh `status` và `stop` bao gồm cả tiến trình console.
 
+Để debug simulation cục bộ, hãy khởi động stack với debug session do server cấp:
+
+```bash
+bash scripts/run_dev.sh simulation debug
+```
+
+Chế độ chỉ dành cho development này mở thẳng dashboard mà không hiển thị form đăng nhập. Backend tìm seed operator đã cấu hình trong `.env` không được Git theo dõi; mật khẩu không được nhúng vào frontend bundle, dòng lệnh, README hoặc log. Lệnh cũ bên dưới cũng được chấp nhận để tương thích và bật cùng hành vi debug auto-login:
+
+```bash
+VITE_AOI_SIMULATOR_NO_BROWSER=1 bash scripts/run_dev.sh simulation
+```
+
+Nếu chỉ muốn ngăn trình duyệt tự mở mà không bật auto-login, hãy dùng `AOI_SIMULATOR_NO_BROWSER=1`. Debug auto-login không khả dụng ngoài development environment; chế độ `simulation` bình thường và hardware startup vẫn yêu cầu đăng nhập.
+
 Hardware mode khởi động bốn dịch vụ theo ranh giới production mà không mở cổng `9200`. Adapter CSI/UART chưa kết nối báo `unavailable`; launcher vẫn khởi động HMI ở trạng thái chẩn đoán an toàn và không bao giờ fallback sang simulation.
 
 Từ PowerShell khi thư mục hiện tại là repository này, hãy dùng launcher WSL portable:

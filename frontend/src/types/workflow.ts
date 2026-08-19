@@ -109,6 +109,7 @@ export interface WorkflowConnection {
   targetPortId: string;
   kind?: 'data' | 'control';
   maxTraversals?: number | null;
+  waypoints?: WorkflowPoint[];
 }
 
 export interface Workflow {

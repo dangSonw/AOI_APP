@@ -112,6 +112,11 @@ def validate_workflow(workflow: Workflow) -> tuple[ValidationIssue, ...]:
     incoming: dict[tuple[str, str], int] = defaultdict(int)
     generic_types: dict[str, set[DataType]] = defaultdict(set)
     for connection in workflow.connections:
+        if any(not math.isfinite(point.x) or not math.isfinite(point.y) for point in connection.waypoints):
+            issues.append(ValidationIssue(
+                'invalid-parameter', 'Connection waypoints require finite coordinates.',
+                connection_id=connection.id,
+            ))
         endpoint = (connection.source_node_id, connection.source_port_id, connection.target_node_id, connection.target_port_id)
         endpoint_counts[endpoint] += 1
         target_counts[(connection.target_node_id, connection.target_port_id)] += 1

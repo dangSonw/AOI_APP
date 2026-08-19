@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlgorithmCatalog } from '../components/workflow/AlgorithmCatalog';
 import { ExecutionOrderRail } from '../components/workflow/ExecutionOrderRail';
 import { NodeInspector } from '../components/workflow/NodeInspector';
@@ -46,6 +46,9 @@ export function WorkflowEditorPage({
   const [notice, setNotice] = useState('');
   const [hasConflict, setHasConflict] = useState(false);
   const [documentationDefinition, setDocumentationDefinition] = useState<AlgorithmDefinition | null>(null);
+  const undoStack = useRef<Workflow[]>([]);
+  const redoStack = useRef<Workflow[]>([]);
+  const clipboard = useRef<WorkflowNode | null>(null);
   const loadEditor = useCallback(async () => {
     setIsLoading(true);
     setError('');
@@ -59,6 +62,8 @@ export function WorkflowEditorPage({
       setCatalog(nextCatalog);
       setSavedWorkflow(nextWorkflow);
       setDraftWorkflow(structuredClone(nextWorkflow));
+      undoStack.current = [];
+      redoStack.current = [];
       setSelectedNodeId(nextWorkflow.nodes[0]?.id ?? null);
       onWorkflowSaved(nextWorkflow);
     } catch (loadError) {
@@ -97,7 +102,14 @@ export function WorkflowEditorPage({
   const canSave = Boolean(draftWorkflow && isDirty && !isLoading && !isSaving && issues.length === 0);
 
   const updateDraft = (updater: (workflow: Workflow) => Workflow) => {
-    setDraftWorkflow((current) => current ? updater(current) : current);
+    setDraftWorkflow((current) => {
+      if (!current) return current;
+      const next = updater(current);
+      if (next === current || JSON.stringify(next) === JSON.stringify(current)) return current;
+      undoStack.current = [...undoStack.current.slice(-49), structuredClone(current)];
+      redoStack.current = [];
+      return next;
+    });
     setNotice('');
     setError('');
     setHasConflict(false);
@@ -171,6 +183,62 @@ export function WorkflowEditorPage({
     }
   };
 
+  useEffect(() => {
+    const isEditableTarget = (target: EventTarget | null) => target instanceof HTMLElement
+      && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (isEditableTarget(event.target) || (!event.ctrlKey && !event.metaKey)) return;
+      const key = event.key.toLowerCase();
+      const restore = (source: React.MutableRefObject<Workflow[]>, destination: React.MutableRefObject<Workflow[]>) => {
+        const snapshot = source.current.at(-1);
+        if (!snapshot || !draftWorkflow) return;
+        destination.current = [...destination.current.slice(-49), structuredClone(draftWorkflow)];
+        source.current = source.current.slice(0, -1);
+        setDraftWorkflow(structuredClone(snapshot));
+        setSelectedNodeId(null);
+      };
+
+      if (key === 's') {
+        event.preventDefault();
+        void handleSave();
+      } else if (key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        restore(undoStack, redoStack);
+      } else if (key === 'y' || (key === 'z' && event.shiftKey)) {
+        event.preventDefault();
+        restore(redoStack, undoStack);
+      } else if (key === 'c' && selectedNode) {
+        event.preventDefault();
+        clipboard.current = structuredClone(selectedNode);
+      } else if (key === 'x' && selectedNode) {
+        event.preventDefault();
+        clipboard.current = structuredClone(selectedNode);
+        removeNode(selectedNode.id);
+      } else if (key === 'v' && clipboard.current) {
+        event.preventDefault();
+        const copied = clipboard.current;
+        const nodeId = crypto.randomUUID();
+        const portIds = new Map(copied.ports.map((port) => [port.id, crypto.randomUUID()]));
+        const node: WorkflowNode = {
+          ...structuredClone(copied),
+          id: nodeId,
+          displayName: `${copied.displayName} copy`,
+          position: { x: copied.position.x + 32, y: copied.position.y + 32 },
+          ports: copied.ports.map((port) => ({
+            ...port,
+            id: portIds.get(port.id)!,
+            passthroughInputPortId: port.passthroughInputPortId ? portIds.get(port.passthroughInputPortId) ?? null : null,
+          })),
+        };
+        updateDraft((workflow) => ({ ...workflow, nodes: [...workflow.nodes, node], executionOrder: [...workflow.executionOrder, nodeId] }));
+        clipboard.current = node;
+        setSelectedNodeId(nodeId);
+      }
+    };
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, [draftWorkflow, selectedNode, canSave]);
+
   if (isLoading && !draftWorkflow) {
     return <section className="workflow-editor workflow-editor--loading" aria-busy="true"><strong>Loading workflow editor…</strong></section>;
   }
@@ -226,6 +294,10 @@ export function WorkflowEditorPage({
             onConnect={(connection: ConnectionDraft) => updateDraft((workflow) => addConnection(workflow, connection))}
             onRemoveNode={removeNode}
             onRemoveConnection={(connectionId) => updateDraft((workflow) => ({ ...workflow, connections: workflow.connections.filter((connection) => connection.id !== connectionId) }))}
+            onMoveConnection={(connectionId, waypoints) => updateDraft((workflow) => ({
+              ...workflow,
+              connections: workflow.connections.map((connection) => connection.id === connectionId ? { ...connection, waypoints } : connection),
+            }))}
             onConnectionRejected={setError}
           />
         </main>
