@@ -36,7 +36,7 @@ function render(runState: InspectionRun) {
   return renderToStaticMarkup(<DashboardPage
     accessToken="token" inputs={null} outputs={null} isLoading={false} error="" isRunning={runState.status === 'executing'}
     inspectionRun={runState} runError="" onOutputToggle={vi.fn()} workflow={workflow} workflowError=""
-    onConfigureWorkflow={vi.fn()} preferences={preferences} onPreferencesChange={vi.fn()}
+    onConfigureWorkflow={vi.fn()} preferences={preferences} onPreferencesChange={vi.fn()} algorithmCatalog={[]}
   />);
 }
 

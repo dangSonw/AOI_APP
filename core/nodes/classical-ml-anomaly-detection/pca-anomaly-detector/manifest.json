@@ -1,22 +1,129 @@
 {
-  "manifestVersion": 1, "packageVersion": "1.0.0", "id": "pca-anomaly-detector", "use": "debug", "executionTarget": "local-cpu",
-  "capabilities": ["numpy", "scikit-learn", "pca", "anomaly-detection"], "resourceHints": {"cpuCores": 1, "memoryMegabytes": 512, "gpuMemoryMegabytes": 0},
-  "artifactContracts": {"inputs": [], "outputs": []}, "parameterMigrationHooks": [], "inspector": {"kind": "generic", "customKey": null},
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "pca-anomaly-detector",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": [
+    "numpy",
+    "scikit-learn",
+    "pca",
+    "anomaly-detection"
+  ],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 512,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {
+    "kind": "generic",
+    "customKey": null
+  },
   "definition": {
-    "id": "pca-anomaly-detector", "name": "PCA anomaly detector",
-    "description": "Learns a normal BGR subspace and scores each pixel by PCA reconstruction error.", "category": "Classical ML anomaly detection", "documentation_group": "Classical machine learning",
-    "inputs": [{"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false}],
+    "id": "pca-anomaly-detector",
+    "name": "PCA anomaly detector",
+    "description": "Learns a normal BGR subspace and scores each pixel by PCA reconstruction error.",
+    "category": "Classical ML anomaly detection",
+    "documentation_group": "Classical machine learning",
+    "inputs": [
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
+    ],
     "outputs": [
-      {"key": "anomaly-map", "label": "Anomaly map", "direction": "output", "data_type": "anomaly-map", "required": true, "variadic": false},
-      {"key": "score", "label": "Anomaly score", "direction": "output", "data_type": "score", "required": true, "variadic": false}
+      {
+        "key": "anomaly-map",
+        "label": "Anomaly map",
+        "direction": "output",
+        "data_type": "anomaly-map",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "score",
+        "label": "Anomaly score",
+        "direction": "output",
+        "data_type": "score",
+        "required": true,
+        "variadic": false
+      }
     ],
     "parameters": [
-      {"key": "implementation", "label": "Implementation", "kind": "select", "default_value": "scikit-learn", "required": true, "minimum": null, "maximum": null, "options": ["scikit-learn", "manual-python"], "description": "Choose scikit-learn PCA or NumPy singular value decomposition."},
-      {"key": "components", "label": "PCA components", "kind": "integer", "default_value": 2, "required": true, "minimum": 1, "maximum": 3, "options": [], "description": "Number of normal color directions retained; fewer components make the detector more selective."},
-      {"key": "scorePercentile", "label": "Score percentile", "kind": "number", "default_value": 99.0, "required": true, "minimum": 0.0, "maximum": 100.0, "options": [], "description": "Image score is this percentile of the normalized anomaly map."},
-      {"key": "trainingSamples", "label": "Normal BGR samples", "kind": "json", "default_value": [{"features": [20, 20, 20]}, {"features": [40, 40, 40]}, {"features": [60, 60, 60]}, {"features": [80, 80, 80]}], "required": true, "minimum": null, "maximum": null, "options": [], "description": "JSON list of known-normal colors: each item is {\"features\": [B, G, R]}."}
+      {
+        "key": "components",
+        "label": "PCA components",
+        "kind": "integer",
+        "default_value": 2,
+        "required": true,
+        "minimum": 1,
+        "maximum": 3,
+        "options": [],
+        "description": "Number of normal color directions retained; fewer components make the detector more selective."
+      },
+      {
+        "key": "scorePercentile",
+        "label": "Score percentile",
+        "kind": "number",
+        "default_value": 99.0,
+        "required": true,
+        "minimum": 0.0,
+        "maximum": 100.0,
+        "options": [],
+        "description": "Image score is this percentile of the normalized anomaly map."
+      },
+      {
+        "key": "trainingSamples",
+        "label": "Normal BGR samples",
+        "kind": "json",
+        "default_value": [
+          {
+            "features": [
+              20,
+              20,
+              20
+            ]
+          },
+          {
+            "features": [
+              40,
+              40,
+              40
+            ]
+          },
+          {
+            "features": [
+              60,
+              60,
+              60
+            ]
+          },
+          {
+            "features": [
+              80,
+              80,
+              80
+            ]
+          }
+        ],
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [],
+        "description": "JSON list of known-normal colors: each item is {\"features\": [B, G, R]}."
+      }
     ],
-    "availability": "configuration-only", "documentation_reference": "scikit-learn PCA and reconstruction-error anomaly detection"
+    "availability": "configuration-only",
+    "documentation_reference": "scikit-learn PCA and reconstruction-error anomaly detection"
   },
   "catalogOrder": 98
 }

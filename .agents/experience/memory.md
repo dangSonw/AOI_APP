@@ -195,3 +195,19 @@ The current baseline is 15 backend tests, 14 core tests, 12 integration tests, 1
 
 - Use `bash scripts/run_dev.sh simulation debug` for development-only auto-login. The compatibility command `VITE_AOI_SIMULATOR_NO_BROWSER=1 bash scripts/run_dev.sh simulation` maps to the same mode; `AOI_SIMULATOR_NO_BROWSER=1` only suppresses browser launch.
 - Debug auto-login uses a server-issued session for the seed account and never sends or embeds `SEED_ADMIN_PASSWORD` in Vite, source code, documentation, command arguments, or logs. The endpoint remains hidden unless both the development environment and launcher-controlled debug flag are active.
+
+## 24. Named Virtual Workflow Pins
+
+- The earlier dynamic-port and same-node passthrough infrastructure did not create catalog-visible wire shortcut nodes. A workflow node is discoverable only when `core/nodes/<category>/<node-id>/` contains a matching manifest and runtime package, because `/api/algorithms` is projected from the manifest registry.
+- `input-pin` receives one real data connection and `output-pin` emits to real downstream connections. Their trimmed, case-sensitive workflow `display_name` identifies the virtual channel. Each channel requires exactly one Input Pin and at least one Output Pin; one Input Pin may feed multiple Output Pins.
+- Named virtual dependencies are derived rather than persisted as hidden connections. Backend validation, frontend validation, cycle detection, Auto order, and runtime scheduling must all use the same Input Pin to Output Pin dependency rule.
+- Pin ports remain `generic` in persisted workflow JSON. Infer one concrete type from the real source and consumer endpoints, reject conflicting concrete types, and render the inferred type in the workflow node without mutating the persisted port contract.
+- Runtime stores the exact received object for each normalized pin name during one workflow execution and gives that same object to matching Output Pins. Never use process-global pin state, because concurrent inspection runs must remain isolated.
+
+## 25. Project Output Viewer Contracts
+
+- Project viewers are derived from explicit workflow node capabilities. `image-preview` creates one 2D viewer per node; `3d-preview` creates a 3D measurement viewer. Generic `output-pin` nodes never create viewers.
+- The `heightmap-output` node is an explicit 3D output marker. It preserves its image-typed heightmap input and does not calculate measurement data itself.
+- Workflow execution stores preview images by node ID in `WorkflowExecutionResult.preview_images`; inspection runs persist them under `input_artifact.previewArtifacts`. The old `previewRelativePath` remains for backward compatibility.
+- Viewer dimensions are stored in `dashboard.panels.outputViewers` by stable workflow node ID. Legacy `optical2D` preferences are used as the fallback, and the viewer CSS must set an actual height so H−/H＋ changes the visual region.
+- The catalog API exposes node capabilities from manifests. Existing OpenCV/manual or scikit-learn/manual parameters remain backward-compatible; library-backed options are the default and old saved workflows must not be silently invalidated.

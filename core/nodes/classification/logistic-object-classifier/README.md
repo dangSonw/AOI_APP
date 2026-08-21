@@ -63,7 +63,6 @@ Inputs are `image`:image, `detections`:detections. The node applies scikit-learn
 
 | Key | Kind | Default | Min | Max | Options | How to enter / Meaning |
 |---|---|---|---|---|---|---|
-| `implementation` | `select` | `scikit-learn` | — | — | `scikit-learn`, `manual-python` | Choose scikit-learn or manual softmax gradient descent. |
 | `regularizationStrength` | `number` | `0.01` | `0.0` | `1000.0` | — | Higher values reduce large coefficients and may improve generalization. |
 | `learningRate` | `number` | `0.1` | `1e-06` | `10.0` | — | Step size used only by manual-python. |
 | `maximumIterations` | `integer` | `500` | `1` | `10000` | — | Maximum optimization updates. |

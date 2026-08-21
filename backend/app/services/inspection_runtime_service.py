@@ -260,14 +260,14 @@ def _png_pixels(image_bytes: bytes) -> tuple[int, int, bytes]:
             saw_end = True
             break
         offset = end
-    if not saw_end or width <= 0 or height <= 0 or bit_depth != 8 or color_type not in {0, 2}:
+    if not saw_end or width <= 0 or height <= 0 or bit_depth != 8 or color_type not in {0, 2, 4, 6}:
         raise InspectionRunError('Captured artifact is corrupt or unsupported.')
-    channels = 1 if color_type == 0 else 3
+    source_channels = {0: 1, 2: 3, 4: 2, 6: 4}[color_type]
     try:
         raw = zlib.decompress(bytes(compressed))
     except zlib.error as error:
         raise InspectionRunError('Captured artifact is corrupt.') from error
-    stride = width * channels
+    stride = width * source_channels
     if len(raw) != height * (stride + 1):
         raise InspectionRunError('Captured artifact is corrupt.')
     rows: list[bytearray] = []
@@ -279,9 +279,9 @@ def _png_pixels(image_bytes: bytes) -> tuple[int, int, bytes]:
         cursor += stride
         prior = rows[-1] if rows else bytearray(stride)
         for index in range(stride):
-            left = scanline[index - channels] if index >= channels else 0
+            left = scanline[index - source_channels] if index >= source_channels else 0
             above = prior[index]
-            upper_left = prior[index - channels] if index >= channels else 0
+            upper_left = prior[index - source_channels] if index >= source_channels else 0
             if filter_type == 1:
                 scanline[index] = (scanline[index] + left) & 255
             elif filter_type == 2:
@@ -296,7 +296,13 @@ def _png_pixels(image_bytes: bytes) -> tuple[int, int, bytes]:
             elif filter_type != 0:
                 raise InspectionRunError('Captured artifact uses an unsupported PNG filter.')
         rows.append(scanline)
-    return width, height, b''.join(rows)
+    if color_type in {0, 2}:
+        return width, height, b''.join(rows)
+    channels_without_alpha = source_channels - 1
+    return width, height, b''.join(
+        bytes(channel for index, channel in enumerate(scanline) if index % source_channels < channels_without_alpha)
+        for scanline in rows
+    )
 
 
 def _is_blurred(image_bytes: bytes) -> bool:
@@ -539,6 +545,18 @@ def execute_run(
         preview_content = _encode_preview(preview_image)
         preview_sha256 = hashlib.sha256(preview_content).hexdigest()
         preview_relative_path = _store_artifact(artifact_root, preview_content, preview_sha256, 'image/png')
+        preview_artifacts: dict[str, dict[str, object]] = {}
+        for node_id, node_image in workflow_result.preview_images.items():
+            node_content = _encode_preview(node_image)
+            node_sha256 = hashlib.sha256(node_content).hexdigest()
+            node_relative_path = _store_artifact(artifact_root, node_content, node_sha256, 'image/png')
+            preview_artifacts[node_id] = {
+                'relativePath': node_relative_path,
+                'sha256': node_sha256,
+                'mediaType': 'image/png',
+                'width': int(node_image.shape[1]),
+                'height': int(node_image.shape[0]),
+            }
         decision = workflow_result.decision or ('FAIL' if (workflow_result.score or 0.0) >= request.threshold else 'PASS')
         score = workflow_result.score
         evidence_sha256 = _workflow_evidence_hash(
@@ -551,6 +569,7 @@ def execute_run(
             'previewMediaType': 'image/png',
             'previewWidth': int(preview_image.shape[1]),
             'previewHeight': int(preview_image.shape[0]),
+            'previewArtifacts': preview_artifacts,
         }
 
         recipe = session.get(Recipe, run.recipe_id)
@@ -654,18 +673,35 @@ def replay_run(session: Session, run_id: str, artifact_root: Path) -> tuple[str,
     return decision, evidence_sha256, decision == run.decision and evidence_sha256 == run.evidence_sha256
 
 
-def get_preview_artifact(session: Session, run_id: str, artifact_root: Path) -> tuple[Path, str] | None:
+def get_preview_artifact(
+    session: Session,
+    run_id: str,
+    artifact_root: Path,
+    node_id: str | None = None,
+) -> tuple[Path, str] | None:
     run = session.get(InspectionRun, run_id)
     manifest = run.input_artifact if run is not None else None
-    if not isinstance(manifest, dict) or 'previewRelativePath' not in manifest:
+    if not isinstance(manifest, dict):
+        return None
+    node_manifest = manifest.get('previewArtifacts', {}).get(node_id) if node_id else None
+    selected = node_manifest if isinstance(node_manifest, dict) else manifest
+    if 'relativePath' in selected:
+        relative_path = selected.get('relativePath')
+        expected_sha256 = selected.get('sha256')
+        media_type = selected.get('mediaType', 'image/png')
+    elif 'previewRelativePath' in selected:
+        relative_path = selected.get('previewRelativePath')
+        expected_sha256 = selected.get('previewSha256')
+        media_type = selected.get('previewMediaType', 'image/png')
+    else:
         return None
     root = artifact_root.resolve()
-    path = (root / str(manifest['previewRelativePath'])).resolve()
+    path = (root / str(relative_path)).resolve()
     if not path.is_relative_to(root) or not path.is_file():
         raise InspectionRunError('Workflow preview artifact path is invalid.')
-    if hashlib.sha256(path.read_bytes()).hexdigest() != manifest.get('previewSha256'):
+    if hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha256:
         raise InspectionRunError('Workflow preview artifact checksum is invalid.')
-    return path, str(manifest.get('previewMediaType', 'image/png'))
+    return path, str(media_type)
 
 
 def _enqueue_integration_events(session: Session, run: InspectionRun, result_id: int) -> None:

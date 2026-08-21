@@ -63,7 +63,6 @@ Inputs are `image`:image, `detections`:detections. The node applies OpenCV Descr
 
 | Key | Kind | Default | Min | Max | Options | How to enter / Meaning |
 |---|---|---|---|---|---|---|
-| `implementation` | `select` | `opencv` | — | — | `opencv`, `manual-python` | Use OpenCV BFMatcher KNN matching or the KNN algorithm implemented with Python/NumPy. |
 | `neighbors` | `integer` | `3` | `1` | `1000` | — | Must not exceed the number of training samples. |
 | `distanceMetric` | `select` | `euclidean` | — | — | `euclidean`, `manhattan` | OpenCV supports Euclidean; manual Python supports Euclidean and Manhattan. |
 | `distanceWeighted` | `boolean` | `true` | — | — | — | Weight closer neighbors more strongly. |

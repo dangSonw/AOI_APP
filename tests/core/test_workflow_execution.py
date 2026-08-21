@@ -18,6 +18,8 @@ def test_default_workflow_executes_saved_dag_and_returns_preview() -> None:
 
     assert result.final_image is not None
     assert result.final_image.shape[:2] == (96, 128)
+    assert list(result.preview_images) == [workflow.execution_order[-1]]
+    assert result.preview_images[workflow.execution_order[-1]] is not None
     nodes_by_id = {node.id: node for node in workflow.nodes}
     assert [record.algorithm_id for record in result.records] == [
         nodes_by_id[node_id].algorithm_id for node_id in workflow.execution_order

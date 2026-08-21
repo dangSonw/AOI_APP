@@ -10,6 +10,11 @@ import type {
   WorkflowPoint,
   WorkflowPort,
 } from '../types/workflow';
+import {
+  INPUT_PIN_ID, OUTPUT_PIN_ID, resolveVirtualPinGroups, virtualPinDependencies,
+} from './virtual-pins';
+
+export { resolveVirtualPinTypes } from './virtual-pins';
 
 
 function issue(code: ValidationIssue['code'], message: string, context: Partial<ValidationIssue> = {}): ValidationIssue {
@@ -27,6 +32,11 @@ function createsCycle(workflow: Workflow, sourceNodeId: string, targetNodeId: st
     const targets = dependents.get(connection.sourceNodeId) ?? [];
     targets.push(connection.targetNodeId);
     dependents.set(connection.sourceNodeId, targets);
+  }
+  if (kind === 'data') {
+    for (const [source, target] of virtualPinDependencies(workflow)) {
+      dependents.set(source, [...(dependents.get(source) ?? []), target]);
+    }
   }
   const stack = [targetNodeId];
   const visited = new Set<string>();
@@ -93,7 +103,7 @@ export function createNodeFromDefinition(
   return {
     id: nodeId,
     algorithmId: definition.id,
-    displayName: definition.name,
+    displayName: definition.id === INPUT_PIN_ID || definition.id === OUTPUT_PIN_ID ? 'Pin' : definition.name,
     position,
     parameters: Object.fromEntries(definition.parameters.map((parameter) => [parameter.key, parameter.defaultValue])),
     ports: [...dataPorts, ...controlPorts, ...defaultControlPorts],
@@ -167,6 +177,15 @@ export function stableTopologicalOrder(workflow: Workflow, preferredOrder = work
       indegree.set(connection.targetNodeId, (indegree.get(connection.targetNodeId) ?? 0) + 1);
     }
   }
+  for (const [source, target] of virtualPinDependencies(workflow)) {
+    if (!nodeSet.has(source) || !nodeSet.has(target)) continue;
+    const targets = dependents.get(source) ?? new Set<string>();
+    if (!targets.has(target)) {
+      targets.add(target);
+      dependents.set(source, targets);
+      indegree.set(target, (indegree.get(target) ?? 0) + 1);
+    }
+  }
   const orderKey = (nodeId: string) => rank.get(nodeId) ?? preferredOrder.length + (fallback.get(nodeId) ?? 0);
   const ready = nodeIds.filter((nodeId) => indegree.get(nodeId) === 0).sort((left, right) => orderKey(left) - orderKey(right));
   const result: string[] = [];
@@ -238,6 +257,36 @@ export function validateDraft(workflow: Workflow, catalog: AlgorithmDefinition[]
     );
     if (connectionIssue) issues.push({ ...connectionIssue, connectionId: connection.id });
   }
+  for (const group of resolveVirtualPinGroups(workflow)) {
+    if (!group.name) {
+      for (const node of [...group.inputNodes, ...group.outputNodes]) {
+        issues.push(issue('invalid-parameter', 'Virtual pin display name cannot be empty.', { nodeId: node.id }));
+      }
+      continue;
+    }
+    if (group.inputNodes.length !== 1) {
+      for (const node of [...group.inputNodes, ...group.outputNodes]) {
+        issues.push(issue('invalid-parameter', `Virtual pin channel ${group.name} requires exactly one Input Pin.`, { nodeId: node.id }));
+      }
+    }
+    if (group.outputNodes.length === 0) {
+      for (const node of group.inputNodes) {
+        issues.push(issue('invalid-parameter', `Input Pin ${group.name} requires at least one matching Output Pin.`, { nodeId: node.id }));
+      }
+    }
+    if (group.inputNodes.length === 0) {
+      for (const node of group.outputNodes) {
+        issues.push(issue('invalid-parameter', `Output Pin ${group.name} requires a matching Input Pin.`, { nodeId: node.id }));
+      }
+    }
+    if (group.concreteTypes.size > 1) {
+      issues.push(issue(
+        'generic-type-conflict',
+        `Virtual pin channel ${group.name} resolves to conflicting data types: ${[...group.concreteTypes].sort().join(', ')}.`,
+        { nodeId: (group.inputNodes[0] ?? group.outputNodes[0]).id },
+      ));
+    }
+  }
   const expected = workflow.nodes.map((node) => node.id);
   if (workflow.executionOrder.length !== expected.length || new Set(workflow.executionOrder).size !== expected.length
     || expected.some((nodeId) => !workflow.executionOrder.includes(nodeId))) {
@@ -248,6 +297,11 @@ export function validateDraft(workflow: Workflow, catalog: AlgorithmDefinition[]
       if ((connection.kind ?? 'data') === 'data'
         && (positions.get(connection.sourceNodeId) ?? Infinity) >= (positions.get(connection.targetNodeId) ?? -1)) {
         issues.push(issue('dependency-order', 'Move dependencies before their consumers.', { connectionId: connection.id }));
+      }
+    }
+    for (const [source, target] of virtualPinDependencies(workflow)) {
+      if ((positions.get(source) ?? Infinity) >= (positions.get(target) ?? -1)) {
+        issues.push(issue('dependency-order', 'Move Input Pins before matching Output Pins.', { nodeId: target }));
       }
     }
   }

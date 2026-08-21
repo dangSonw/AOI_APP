@@ -1,0 +1,87 @@
+﻿# Project output viewers and algorithm catalog consolidation Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Make Project-tab viewers derive from explicit workflow output nodes, hide 3D unless a 3D output exists, support one resizable 2D window per image output, and consolidate OpenCV/manual labeling without breaking legacy algorithm IDs.
+
+**Architecture:** Add a pure workflow-output selector in `frontend/src/utils/` that recognizes the existing `image-output` capability and future 3D-output capability from catalog definitions. Keep rendering in `DashboardPage`, but render a keyed list of output descriptors and store per-output viewer preferences with legacy fallback. Fix viewer height by making the visual region use a real `height`/`min-height` derived from the CSS custom property rather than only an intrinsic minimum. Treat OpenCV/manual consolidation as catalog metadata and shared-library implementation work; preserve old IDs and runtime contracts until an explicit migration map exists.
+
+**Tech Stack:** React 18, TypeScript, Vitest, CSS Grid, Python/OpenCV node runtime, existing workflow/catalog APIs.
+
+## Global Constraints
+
+- Follow `.agents/rules/RULE.md` for naming, layering, responsive layout, testing, and memory notes.
+- Do not reset or overwrite unrelated pre-existing workspace changes.
+- Do not delete legacy workflow algorithm IDs without migration/alias support.
+- Use only dependencies already present in the repository.
+- Run frontend tests, typecheck, and build when possible.
+- Run GitNexus impact before changing symbols and detect-changes before claiming completion.
+
+### Task 1: Model workflow output descriptors
+
+**Files:**
+- Create: `frontend/src/utils/workflow-output-viewers.ts`
+- Test: `frontend/src/utils/workflow-output-viewers.test.ts`
+
+- [ ] Write failing tests for explicit `image-output`, zero image outputs, multiple image outputs, and 3D capability detection.
+- [ ] Run the focused Vitest test and verify it fails because the selector is not implemented.
+- [ ] Implement pure descriptor selection using `AlgorithmDefinition` plus `Workflow`; recognize `image-output` by catalog capability `image-preview` and recognize 3D only through explicit `3d-preview` capability (or an explicit catalog definition flag, not generic output text).
+- [ ] Run the focused test and verify it passes.
+
+### Task 2: Support stable per-output viewer preferences
+
+**Files:**
+- Modify: `frontend/src/types/workstation-preferences.ts`
+- Modify: `frontend/src/utils/workstation-preferences.ts`
+- Modify: `frontend/src/pages/WorkspacePage.tsx`
+- Test: `frontend/src/utils/workstation-preferences.test.ts`
+
+- [ ] Add a backward-compatible keyed viewer preference map with fallback to current defaults.
+- [ ] Test clamping and preservation for output-specific width/height values.
+- [ ] Run the preference tests red, implement the smallest migration-safe update, then run green.
+
+### Task 3: Render dynamic Project-tab viewers
+
+**Files:**
+- Modify: `frontend/src/pages/WorkspacePage.tsx`
+- Modify: `frontend/src/pages/DashboardPage.tsx`
+- Modify: `frontend/src/services/workflow-service.ts` only if catalog data is not already available through the existing load path
+- Test: `frontend/src/pages/DashboardPage.test.tsx`
+
+- [ ] Add failing render tests for no image output, one image output, multiple image outputs, and 3D only when explicitly declared.
+- [ ] Run focused tests and verify the old static-view behavior is caught.
+- [ ] Pass catalog definitions or a derived viewer model into `DashboardPage`; render one 2D article per image output and one 3D article only for a 3D output.
+- [ ] Run focused tests and verify green.
+
+### Task 4: Fix width/height resizing and responsive layout
+
+**Files:**
+- Modify: `frontend/src/components/ViewerSizeControls.tsx` if a testable handler/helper is needed
+- Modify: `frontend/src/styles/global.css`
+- Test: `frontend/src/utils/workstation-preferences.test.ts` and `frontend/src/pages/DashboardPage.test.tsx`
+
+- [ ] Add a regression test proving H−/H＋ change `heightUnits` while W controls leave height unchanged.
+- [ ] Make `.pcb-visual` height derive from `--viewer-height` while retaining responsive min/max bounds; ensure content uses the available region.
+- [ ] Run focused tests and frontend build.
+
+### Task 5: Consolidate OpenCV/manual catalog presentation safely
+
+**Files:**
+- Modify: relevant `core/nodes/**/manifest.json` files only after duplicate-contract comparison
+- Modify: backend catalog normalization module if needed
+- Test: existing catalog/registry tests plus a focused regression test
+
+- [ ] Produce a duplicate-contract report comparing IDs, input/output types, parameters, capabilities, and implementation dependencies.
+- [ ] Add a shared implementation/category metadata field or catalog grouping for equivalent OpenCV/manual nodes while retaining legacy IDs.
+- [ ] Prefer installed OpenCV/scikit-image/scikit-learn APIs in the implementation; do not replace domain-specific algorithms with a generic operation.
+- [ ] Run catalog and runtime tests.
+
+### Task 6: Memory and final verification
+
+**Files:**
+- Modify: `.agents/experience/memory.md`
+- Modify: `.agents/experience/memory.md.vn`
+
+- [ ] Record the static-viewer root cause, explicit output capability rule, and resize CSS regression.
+- [ ] Run `npm test`, `npm run typecheck`, and `npm run build` from `frontend`.
+- [ ] Read changed files and run GitNexus `detect_changes()` or CodeGraph equivalent; report any pre-existing unrelated changes separately.

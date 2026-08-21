@@ -24,7 +24,7 @@ Inputs are `image`:image. The node applies scikit-learn KMeans and Lloyd's algor
 ## How the algorithm works
 
 - Validate input presence, data types, and shapes against `kmeans-image-segmentation`.
-- Parameters `implementation`, `clusters`, `colorSpace`, `foregroundClusters`, `maximumTrainingPixels`, `maximumIterations`, `tolerance`, `randomSeed` control processing; change one value at a time to trace its effect.
+- Parameters `clusters`, `colorSpace`, `foregroundClusters`, `maximumTrainingPixels`, `maximumIterations`, `tolerance`, `randomSeed` control processing; change one value at a time to trace its effect.
 - Represent pixels in BGR, Lab, or HSV color space.
 - Repeatedly assign pixels to the nearest centroid and update centroid means.
 - Sort learned centroids from darkest ID 0 to brightest ID K-1, then turn foregroundClusters white in the mask.
@@ -63,7 +63,6 @@ Inputs are `image`:image. The node applies scikit-learn KMeans and Lloyd's algor
 
 | Key | Kind | Default | Min | Max | Options | How to enter / Meaning |
 |---|---|---|---|---|---|---|
-| `implementation` | `select` | `scikit-learn` | — | — | `scikit-learn`, `manual-python` | Choose the maintained library or the project-owned NumPy implementation. |
 | `clusters` | `integer` | `2` | `2` | `32` | — | Number of color groups K. |
 | `colorSpace` | `select` | `bgr` | — | — | `bgr`, `lab`, `hsv` | Lab is often more stable for separating brightness from color. |
 | `foregroundClusters` | `json` | `[1]` | — | — | — | JSON cluster IDs to turn white. IDs are ordered from darkest (0) to brightest (K-1); with K=2, [1] selects bright objects. |
@@ -80,14 +79,13 @@ Inputs are `image`:image. The node applies scikit-learn KMeans and Lloyd's algor
 
 - Drag **K-means image segmentation** onto the canvas.
 - Connect ports as shown in the workflow.
-- Open Node inspector and enter the JSON config below.
+- Open Node inspector and configure the fields shown below.
 - Run, inspect output, then tune one parameter at a time.
 
 **Paste into the config panel:**
 
 ```json
 {
-  "implementation": "scikit-learn",
   "clusters": 2,
   "colorSpace": "bgr",
   "foregroundClusters": [

@@ -25,7 +25,8 @@ describe('inspection runtime service', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(RUN), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(RUN), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ ...RUN, status: 'cancelled' }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(new Blob(['png']), { status: 200 }));
+      .mockResolvedValueOnce(new Response(new Blob(['png']), { status: 200 }))
+      .mockResolvedValueOnce(new Response(new Blob(['node-png']), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
 
     await startInspectionRun('token', { boardSerial: 'PCB-01', lot: '', recipeId: 1, threshold: 0.5 });
@@ -33,16 +34,18 @@ describe('inspection runtime service', () => {
     await readInspectionRun('token', RUN.id);
     const cancelled = await cancelInspectionRun('token', RUN.id);
     const preview = await readInspectionPreview('token', RUN.id);
+    const nodePreview = await readInspectionPreview('token', RUN.id, 'image-output-1');
 
     expect(cancelled.status).toBe('cancelled');
     expect(preview.size).toBe(3);
+    expect(nodePreview.size).toBe(8);
     expect(fetchMock.mock.calls.map((call) => new URL(call[0]).pathname)).toEqual([
       '/api/inspection-runs', '/api/inspection-runs/latest',
       '/api/inspection-runs/inspection-01', '/api/inspection-runs/inspection-01/cancel',
-      '/api/inspection-runs/inspection-01/preview',
+      '/api/inspection-runs/inspection-01/preview', '/api/inspection-runs/inspection-01/preview/image-output-1',
     ]);
     expect(fetchMock.mock.calls[0][1].method).toBe('POST');
     expect(fetchMock.mock.calls[3][1].method).toBe('POST');
-    expect(new Headers(fetchMock.mock.calls[4][1].headers).get('Authorization')).toBe('Bearer token');
+    expect(new Headers(fetchMock.mock.calls[5][1].headers).get('Authorization')).toBe('Bearer token');
   });
 });

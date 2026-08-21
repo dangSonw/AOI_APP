@@ -16,6 +16,7 @@ from core.nodes import (
 from .models import (
     ConnectionKind, PortChannel, RuntimeBindingMode, Workflow, WorkflowNode,
 )
+from .virtual_pins import INPUT_PIN_ID, OUTPUT_PIN_ID, normalize_virtual_pin_name
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +45,7 @@ class WorkflowExecutionResult:
     final_image: np.ndarray | None
     decision: str | None
     score: float | None
+    preview_images: dict[str, np.ndarray]
 
 
 def _summary(value: Any) -> Any:
@@ -67,6 +69,7 @@ def _token_node_inputs(
     node: WorkflowNode,
     values: dict[tuple[str, str], Any],
     source_image: np.ndarray,
+    virtual_pin_values: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], tuple[str, ...], dict[str, Any]]:
     node_inputs: dict[str, Any] = {}
     values_by_input_port: dict[str, Any] = {}
@@ -94,8 +97,21 @@ def _token_node_inputs(
         elif received:
             node_inputs[runtime_key] = received[0]
             values_by_input_port[port.id] = received[0]
+        elif node.algorithm_id == OUTPUT_PIN_ID and virtual_pin_values is not None:
+            name = normalize_virtual_pin_name(node)
+            if name in virtual_pin_values:
+                node_inputs[runtime_key] = virtual_pin_values[name]
+                values_by_input_port[port.id] = virtual_pin_values[name]
+            elif port.required:
+                missing.append(port.id)
         elif port.required:
             missing.append(port.id)
+    if node.algorithm_id == OUTPUT_PIN_ID:
+        name = normalize_virtual_pin_name(node)
+        if virtual_pin_values is not None and name in virtual_pin_values:
+            node_inputs['value'] = virtual_pin_values[name]
+        else:
+            missing.append(node.id)
     if node.algorithm_id in {'image-input', 'camera-capture'}:
         node_inputs['source-image'] = source_image
     return node_inputs, tuple(missing), values_by_input_port
@@ -111,6 +127,7 @@ def _execute_token_workflow(
     nodes = {node.id: node for node in workflow.nodes}
     manifests = get_node_manifest_registry()
     values: dict[tuple[str, str], Any] = {}
+    virtual_pin_values: dict[str, Any] = {}
     records: list[WorkflowExecutionRecord] = []
     visits: dict[str, int] = {}
     traversals: dict[str, int] = {}
@@ -118,6 +135,7 @@ def _execute_token_workflow(
     has_explicit_preview = False
     decision: str | None = None
     score: float | None = None
+    preview_images: dict[str, np.ndarray] = {}
     next_activation = 0
     executed_steps = 0
 
@@ -177,7 +195,9 @@ def _execute_token_workflow(
         runnable_index: int | None = None
         blocked: list[tuple[str, tuple[str, ...]]] = []
         for index, (node_id, _) in enumerate(queue):
-            _, missing_ports, _ = _token_node_inputs(workflow, nodes[node_id], values, source_image)
+            _, missing_ports, _ = _token_node_inputs(
+                workflow, nodes[node_id], values, source_image, virtual_pin_values,
+            )
             if not missing_ports:
                 runnable_index = index
                 break
@@ -205,7 +225,9 @@ def _execute_token_workflow(
         node = nodes[node_id]
         runtime = get_node_runtime(node.algorithm_id)
         manifest = manifests.get(node.algorithm_id)
-        node_inputs, _, input_port_values = _token_node_inputs(workflow, node, values, source_image)
+        node_inputs, _, input_port_values = _token_node_inputs(
+            workflow, node, values, source_image, virtual_pin_values,
+        )
         if node.algorithm_id == 'counter-limit':
             node_inputs['__visit_index__'] = visits.get(node.id, 0) + 1
         started = time.monotonic()
@@ -225,6 +247,8 @@ def _execute_token_workflow(
             outputs = dict(runtime.invoke(node_inputs, node.parameters, context=context))
             control_branch = str(outputs.pop('__control__', 'success'))
             log_event = outputs.pop('__log__', None)
+            if node.algorithm_id == INPUT_PIN_ID:
+                virtual_pin_values[normalize_virtual_pin_name(node)] = node_inputs['value']
             output_ports = [
                 port for port in node.ports
                 if port.channel is PortChannel.DATA and port.direction.value == 'output'
@@ -249,6 +273,9 @@ def _execute_token_workflow(
                 if node.algorithm_id == 'image-output' and key == 'preview-image' and is_viewable_output:
                     final_image = value
                     has_explicit_preview = True
+                    preview_images[node.id] = value
+                elif any(capability in manifest.capabilities for capability in ('image-preview', '3d-preview')) and is_viewable_output:
+                    preview_images[node.id] = value
                 elif is_viewable_output and not has_explicit_preview:
                     final_image = value
                 if key in {'decision', 'result-decision'}:
@@ -321,7 +348,7 @@ def _execute_token_workflow(
                 break
             emit_control(node, {'failure'})
             continue
-    return WorkflowExecutionResult(tuple(records), final_image, decision, score)
+    return WorkflowExecutionResult(tuple(records), final_image, decision, score, dict(preview_images))
 
 
 def execute_workflow(

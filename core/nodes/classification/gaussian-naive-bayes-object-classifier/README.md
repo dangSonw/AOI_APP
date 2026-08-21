@@ -63,7 +63,6 @@ Inputs are `image`:image, `detections`:detections. The node applies scikit-learn
 
 | Key | Kind | Default | Min | Max | Options | How to enter / Meaning |
 |---|---|---|---|---|---|---|
-| `implementation` | `select` | `scikit-learn` | — | — | `scikit-learn`, `manual-python` | Choose scikit-learn or the manually implemented Gaussian log-posterior. |
 | `varianceSmoothing` | `number` | `1e-09` | `1e-12` | `1.0` | — | Prevents division by zero when samples in a class have nearly identical colors. |
 | `trainingSamples` | `json` | `[{"label": "dark", "color": [20, 20, 20]}, {"label": "dark", "color": [50, 50, 50]}, {"label": "bright", "color": [205, 205, 205]}, {"label": "bright", "color": [245, 245, 245]}]` | — | — | — | JSON list: each item is {"label": "class-name", "color": [B, G, R]}. |
 

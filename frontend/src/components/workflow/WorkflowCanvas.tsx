@@ -19,6 +19,7 @@ import {
 } from '@xyflow/react';
 import type { AlgorithmDefinition, ConnectionDraft, Workflow, WorkflowPoint } from '../../types/workflow';
 import { validateConnection } from '../../utils/workflow-graph';
+import { resolveVirtualPinTypes } from '../../utils/virtual-pins';
 import { ALGORITHM_DRAG_TYPE } from './AlgorithmCatalog';
 import { WorkflowNode, type WorkflowFlowNode } from './WorkflowNode';
 import { EditableWorkflowEdge, type EditableEdge } from './EditableWorkflowEdge';
@@ -48,6 +49,7 @@ function CanvasContent(props: WorkflowCanvasProps) {
   const removeNodeRef = useRef(props.onRemoveNode);
   removeNodeRef.current = props.onRemoveNode;
   const handleRemoveNode = useCallback((nodeId: string) => removeNodeRef.current(nodeId), []);
+  const virtualPinTypes = useMemo(() => resolveVirtualPinTypes(props.workflow), [props.workflow]);
   const mappedNodes = useMemo<WorkflowFlowNode[]>(() => props.workflow.nodes.map((node) => ({
     id: node.id,
     type: 'workflow' as const,
@@ -57,8 +59,9 @@ function CanvasContent(props: WorkflowCanvasProps) {
       value: node,
       definition: props.catalog.find((definition) => definition.id === node.algorithmId)!,
       onRemove: handleRemoveNode,
+      inferredDataType: virtualPinTypes.get(node.id),
     },
-  })).filter((node) => node.data.definition), [props.workflow.nodes, props.catalog, props.selectedNodeId, handleRemoveNode]);
+  })).filter((node) => node.data.definition), [props.workflow.nodes, props.catalog, props.selectedNodeId, handleRemoveNode, virtualPinTypes]);
   const [nodes, setNodes] = useState<WorkflowFlowNode[]>(mappedNodes);
   const edges = useMemo<EditableEdge[]>(() => props.workflow.connections.map((connection) => ({
     id: connection.id,

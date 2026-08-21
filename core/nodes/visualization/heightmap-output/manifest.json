@@ -1,0 +1,25 @@
+{
+  "manifestVersion": 1,
+  "packageVersion": "1.0.0",
+  "id": "heightmap-output",
+  "use": "debug",
+  "executionTarget": "local-cpu",
+  "capabilities": ["3d-preview"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 64, "gpuMemoryMegabytes": 0},
+  "artifactContracts": {"inputs": ["heightmap"], "outputs": ["heightmap"]},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "none", "customKey": null},
+  "definition": {
+    "id": "heightmap-output",
+    "name": "3D measurement output",
+    "description": "Marks a heightmap as a workflow 3D measurement output.",
+    "category": "Visualization",
+    "documentation_group": "Acquisition and pipeline components",
+    "inputs": [{"key": "heightmap", "label": "Heightmap", "direction": "input", "data_type": "image", "required": true, "variadic": false}],
+    "outputs": [{"key": "measurement-heightmap", "label": "Measurement heightmap", "direction": "output", "data_type": "image", "required": true, "variadic": false}],
+    "parameters": [],
+    "availability": "configuration-only",
+    "documentation_reference": null
+  },
+  "catalogOrder": 60
+}

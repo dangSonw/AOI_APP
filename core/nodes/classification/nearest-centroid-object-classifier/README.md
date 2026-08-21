@@ -63,7 +63,6 @@ Inputs are `image`:image, `detections`:detections. The node applies scikit-learn
 
 | Key | Kind | Default | Min | Max | Options | How to enter / Meaning |
 |---|---|---|---|---|---|---|
-| `implementation` | `select` | `scikit-learn` | — | — | `scikit-learn`, `manual-python` | Choose scikit-learn or the manually implemented NumPy algorithm. |
 | `distanceMetric` | `select` | `euclidean` | — | — | `euclidean`, `manhattan` | Euclidean uses straight-line color distance; Manhattan sums channel differences. |
 | `trainingSamples` | `json` | `[{"label": "dark", "color": [20, 20, 20]}, {"label": "dark", "color": [50, 50, 50]}, {"label": "bright", "color": [205, 205, 205]}, {"label": "bright", "color": [245, 245, 245]}]` | — | — | — | JSON list: each item is {"label": "class-name", "color": [B, G, R]}. |
 

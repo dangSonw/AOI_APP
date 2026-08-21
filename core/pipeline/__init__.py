@@ -8,6 +8,7 @@ from .models import (
 )
 from .ordering import CycleError, stable_topological_order
 from .validation import validate_workflow
+from .virtual_pins import resolve_virtual_pin_groups, resolve_virtual_pin_types, virtual_pin_dependencies
 
 __all__ = [
     'Connection',
@@ -28,4 +29,7 @@ __all__ = [
     'execute_workflow',
     'stable_topological_order',
     'validate_workflow',
+    'resolve_virtual_pin_groups',
+    'resolve_virtual_pin_types',
+    'virtual_pin_dependencies',
 ]

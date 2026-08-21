@@ -22,7 +22,6 @@ def _objects() -> tuple[np.ndarray, list[dict[str, int]]]:
     ]
 
 
-@pytest.mark.parametrize('implementation', ['scikit-learn', 'manual-python'])
 @pytest.mark.parametrize(
     ('node_id', 'extra'),
     [
@@ -34,18 +33,14 @@ def _objects() -> tuple[np.ndarray, list[dict[str, int]]]:
         }),
     ],
 )
-def test_supervised_ml_nodes_classify_dark_and_bright_objects(
-    implementation: str,
-    node_id: str,
-    extra: dict[str, object],
-) -> None:
+def test_supervised_ml_nodes_classify_dark_and_bright_objects(node_id: str, extra: dict[str, object]) -> None:
     image, detections = _objects()
     runtime = get_node_runtime(node_id)
     assert runtime is not None
 
     output = runtime.execute(
         {'image': image, 'detections': detections},
-        {'implementation': implementation, 'trainingSamples': SAMPLES, **extra},
+        {'trainingSamples': SAMPLES, **extra},
     )['classified-detections']
 
     assert [item['label'] for item in output] == ['dark', 'bright']
@@ -54,15 +49,14 @@ def test_supervised_ml_nodes_classify_dark_and_bright_objects(
     assert 'label' not in detections[0]
 
 
-@pytest.mark.parametrize('implementation', ['scikit-learn', 'manual-python'])
-def test_kmeans_segmentation_returns_binary_mask_and_contour(implementation: str) -> None:
+def test_kmeans_segmentation_returns_binary_mask_and_contour() -> None:
     image = np.zeros((20, 20, 3), dtype=np.uint8)
     image[5:15, 6:14] = 255
     runtime = get_node_runtime('kmeans-image-segmentation')
     assert runtime is not None
 
     result = runtime.execute({'image': image}, {
-        'implementation': implementation, 'clusters': 2, 'colorSpace': 'bgr',
+        'clusters': 2, 'colorSpace': 'bgr',
         'foregroundClusters': [1], 'maximumTrainingPixels': 10000,
         'maximumIterations': 100, 'tolerance': 1e-4, 'randomSeed': 42,
     })
@@ -73,15 +67,13 @@ def test_kmeans_segmentation_returns_binary_mask_and_contour(implementation: str
     assert len(result['contours']) == 1
 
 
-@pytest.mark.parametrize('implementation', ['scikit-learn', 'manual-python'])
-def test_pca_anomaly_detector_highlights_unseen_color(implementation: str) -> None:
+def test_pca_anomaly_detector_highlights_unseen_color() -> None:
     image = np.full((8, 8, 3), 40, dtype=np.uint8)
     image[2:6, 2:6] = [0, 0, 255]
     runtime = get_node_runtime('pca-anomaly-detector')
     assert runtime is not None
 
     result = runtime.execute({'image': image}, {
-        'implementation': implementation,
         'components': 1,
         'scorePercentile': 99.0,
         'trainingSamples': [
@@ -97,22 +89,32 @@ def test_pca_anomaly_detector_highlights_unseen_color(implementation: str) -> No
     assert 0.0 <= result['score'] <= 1.0
 
 
-def test_ml_nodes_reject_invalid_training_samples_and_implementation() -> None:
+def test_ml_nodes_ignore_legacy_implementation_parameter() -> None:
     image, detections = _objects()
     classifier = get_node_runtime('nearest-centroid-object-classifier')
-    segmenter = get_node_runtime('kmeans-image-segmentation')
-    assert classifier is not None and segmenter is not None
+    assert classifier is not None
+
+    output = classifier.execute(
+        {'image': image, 'detections': detections},
+        {'implementation': 'manual-python', 'distanceMetric': 'euclidean', 'trainingSamples': SAMPLES},
+    )['classified-detections']
+    assert [item['label'] for item in output] == ['dark', 'bright']
+
+
+def test_ml_nodes_reject_invalid_training_samples() -> None:
+    image, detections = _objects()
+    classifier = get_node_runtime('nearest-centroid-object-classifier')
+    assert classifier is not None
 
     with pytest.raises(ValueError, match='two distinct labels'):
         classifier.execute(
             {'image': image, 'detections': detections},
-            {'implementation': 'manual-python', 'distanceMetric': 'euclidean', 'trainingSamples': [
+            {'distanceMetric': 'euclidean', 'trainingSamples': [
                 {'label': 'same', 'color': [0, 0, 0]}, {'label': 'same', 'color': [255, 255, 255]},
             ]},
         )
-    with pytest.raises(ValueError, match='Unsupported implementation'):
-        segmenter.execute({'image': image}, {
-            'implementation': 'unknown', 'clusters': 2, 'colorSpace': 'bgr',
-            'foregroundClusters': [1], 'maximumTrainingPixels': 1000,
-            'maximumIterations': 10, 'tolerance': 1e-4, 'randomSeed': 42,
-        })
+    with pytest.raises(ValueError, match='at least two samples'):
+        classifier.execute(
+            {'image': image, 'detections': detections},
+            {'distanceMetric': 'euclidean', 'trainingSamples': [{'label': 'only', 'color': [0, 0, 0]}]},
+        )

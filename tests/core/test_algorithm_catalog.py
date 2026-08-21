@@ -4,7 +4,7 @@ from core.algorithms import DataType, ParameterKind, get_algorithm_catalog, get_
 def test_catalog_contains_every_approved_configuration_definition() -> None:
     catalog = get_algorithm_catalog()
 
-    assert len(catalog) == 99
+    assert len(catalog) == 102
     assert len({item.id for item in catalog}) == len(catalog)
     assert all(item.availability == 'configuration-only' for item in catalog)
     assert all(item.name and item.description and item.category for item in catalog)
@@ -63,6 +63,22 @@ def test_catalog_contains_approved_logic_and_extended_opencv_packages() -> None:
         'convex-hull', 'contour-metrics', 'image-arithmetic', 'image-bitwise',
     } <= ids
     assert {'bounded-loop', 'control-gate', 'feedback-state'}.isdisjoint(ids)
+
+
+def test_catalog_contains_generic_named_virtual_pin_nodes() -> None:
+    input_pin = get_algorithm_definition('input-pin')
+    output_pin = get_algorithm_definition('output-pin')
+
+    assert input_pin is not None
+    assert input_pin.name == 'Input Pin'
+    assert len(input_pin.inputs) == 1
+    assert input_pin.inputs[0].data_type is DataType.GENERIC
+    assert input_pin.outputs == ()
+    assert output_pin is not None
+    assert output_pin.name == 'Output Pin'
+    assert output_pin.inputs == ()
+    assert len(output_pin.outputs) == 1
+    assert output_pin.outputs[0].data_type is DataType.GENERIC
 
 
 def test_logic_definitions_expose_boolean_data_and_dynamic_control_ports() -> None:

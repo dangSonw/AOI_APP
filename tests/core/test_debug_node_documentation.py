@@ -22,7 +22,7 @@ def _debug_packages() -> list[tuple[Path, dict]]:
 
 def test_every_debug_node_has_structured_bilingual_documentation() -> None:
     packages = _debug_packages()
-    assert len(packages) == 79
+    assert len(packages) == 82
 
     for directory, manifest in packages:
         metadata = json.loads((directory / 'documentation.json').read_text(encoding='utf-8'))

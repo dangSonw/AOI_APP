@@ -19,6 +19,7 @@ class DashboardPanelsSchema(ApiSchema):
     state: DashboardPanelSchema = DashboardPanelSchema()
     optical_2d: ViewerPanelSchema = ViewerPanelSchema()
     heightmap_3d: ViewerPanelSchema = ViewerPanelSchema()
+    output_viewers: dict[str, ViewerPanelSchema] = Field(default_factory=dict)
     physical_io: DashboardPanelSchema = DashboardPanelSchema()
     inspection_flow: DashboardPanelSchema = DashboardPanelSchema()
 

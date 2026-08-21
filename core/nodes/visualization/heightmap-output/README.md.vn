@@ -1,0 +1,99 @@
+# Node 3D measurement output
+
+## Mục đích và cách dùng nhanh
+
+`heightmap-output` đánh dấu heightmap là output đo 3D rõ ràng của workflow.
+
+**Dùng khi:** dùng khi tab Project cần hiển thị cửa sổ đo 3D.
+
+**Luồng nhanh:** `heightmap-output`
+
+## Cấu trúc node
+
+```text
+heightmap
+    │
+    ▼
+[heightmap-output]
+    │
+    └── measurement-heightmap
+```
+
+Input là `heightmap`:image. Output là `measurement-heightmap`:image.
+
+## Nguyên lý xử lý
+
+- Kiểm tra input heightmap.
+- Giữ nguyên giá trị heightmap.
+- Xuất output đo 3D rõ ràng.
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `heightmap-output` |
+| Nhóm | Visualization |
+| Trạng thái | `debug` |
+| Đích thực thi | `local-cpu` |
+| Khả năng | `3d-preview` |
+
+> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.
+
+## Cách nhập dữ liệu và đọc output
+
+| Key | Hướng | Kiểu | Required | Variadic | Label |
+|---|---|---|---|---|---|
+| `heightmap` | đầu vào | `image` | có | không | Heightmap |
+| `measurement-heightmap` | đầu ra | `image` | có | không | Measurement heightmap |
+
+### Nhập input
+
+1. Nối output `image` vào `heightmap`. Cấp heightmap do pipeline đo đã cấu hình tạo ra.
+
+### Đọc output
+
+- `measurement-heightmap` (`image`): Heightmap giữ nguyên cho cửa sổ đo 3D ở tab Project.
+
+## Cách nhập tham số
+
+| Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
+|---|---|---|---|---|---|---|
+| — | — | — | — | — | — | Node không có tham số cấu hình. |
+
+## Ví dụ sử dụng có thể làm theo ngay
+
+**Mục tiêu:** Bật một output đo 3D.
+
+**Workflow:** `heightmap-output`
+
+- Thêm node.
+- Nối heightmap.
+- Chạy workflow.
+
+**Nhập trong bảng config:**
+
+```json
+{}
+```
+
+**Input ví dụ:** Ảnh heightmap.
+
+**Kết quả mong đợi:** Cửa sổ đo 3D được bật.
+
+## Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Không có viewer 3D | Node chưa nằm trong workflow đã lưu. | Thêm và lưu output đo 3D. |
+| Thiếu input | Chưa nối heightmap. | Nối output heightmap. |
+| Kết nối không hợp lệ | Nguồn không phải image. | Dùng nguồn heightmap tương thích image. |
+
+## Giới hạn và kiểm tra trước production
+
+- Node chỉ đánh dấu output, không tự tính heightmap.
+
+### Checklist trước production
+
+- Xác thực calibration và đơn vị chiều cao.
+- Kiểm tra board đại diện.
+- Xác nhận artifact output có sẵn.

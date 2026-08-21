@@ -1,0 +1,29 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`heightmap-output` marks a heightmap as an explicit workflow 3D measurement output.",
+    "whenToUse": "use when the Project tab should show a 3D measurement window.",
+    "structure": "Input is `heightmap`:image. Output is `measurement-heightmap`:image.",
+    "algorithm": ["Validate the heightmap input.", "Preserve the heightmap without changing its values.", "Publish the explicit 3D measurement output."],
+    "inputGuidance": {"heightmap": "Provide a heightmap image produced by the configured measurement pipeline."},
+    "outputGuidance": {"measurement-heightmap": "The unchanged heightmap used by the Project 3D measurement viewer."},
+    "parameterGuidance": {},
+    "example": {"goal": "Expose one 3D measurement output.", "workflow": ["heightmap-output"], "parameters": {}, "steps": ["Add the node.", "Connect a heightmap.", "Run the workflow."], "input": "Heightmap image.", "expectedOutput": "The 3D measurement viewer is enabled."},
+    "troubleshooting": [{"symptom": "No 3D viewer", "cause": "The node is not in the saved workflow.", "resolution": "Add and save 3D measurement output."}, {"symptom": "Missing input", "cause": "No heightmap is connected.", "resolution": "Connect a heightmap output."}, {"symptom": "Invalid connection", "cause": "The source is not an image.", "resolution": "Use an image-compatible heightmap source."}],
+    "limitations": ["This node marks the output; it does not calculate a heightmap."],
+    "productionChecklist": ["Validate calibration and height units.", "Check representative boards.", "Confirm the output artifact is available."]
+  },
+  "vi": {
+    "overview": "`heightmap-output` đánh dấu heightmap là output đo 3D rõ ràng của workflow.",
+    "whenToUse": "dùng khi tab Project cần hiển thị cửa sổ đo 3D.",
+    "structure": "Input là `heightmap`:image. Output là `measurement-heightmap`:image.",
+    "algorithm": ["Kiểm tra input heightmap.", "Giữ nguyên giá trị heightmap.", "Xuất output đo 3D rõ ràng."],
+    "inputGuidance": {"heightmap": "Cấp heightmap do pipeline đo đã cấu hình tạo ra."},
+    "outputGuidance": {"measurement-heightmap": "Heightmap giữ nguyên cho cửa sổ đo 3D ở tab Project."},
+    "parameterGuidance": {},
+    "example": {"goal": "Bật một output đo 3D.", "workflow": ["heightmap-output"], "parameters": {}, "steps": ["Thêm node.", "Nối heightmap.", "Chạy workflow."], "input": "Ảnh heightmap.", "expectedOutput": "Cửa sổ đo 3D được bật."},
+    "troubleshooting": [{"symptom": "Không có viewer 3D", "cause": "Node chưa nằm trong workflow đã lưu.", "resolution": "Thêm và lưu output đo 3D."}, {"symptom": "Thiếu input", "cause": "Chưa nối heightmap.", "resolution": "Nối output heightmap."}, {"symptom": "Kết nối không hợp lệ", "cause": "Nguồn không phải image.", "resolution": "Dùng nguồn heightmap tương thích image."}],
+    "limitations": ["Node chỉ đánh dấu output, không tự tính heightmap."],
+    "productionChecklist": ["Xác thực calibration và đơn vị chiều cao.", "Kiểm tra board đại diện.", "Xác nhận artifact output có sẵn."]
+  }
+}

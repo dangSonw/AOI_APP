@@ -195,3 +195,19 @@ Baseline hiện tại gồm 15 backend test, 14 core test, 12 integration test, 
 
 - Dùng `bash scripts/run_dev.sh simulation debug` để tự đăng nhập chỉ trong development. Lệnh tương thích `VITE_AOI_SIMULATOR_NO_BROWSER=1 bash scripts/run_dev.sh simulation` được ánh xạ sang cùng chế độ; `AOI_SIMULATOR_NO_BROWSER=1` chỉ ngăn tự mở trình duyệt.
 - Debug auto-login dùng session do server cấp cho seed account và không gửi hoặc nhúng `SEED_ADMIN_PASSWORD` vào Vite, source code, tài liệu, đối số dòng lệnh hay log. Endpoint bị ẩn trừ khi đồng thời chạy development environment và cờ debug do launcher kiểm soát.
+
+## 24. Pin Workflow Ảo Có Tên
+
+- Hạ tầng dynamic port và passthrough trong cùng node trước đây không tạo node nối tắt dây có thể tìm thấy trong catalog. Một workflow node chỉ xuất hiện khi `core/nodes/<category>/<node-id>/` có manifest và runtime package tương ứng, vì `/api/algorithms` được chiếu từ manifest registry.
+- `input-pin` nhận một data connection thật và `output-pin` phát tới các connection thật phía sau. `display_name` của workflow sau khi trim và vẫn phân biệt hoa thường định danh kênh ảo. Mỗi kênh cần đúng một Input Pin và ít nhất một Output Pin; một Input Pin có thể cấp cho nhiều Output Pin.
+- Dependency ảo theo tên được suy ra thay vì lưu dưới dạng connection ẩn. Backend validation, frontend validation, cycle detection, Auto order và runtime scheduling đều phải dùng chung quy tắc dependency từ Input Pin tới Output Pin.
+- Port của pin vẫn là `generic` trong JSON workflow đã lưu. Hệ thống suy luận một kiểu cụ thể từ source và consumer thật, từ chối nhiều kiểu cụ thể xung đột, đồng thời hiển thị kiểu suy luận trên node mà không sửa contract port đã lưu.
+- Runtime giữ chính object đã nhận theo mỗi tên pin chuẩn hóa trong phạm vi một lần chạy workflow và cấp cùng object đó cho Output Pin tương ứng. Không dùng trạng thái pin global theo process vì các inspection run đồng thời phải được cô lập.
+
+## 25. Contract viewer output của Project
+
+- Viewer trong Project được suy ra từ capability rõ ràng của node workflow. `image-preview` tạo một cửa sổ 2D cho mỗi node; `3d-preview` tạo viewer đo 3D. Node `output-pin` generic không tự tạo viewer.
+- Node `heightmap-output` là marker output 3D rõ ràng. Node giữ nguyên heightmap kiểu image và không tự tính dữ liệu đo.
+- Runtime lưu ảnh preview theo node ID trong `WorkflowExecutionResult.preview_images`; inspection run lưu dưới `input_artifact.previewArtifacts`. Field cũ `previewRelativePath` vẫn được giữ để tương thích.
+- Kích thước viewer lưu trong `dashboard.panels.outputViewers` theo node ID ổn định. Preference `optical2D` cũ là fallback; CSS phải đặt chiều cao thật để nút H−/H＋ thay đổi vùng hiển thị.
+- Catalog API lấy capability từ manifest. Các tham số OpenCV/manual hoặc scikit-learn/manual vẫn tương thích ngược; lựa chọn dùng thư viện là mặc định và workflow cũ không bị vô hiệu hóa âm thầm.

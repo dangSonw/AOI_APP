@@ -12,18 +12,17 @@ TRAINING_SAMPLES = [
 ]
 
 
-def _parameters(implementation: str) -> dict[str, object]:
+def _parameters(**extra: object) -> dict[str, object]:
     return {
-        'implementation': implementation,
         'neighbors': 3,
         'distanceMetric': 'euclidean',
         'distanceWeighted': True,
         'trainingSamples': TRAINING_SAMPLES,
+        **extra,
     }
 
 
-@pytest.mark.parametrize('implementation', ['opencv', 'manual-python'])
-def test_knn_object_classifier_labels_detected_regions(implementation: str) -> None:
+def test_knn_object_classifier_labels_detected_regions() -> None:
     image = np.zeros((12, 24, 3), dtype=np.uint8)
     image[:, 12:] = 255
     detections = [
@@ -33,7 +32,7 @@ def test_knn_object_classifier_labels_detected_regions(implementation: str) -> N
 
     runtime = get_node_runtime('knn-object-classifier')
     assert runtime is not None
-    result = runtime.execute({'image': image, 'detections': detections}, _parameters(implementation))
+    result = runtime.execute({'image': image, 'detections': detections}, _parameters())
 
     classified = result['classified-detections']
     assert [item['label'] for item in classified] == ['dark', 'bright']
@@ -42,12 +41,11 @@ def test_knn_object_classifier_labels_detected_regions(implementation: str) -> N
     assert 'label' not in detections[0]
 
 
-@pytest.mark.parametrize('implementation', ['opencv', 'manual-python'])
-def test_knn_image_segmentation_returns_mask_and_object_contour(implementation: str) -> None:
+def test_knn_image_segmentation_returns_mask_and_object_contour() -> None:
     image = np.zeros((20, 20, 3), dtype=np.uint8)
     image[5:15, 6:14] = 255
     parameters = {
-        **_parameters(implementation),
+        **_parameters(),
         'foregroundLabels': ['bright'],
         'minimumConfidence': 0.5,
     }
@@ -64,21 +62,22 @@ def test_knn_image_segmentation_returns_mask_and_object_contour(implementation: 
     assert len(contours) == 1
 
 
-def test_knn_implementations_produce_matching_masks() -> None:
+def test_knn_nodes_ignore_legacy_implementation_parameter() -> None:
     image = np.zeros((8, 8, 3), dtype=np.uint8)
-    image[:, 4:] = 255
     runtime = get_node_runtime('knn-image-segmentation')
     assert runtime is not None
 
-    outputs = [
-        runtime.execute(
-            {'image': image},
-            {**_parameters(implementation), 'foregroundLabels': ['bright'], 'minimumConfidence': 0.5},
-        )['mask']
-        for implementation in ('opencv', 'manual-python')
-    ]
-
-    assert np.array_equal(outputs[0], outputs[1])
+    # Legacy recipes may carry an `implementation` value; it must be ignored.
+    result = runtime.execute(
+        {'image': image},
+        {
+            **_parameters(),
+            'implementation': 'manual-python',
+            'foregroundLabels': ['bright'],
+            'minimumConfidence': 0.5,
+        },
+    )
+    assert result['mask'].shape == image.shape[:2]
 
 
 def test_knn_nodes_reject_invalid_configuration_and_detections() -> None:
@@ -90,31 +89,15 @@ def test_knn_nodes_reject_invalid_configuration_and_detections() -> None:
     with pytest.raises(ValueError, match='cannot exceed'):
         classifier.execute(
             {'image': image, 'detections': []},
-            {**_parameters('manual-python'), 'neighbors': 5},
+            {**_parameters(), 'neighbors': 5},
         )
     with pytest.raises(ValueError, match='inside the image'):
         classifier.execute(
             {'image': image, 'detections': [{'x': 7, 'y': 7, 'width': 2, 'height': 2}]},
-            _parameters('manual-python'),
+            _parameters(),
         )
     with pytest.raises(ValueError, match='missing from training samples'):
         segmenter.execute(
             {'image': image},
-            {**_parameters('manual-python'), 'foregroundLabels': ['unknown'], 'minimumConfidence': 0.5},
-        )
-
-
-def test_opencv_knn_rejects_manual_only_manhattan_metric() -> None:
-    runtime = get_node_runtime('knn-image-segmentation')
-    assert runtime is not None
-
-    with pytest.raises(ValueError, match='only Euclidean'):
-        runtime.execute(
-            {'image': np.zeros((2, 2, 3), dtype=np.uint8)},
-            {
-                **_parameters('opencv'),
-                'distanceMetric': 'manhattan',
-                'foregroundLabels': ['bright'],
-                'minimumConfidence': 0.5,
-            },
+            {**_parameters(), 'foregroundLabels': ['unknown'], 'minimumConfidence': 0.5},
         )

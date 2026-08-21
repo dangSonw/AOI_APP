@@ -141,3 +141,52 @@ This document defines the standard rules for folder structure, file names, varia
 ## 17. AI Experience and Memory rules
 - When resolving a bug, encountering unique configurations, or identifying critical technical notes, the AI agent must record this knowledge.
 - Save these notes as `memory.md` (in English) and `memory.md.vn` (in Vietnamese) inside the `.agents/experience/` directory to preserve operational knowledge for future agents.
+
+## 18. Project code-graph query rules
+- Before reading, understanding, debugging, refactoring, or changing project code, the AI agent must query the project with CodeGraph or GitNexus when either tool is available.
+- Prefer GitNexus for symbol context, execution flows, dependency relationships, impact analysis, and change detection. Use CodeGraph when it is the available project code-graph tool or when its graph view is more appropriate.
+- Read the relevant project/index context before making assumptions about architecture or dependencies. If the index is stale, refresh it before relying on graph results.
+- For changes to functions, classes, or methods, run impact analysis first and report the affected callers, execution flows, and risk level. Do not proceed without warning the user when the risk is high or critical.
+- After editing, run the graph change-detection check when available to confirm that only the expected symbols and execution flows were affected.
+
+## 19. Core node independence rules
+- Every `node.py` under `core/nodes/` must be an independent, replaceable component.
+- A node must not import, call, or depend on another node's functions, classes, implementation details, or mutable runtime state. Do not create shared helper functions between nodes.
+- Node implementations must not use shared `*_runtime.py` files or other runtime implementation files as a shortcut for node behavior. The node must contain the behavior it owns and declare its own dependencies explicitly.
+- Nodes may communicate only through the documented node input/output contract and approved pipeline interfaces; they must not rely on hidden cross-node state, import order, or side effects.
+- Replacing or removing one node must not require edits to unrelated node implementations. If common behavior is truly required, first ask the user to approve a change to the node contract or a separately documented platform-level interface.
+
+## 20. Clarification rule for uncertain requests
+- If the AI agent is not certain about the user's requirement, intended scope, expected behavior, or direction of the edit, it must ask the user for clarification before changing files or running state-changing commands.
+- The clarification must explicitly explain what is uncertain, why that uncertainty matters, and the concrete choices or edit options available. Include the expected impact of each option when it is known.
+- Do not silently choose an interpretation for an ambiguous request. Continue only after the user confirms the requirement or selects an option.
+
+## 21. Non-interactive command and installation rules
+- Commands must be run in non-interactive mode whenever possible so the agent does not stop at a pager prompt such as `:` or wait for manual `Enter` and `q` input.
+- For Git output, use `git --no-pager ...` or set `GIT_PAGER=cat`, `PAGER=cat`, and `TERM=dumb`. Never use an interactive pager for `status`, `diff`, `log`, `show`, or file inspection.
+- For file inspection, use direct non-paginated commands such as `Get-Content`, `cat`, or the approved file-reading tools. Do not pipe output to `less`, `more`, `vim`, or another interactive viewer.
+- For package installation and commands that may ask for confirmation, use the package manager's documented non-interactive/assume-yes option and set the appropriate CI flag. Examples: `npm install --yes` or `npm_config_yes=true`, `pip install --no-input`, `apt-get -y`, and `CI=1` where supported.
+- Do not wait for or request manual `y/n`, `Enter`, or `q` input from the user. If a tool has no safe non-interactive option, stop and explain the exact command and required confirmation instead of launching an interactive process.
+- Avoid commands that require a TTY or an interactive shell. Add explicit timeouts where the execution environment supports them, and report a timeout rather than leaving a command running indefinitely.
+
+## 22. VS Code terminal tab hygiene
+- Unless multiple commands must run concurrently, use only one VS Code terminal tab for the task.
+- When a command or test is complete and its terminal is no longer needed, clear its output or close/remove the terminal tab before starting another unrelated command.
+- Do not create extra terminal tabs for independent sequential work; batch independent commands in one terminal invocation when safe.
+
+## 23. WSL command execution
+- When the project is located in the WSL filesystem and a Linux command, GitNexus operation, Python command, or test is required, prefer executing it through the Ubuntu WSL distribution from the project directory `/home/sonev/graduation_project/main/AOI_APP`.
+- From a Windows/Cline command runner, use this exact wrapper: `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && <command>\"`. The wrapper starts Ubuntu, changes to the Linux project directory, executes the command, returns its exit code, and then closes the non-interactive shell.
+- The wrapper is the non-interactive equivalent of the project terminal prompt `(base) sonev@Son:~/graduation_project/main/AOI_APP$`; do not try to reproduce the prompt with `echo` or use a Windows UNC path as the Linux working directory.
+- Before a group of commands, optionally verify the WSL context with `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && whoami && hostname && pwd\"`. Expected values are user `sonev`, host `Son`, and project path `/home/sonev/graduation_project/main/AOI_APP`.
+- Put all Linux commands inside the same `bash -lc` block and chain dependent commands with `&&`; use `;` only when a later command must run after a failed command. Example: `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && git --no-pager status --short && python -m compileall -q core\"`.
+- Run common project operations through WSL as follows:
+  - Git: `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && git --no-pager diff --check\"`.
+  - Python: `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && python -m compileall -q core\"`.
+  - Tests: `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && python -m pytest -q tests/core\"`.
+  - GitNexus: `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && node .gitnexus/run.cjs detect_changes\"`.
+- Quote the outer Windows command and inner Bash command carefully. Use Linux paths after `bash -lc`; do not pass `\\wsl.localhost\\Ubuntu\\...`, `C:\\...`, or PowerShell variables to a Linux command. Escape `$`, backticks, quotes, and command substitutions when they must be evaluated inside WSL rather than by the outer shell.
+- Do not use `wsl.exe` without `-d Ubuntu`, do not rely on the user's current Windows directory, and do not run the command from `/mnt/c/...` when the project is stored under `/home/sonev/...`.
+- Do not open or depend on an interactive WSL terminal, and do not wait for manual input. Commands must remain non-interactive and must use explicit pager/confirmation options where applicable.
+- Keep the WSL working directory and environment consistent with the project. Do not mix Windows and WSL path syntaxes inside the same Linux command.
+- If WSL is unavailable or the command cannot be executed safely through WSL, report the limitation and use the safest available fallback without changing project state unexpectedly.

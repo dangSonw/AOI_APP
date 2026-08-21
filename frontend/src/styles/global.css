@@ -939,7 +939,8 @@ button:disabled {
 }
 
 .viewer-grid > .inspection-viewer .pcb-visual {
-  min-height: calc(var(--viewer-height, 5) * 52px);
+  height: clamp(180px, calc(var(--viewer-height, 5) * 52px), 720px);
+  min-height: 0;
 }
 
 .dashboard-panel {
@@ -1166,7 +1167,7 @@ button:disabled {
 }
 
 .pcb-visual {
-  min-height: clamp(230px, 25vw, 340px);
+  min-height: clamp(180px, 25vw, 340px);
   grid-template: 1fr / 1fr;
   background-color: #101419;
   background-image: linear-gradient(rgba(0,209,222,.06) 1px, transparent 1px), linear-gradient(90deg, rgba(0,209,222,.06) 1px, transparent 1px);
@@ -2905,7 +2906,7 @@ button:disabled {
   .surface-viewer__canvas,
   .evidence-preview,
   .pcb-visual {
-    min-height: 240px;
+    min-height: 0;
   }
 }
 

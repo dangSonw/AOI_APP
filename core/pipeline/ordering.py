@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 from .models import ConnectionKind, Workflow
+from .virtual_pins import virtual_pin_dependencies
 
 
 class CycleError(ValueError):
@@ -24,6 +25,12 @@ def stable_topological_order(
             continue
         source = connection.source_node_id
         target = connection.target_node_id
+        if source not in node_set or target not in node_set or target in dependents[source]:
+            continue
+        dependents[source].add(target)
+        indegree[target] += 1
+
+    for source, target in virtual_pin_dependencies(workflow):
         if source not in node_set or target not in node_set or target in dependents[source]:
             continue
         dependents[source].add(target)

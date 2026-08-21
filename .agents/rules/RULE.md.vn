@@ -141,3 +141,52 @@ Tài liệu này định nghĩa các quy tắc chuẩn để thống nhất cấ
 ## 17. Quy tắc ghi nhớ kinh nghiệm AI (Experience & Memory)
 - Khi phát hiện hoặc sửa chữa một lỗi (bug), khi gặp các cấu hình đặc biệt, hoặc khi có các lưu ý kỹ thuật quan trọng, AI phải ghi lại trải nghiệm này.
 - Lưu trữ các lưu ý này dưới dạng file `memory.md` (tiếng Anh) và `memory.md.vn` (tiếng Việt) trong thư mục `.agents/experience/` để tích lũy kiến thức vận hành cho các agent sau này.
+
+## 18. Quy tắc truy vấn đồ thị mã nguồn dự án
+- Trước khi đọc hiểu, debug, refactor hoặc thay đổi code của dự án, AI agent phải truy vấn dự án bằng CodeGraph hoặc GitNexus khi một trong hai công cụ khả dụng.
+- Ưu tiên GitNexus để xem context của symbol, execution flow, quan hệ phụ thuộc, phân tích impact và phát hiện thay đổi. Dùng CodeGraph khi đây là công cụ đồ thị mã nguồn khả dụng hoặc khi góc nhìn đồ thị của nó phù hợp hơn.
+- Đọc context của dự án/index liên quan trước khi đưa ra giả định về kiến trúc hoặc dependency. Nếu index đã cũ, phải cập nhật index trước khi dựa vào kết quả đồ thị.
+- Khi thay đổi function, class hoặc method, phải chạy phân tích impact trước và báo cáo các caller, execution flow bị ảnh hưởng cùng mức độ rủi ro. Không được tiếp tục mà không cảnh báo người dùng nếu rủi ro ở mức cao hoặc nghiêm trọng.
+- Sau khi chỉnh sửa, chạy kiểm tra phát hiện thay đổi của đồ thị khi có thể để xác nhận chỉ các symbol và execution flow dự kiến bị ảnh hưởng.
+
+## 19. Quy tắc độc lập của node trong core
+- Mọi `node.py` bên dưới `core/nodes/` phải là một component độc lập và có thể thay thế.
+- Một node không được import, gọi hoặc phụ thuộc vào function, class, chi tiết triển khai hay mutable runtime state của node khác. Không tạo các helper function dùng chung giữa các node.
+- Implementation của node không được sử dụng các file `*_runtime.py` dùng chung hoặc file runtime triển khai khác làm lối tắt cho hành vi của node. Node phải chứa hành vi do nó sở hữu và khai báo dependency của chính nó một cách rõ ràng.
+- Các node chỉ được giao tiếp thông qua input/output contract đã được tài liệu hóa và pipeline interface được phê duyệt; không được phụ thuộc vào state ẩn giữa các node, thứ tự import hoặc side effect.
+- Việc thay thế hoặc xóa một node không được yêu cầu chỉnh sửa các implementation của node không liên quan. Nếu thực sự cần hành vi dùng chung, trước tiên phải hỏi người dùng phê duyệt thay đổi node contract hoặc một platform-level interface được tài liệu hóa riêng.
+
+## 20. Quy tắc hỏi lại khi yêu cầu chưa rõ
+- Nếu AI agent không chắc chắn về yêu cầu, phạm vi dự kiến, hành vi cần có hoặc hướng chỉnh sửa, phải hỏi người dùng để làm rõ trước khi thay đổi file hoặc chạy lệnh làm thay đổi trạng thái.
+- Câu hỏi làm rõ phải giải thích rõ điểm chưa chắc chắn, lý do điểm đó quan trọng và các lựa chọn chỉnh sửa cụ thể. Khi biết được, phải nêu cả ảnh hưởng dự kiến của từng lựa chọn.
+- Không được tự ý chọn cách diễn giải cho một yêu cầu mơ hồ. Chỉ tiếp tục sau khi người dùng xác nhận yêu cầu hoặc chọn một phương án.
+
+## 21. Quy tắc chạy lệnh và cài đặt ở chế độ không tương tác
+- Khi có thể, phải chạy lệnh ở chế độ không tương tác để agent không dừng tại prompt của pager như `:` hoặc chờ người dùng nhấn `Enter` và `q`.
+- Với output của Git, dùng `git --no-pager ...` hoặc đặt `GIT_PAGER=cat`, `PAGER=cat` và `TERM=dumb`. Không dùng pager tương tác cho `status`, `diff`, `log`, `show` hoặc thao tác xem file.
+- Khi xem file, dùng lệnh trực tiếp không phân trang như `Get-Content`, `cat` hoặc công cụ đọc file được phê duyệt. Không pipe output vào `less`, `more`, `vim` hoặc trình xem tương tác khác.
+- Với lệnh cài đặt package và các lệnh có thể hỏi xác nhận, dùng tùy chọn non-interactive/assume-yes được package manager hỗ trợ và đặt cờ CI phù hợp. Ví dụ: `npm install --yes` hoặc `npm_config_yes=true`, `pip install --no-input`, `apt-get -y` và `CI=1` nếu được hỗ trợ.
+- Không chờ hoặc yêu cầu người dùng nhập `y/n`, `Enter` hay `q`. Nếu công cụ không có tùy chọn non-interactive an toàn, phải dừng và giải thích chính xác lệnh cùng xác nhận cần thiết thay vì khởi chạy tiến trình tương tác.
+- Tránh các lệnh yêu cầu TTY hoặc shell tương tác. Thêm timeout rõ ràng khi môi trường thực thi hỗ trợ và báo cáo timeout thay vì để lệnh chạy vô thời hạn.
+
+## 22. Quy tắc quản lý tab terminal trong VS Code
+- Trừ khi cần chạy nhiều lệnh đồng thời, chỉ sử dụng một tab terminal trong VS Code cho task.
+- Khi một lệnh hoặc test đã hoàn tất và terminal không còn cần dùng, hãy clear output hoặc đóng/xóa tab terminal trước khi chạy nhóm lệnh không liên quan.
+- Không tạo thêm tab terminal cho các công việc tuần tự độc lập; khi an toàn, hãy gom các lệnh độc lập vào cùng một lần chạy.
+
+## 23. Quy tắc thực thi lệnh qua WSL
+- Khi project nằm trong filesystem của WSL và cần chạy lệnh Linux, thao tác GitNexus, lệnh Python hoặc test, ưu tiên thực thi thông qua bản phân phối Ubuntu WSL từ thư mục project `/home/sonev/graduation_project/main/AOI_APP`.
+- Từ command runner của Windows/Cline, dùng wrapper chính xác sau: `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && <command>\"`. Wrapper này khởi động Ubuntu, chuyển đến thư mục project Linux, chạy lệnh, trả về exit code rồi đóng shell non-interactive.
+- Wrapper là cách thực thi non-interactive tương đương prompt terminal `(base) sonev@Son:~/graduation_project/main/AOI_APP$`; không cố mô phỏng prompt bằng `echo` và không dùng đường dẫn UNC Windows làm thư mục làm việc Linux.
+- Trước một nhóm lệnh, có thể xác minh context WSL bằng `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && whoami && hostname && pwd\"`. Giá trị kỳ vọng là user `sonev`, host `Son` và đường dẫn project `/home/sonev/graduation_project/main/AOI_APP`.
+- Đặt toàn bộ lệnh Linux trong cùng một block `bash -lc` và nối các lệnh phụ thuộc bằng `&&`; chỉ dùng `;` khi lệnh sau vẫn phải chạy sau khi lệnh trước thất bại. Ví dụ: `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && git --no-pager status --short && python -m compileall -q core\"`.
+- Chạy các thao tác thường dùng của project qua WSL như sau:
+  - Git: `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && git --no-pager diff --check\"`.
+  - Python: `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && python -m compileall -q core\"`.
+  - Test: `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && python -m pytest -q tests/core\"`.
+  - GitNexus: `wsl.exe -d Ubuntu -- bash -lc \"cd /home/sonev/graduation_project/main/AOI_APP && node .gitnexus/run.cjs detect_changes\"`.
+- Phải đặt quote cẩn thận cho command Windows bên ngoài và lệnh Bash bên trong. Sau `bash -lc` chỉ dùng đường dẫn Linux; không truyền `\\wsl.localhost\\Ubuntu\\...`, `C:\\...` hoặc biến PowerShell vào lệnh Linux. Escape `$`, backtick, quote và command substitution nếu chúng phải được đánh giá bên trong WSL thay vì bởi shell bên ngoài.
+- Không dùng `wsl.exe` thiếu `-d Ubuntu`, không phụ thuộc vào thư mục Windows hiện tại và không chạy từ `/mnt/c/...` khi project nằm dưới `/home/sonev/...`.
+- Không mở hoặc phụ thuộc vào terminal WSL tương tác và không chờ người dùng nhập thủ công. Các lệnh vẫn phải ở chế độ không tương tác, đồng thời dùng tùy chọn pager/xác nhận rõ ràng khi cần.
+- Giữ thư mục làm việc và environment trong WSL nhất quán với project. Không trộn cú pháp đường dẫn Windows và WSL trong cùng một lệnh Linux.
+- Nếu WSL không khả dụng hoặc không thể thực thi lệnh an toàn qua WSL, phải báo rõ giới hạn và dùng phương án dự phòng an toàn nhất mà không làm thay đổi trạng thái project ngoài dự kiến.

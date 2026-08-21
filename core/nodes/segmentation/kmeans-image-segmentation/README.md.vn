@@ -24,7 +24,7 @@ Input gồm `image`:image. Node áp dụng scikit-learn KMeans and Lloyd's algor
 ## Nguyên lý xử lý
 
 - Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `kmeans-image-segmentation`.
-- Các parameter `implementation`, `clusters`, `colorSpace`, `foregroundClusters`, `maximumTrainingPixels`, `maximumIterations`, `tolerance`, `randomSeed` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.
+- Các parameter `clusters`, `colorSpace`, `foregroundClusters`, `maximumTrainingPixels`, `maximumIterations`, `tolerance`, `randomSeed` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.
 - Biểu diễn pixel trong không gian BGR, Lab hoặc HSV.
 - Lặp bước gán pixel vào centroid gần nhất và cập nhật trung bình centroid.
 - Sắp centroid học được từ ID 0 tối nhất đến ID K-1 sáng nhất, rồi đưa foregroundClusters vào vùng trắng.
@@ -63,7 +63,6 @@ Input gồm `image`:image. Node áp dụng scikit-learn KMeans and Lloyd's algor
 
 | Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
 |---|---|---|---|---|---|---|
-| `implementation` | `select` | `scikit-learn` | — | — | `scikit-learn`, `manual-python` | Choose the maintained library or the project-owned NumPy implementation. |
 | `clusters` | `integer` | `2` | `2` | `32` | — | Number of color groups K. |
 | `colorSpace` | `select` | `bgr` | — | — | `bgr`, `lab`, `hsv` | Lab is often more stable for separating brightness from color. |
 | `foregroundClusters` | `json` | `[1]` | — | — | — | JSON cluster IDs to turn white. IDs are ordered from darkest (0) to brightest (K-1); with K=2, [1] selects bright objects. |
@@ -80,14 +79,13 @@ Input gồm `image`:image. Node áp dụng scikit-learn KMeans and Lloyd's algor
 
 - Kéo **K-means image segmentation** vào canvas.
 - Nối port theo workflow mẫu.
-- Mở Node inspector và nhập config JSON bên dưới.
+- Mở Node inspector và cấu hình các trường bên dưới.
 - Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần.
 
 **Nhập trong bảng config:**
 
 ```json
 {
-  "implementation": "scikit-learn",
   "clusters": 2,
   "colorSpace": "bgr",
   "foregroundClusters": [

@@ -73,6 +73,7 @@ export async function cancelInspectionRun(accessToken: string, runId: string): P
   }, accessToken);
 }
 
-export async function readInspectionPreview(accessToken: string, runId: string): Promise<Blob> {
-  return apiBlobRequest(`/api/inspection-runs/${encodeURIComponent(runId)}/preview`, accessToken);
+export async function readInspectionPreview(accessToken: string, runId: string, nodeId?: string): Promise<Blob> {
+  const suffix = nodeId ? `/preview/${encodeURIComponent(nodeId)}` : '/preview';
+  return apiBlobRequest(`/api/inspection-runs/${encodeURIComponent(runId)}${suffix}`, accessToken);
 }

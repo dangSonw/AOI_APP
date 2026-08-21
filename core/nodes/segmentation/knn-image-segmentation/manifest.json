@@ -4,35 +4,169 @@
   "id": "knn-image-segmentation",
   "use": "debug",
   "executionTarget": "local-cpu",
-  "capabilities": ["opencv", "numpy", "knn", "segmentation", "contours"],
-  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 512, "gpuMemoryMegabytes": 0},
-  "artifactContracts": {"inputs": [], "outputs": []},
+  "capabilities": [
+    "opencv",
+    "numpy",
+    "knn",
+    "segmentation",
+    "contours"
+  ],
+  "resourceHints": {
+    "cpuCores": 1,
+    "memoryMegabytes": 512,
+    "gpuMemoryMegabytes": 0
+  },
+  "artifactContracts": {
+    "inputs": [],
+    "outputs": []
+  },
   "parameterMigrationHooks": [],
-  "inspector": {"kind": "generic", "customKey": null},
+  "inspector": {
+    "kind": "custom",
+    "customKey": "knn-image-segmentation"
+  },
   "definition": {
     "id": "knn-image-segmentation",
     "name": "KNN image segmentation",
-    "description": "Segments pixels by representative BGR colors and extracts object contours using OpenCV KNN matching or a manual Python KNN implementation.",
+    "description": "Segments pixels by named color features and extracts object contours with a deterministic KNN classifier.",
     "category": "Segmentation",
     "documentation_group": "Classical machine learning",
     "inputs": [
-      {"key": "image", "label": "Image", "direction": "input", "data_type": "image", "required": true, "variadic": false}
+      {
+        "key": "image",
+        "label": "Image",
+        "direction": "input",
+        "data_type": "image",
+        "required": true,
+        "variadic": false
+      }
     ],
     "outputs": [
-      {"key": "mask", "label": "Object mask", "direction": "output", "data_type": "mask", "required": true, "variadic": false},
-      {"key": "contours", "label": "Object contours", "direction": "output", "data_type": "contours", "required": true, "variadic": false}
+      {
+        "key": "mask",
+        "label": "Object mask",
+        "direction": "output",
+        "data_type": "mask",
+        "required": true,
+        "variadic": false
+      },
+      {
+        "key": "contours",
+        "label": "Object contours",
+        "direction": "output",
+        "data_type": "contours",
+        "required": true,
+        "variadic": false
+      }
     ],
     "parameters": [
-      {"key": "implementation", "label": "Implementation", "kind": "select", "default_value": "opencv", "required": true, "minimum": null, "maximum": null, "options": ["opencv", "manual-python"], "description": "Use OpenCV BFMatcher KNN matching or the KNN algorithm implemented with Python/NumPy."},
-      {"key": "neighbors", "label": "K neighbors", "kind": "integer", "default_value": 3, "required": true, "minimum": 1, "maximum": 1000, "options": [], "description": "Must not exceed the number of training samples."},
-      {"key": "distanceMetric", "label": "Distance metric", "kind": "select", "default_value": "euclidean", "required": true, "minimum": null, "maximum": null, "options": ["euclidean", "manhattan"], "description": "OpenCV supports Euclidean; manual Python supports Euclidean and Manhattan."},
-      {"key": "distanceWeighted", "label": "Distance-weighted vote", "kind": "boolean", "default_value": true, "required": true, "minimum": null, "maximum": null, "options": [], "description": "Weight closer color samples more strongly."},
-      {"key": "minimumConfidence", "label": "Minimum confidence", "kind": "number", "default_value": 0.5, "required": true, "minimum": 0.0, "maximum": 1.0, "options": [], "description": "Pixels below this winning-vote confidence become background."},
-      {"key": "foregroundLabels", "label": "Foreground labels", "kind": "json", "default_value": ["object"], "required": true, "minimum": null, "maximum": null, "options": [], "description": "Labels that form the output object mask."},
-      {"key": "trainingSamples", "label": "Training samples", "kind": "json", "default_value": [{"label": "background", "color": [0, 0, 0]}, {"label": "background", "color": [32, 32, 32]}, {"label": "object", "color": [224, 224, 224]}, {"label": "object", "color": [255, 255, 255]}], "required": true, "minimum": null, "maximum": null, "options": [], "description": "JSON samples with a label and representative BGR color."}
+      {
+        "key": "neighbors",
+        "label": "K neighbors",
+        "kind": "integer",
+        "default_value": 3,
+        "required": true,
+        "minimum": 1,
+        "maximum": 1000,
+        "options": [],
+        "description": "Must not exceed the number of training samples."
+      },
+      {
+        "key": "distanceMetric",
+        "label": "Distance metric",
+        "kind": "select",
+        "default_value": "euclidean",
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [
+          "euclidean",
+          "manhattan"
+        ],
+        "description": "Euclidean uses straight-line color distance; Manhattan sums channel differences."
+      },
+      {
+        "key": "distanceWeighted",
+        "label": "Distance-weighted vote",
+        "kind": "boolean",
+        "default_value": true,
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [],
+        "description": "Weight closer color samples more strongly."
+      },
+      {
+        "key": "minimumConfidence",
+        "label": "Minimum confidence",
+        "kind": "number",
+        "default_value": 0.5,
+        "required": true,
+        "minimum": 0.0,
+        "maximum": 1.0,
+        "options": [],
+        "description": "Pixels below this winning-vote confidence become background."
+      },
+      {
+        "key": "foregroundLabels",
+        "label": "Foreground feature names",
+        "kind": "reference",
+        "default_value": [
+          "object"
+        ],
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [],
+        "description": "Select named features that should become the foreground mask."
+      },
+      {
+        "key": "trainingSamples",
+        "label": "Color features",
+        "kind": "reference",
+        "default_value": [
+          {
+            "label": "background",
+            "color": [
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "label": "background",
+            "color": [
+              32,
+              32,
+              32
+            ]
+          },
+          {
+            "label": "object",
+            "color": [
+              224,
+              224,
+              224
+            ]
+          },
+          {
+            "label": "object",
+            "color": [
+              255,
+              255,
+              255
+            ]
+          }
+        ],
+        "required": true,
+        "minimum": null,
+        "maximum": null,
+        "options": [],
+        "description": "Name each feature and set its representative BGR color; no JSON editing is required."
+      }
     ],
     "availability": "configuration-only",
-    "documentation_reference": "OpenCV DescriptorMatcher.knnMatch and findContours"
+    "documentation_reference": "Deterministic KNN color classification and OpenCV contour extraction"
   },
   "catalogOrder": 93
 }

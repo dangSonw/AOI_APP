@@ -3,11 +3,13 @@ import type { PhysicalInputState, PhysicalOutputState } from '../types/physical-
 import type { InspectionStatus } from '../types/workspace';
 import type { InspectionRun } from '../types/inspection';
 import { StatusBadge } from '../components/StatusBadge';
-import type { Workflow } from '../types/workflow';
+import type { AlgorithmDefinition, Workflow } from '../types/workflow';
 import type { DashboardPreferences, ViewerPreference } from '../types/workstation-preferences';
 import { CollapsiblePanelHeader } from '../components/CollapsiblePanelHeader';
 import { ViewerSizeControls } from '../components/ViewerSizeControls';
 import { readInspectionPreview } from '../services/inspection-service';
+import { getDashboardViewerPreference, updateDashboardViewerPreference } from '../utils/workstation-preferences';
+import { selectWorkflowOutputViewers } from '../utils/workflow-output-viewers';
 
 interface DashboardPageProps {
   accessToken: string;
@@ -20,6 +22,7 @@ interface DashboardPageProps {
   runError: string;
   onOutputToggle: (signalName: string, currentValue: boolean) => void;
   workflow: Workflow | null;
+  algorithmCatalog?: AlgorithmDefinition[];
   workflowError: string;
   onConfigureWorkflow: () => void;
   preferences: DashboardPreferences;
@@ -49,10 +52,13 @@ interface WorkflowPopupState {
   active: WorkflowPopupToast[];
 }
 
-export function DashboardPage({ accessToken, inputs, outputs, isLoading, error, isRunning, inspectionRun, runError, onOutputToggle, workflow, workflowError, onConfigureWorkflow, preferences, onPreferencesChange }: DashboardPageProps) {
+export function DashboardPage({ accessToken, inputs, outputs, isLoading, error, isRunning, inspectionRun, runError, onOutputToggle, workflow, algorithmCatalog = [], workflowError, onConfigureWorkflow, preferences, onPreferencesChange }: DashboardPageProps) {
   const panels = preferences.panels;
   const updatePanel = <K extends keyof typeof panels>(key: K, value: typeof panels[K]) => onPreferencesChange({ panels: { ...panels, [key]: value } });
-  const togglePanel = (key: keyof typeof panels) => updatePanel(key, { ...panels[key], isCollapsed: !panels[key].isCollapsed });
+  const togglePanel = (key: 'state' | 'optical2D' | 'heightmap3D' | 'physicalIo' | 'inspectionFlow') => {
+    const panel = panels[key];
+    updatePanel(key, { ...panel, isCollapsed: !panel.isCollapsed });
+  };
   const lineStatus: InspectionStatus = isRunning ? 'running' : inputs ? (inputs.machine.emergencyStop ? 'error' : 'success') : 'warning';
   const lineStatusLabel = isRunning ? 'Inspection running' : inputs ? (inputs.machine.emergencyStop ? 'Emergency stop' : 'Line ready') : 'Awaiting I/O';
   const systemStatuses = [
@@ -67,6 +73,10 @@ export function DashboardPage({ accessToken, inputs, outputs, isLoading, error, 
   const orderedWorkflowNodes = workflow?.executionOrder
     .map((nodeId) => workflowNodes.get(nodeId))
     .filter((node) => node !== undefined) ?? [];
+  const outputViewers = selectWorkflowOutputViewers(workflow, algorithmCatalog);
+  const updateOutputViewer = (key: string, viewer: ViewerPreference) => onPreferencesChange(
+    updateDashboardViewerPreference(preferences, key, viewer),
+  );
   const isFlowActive = Boolean(inspectionRun && ['queued', 'precheck', 'capturing', 'executing'].includes(inspectionRun.status));
   const latestNodeRuns = new Map<string, InspectionRun['nodeRuns'][number]>();
   if (inspectionRun) {
@@ -175,27 +185,36 @@ export function DashboardPage({ accessToken, inputs, outputs, isLoading, error, 
         </section>
 
         <section className="viewer-grid" aria-label="Inspection viewers">
-          <article className={`inspection-viewer ${panels.optical2D.isCollapsed ? 'dashboard-panel--collapsed' : ''}`} style={{ '--viewer-width': panels.optical2D.widthUnits, '--viewer-height': panels.optical2D.heightUnits } as React.CSSProperties}>
-            <CollapsiblePanelHeader title="2D optical view" isCollapsed={panels.optical2D.isCollapsed} onToggle={() => togglePanel('optical2D')} status={<StatusBadge status={inspectionRun?.status === 'completed' ? 'success' : 'warning'} label={inspectionRun?.status === 'completed' ? 'Workflow output' : 'Awaiting output'} />} controls={<ViewerSizeControls label="2D optical view" viewer={panels.optical2D} onChange={(viewer: ViewerPreference) => updatePanel('optical2D', viewer)} />} />
-            {!panels.optical2D.isCollapsed && <>
-            <InspectionPreview accessToken={accessToken} run={inspectionRun} />
-            <footer><span>Workflow preview evidence</span><span>{inspectionRun?.nodeRuns.length ?? 0} nodes</span></footer>
-            </>}
-          </article>
-
-          <article className={`inspection-viewer ${panels.heightmap3D.isCollapsed ? 'dashboard-panel--collapsed' : ''}`} style={{ '--viewer-width': panels.heightmap3D.widthUnits, '--viewer-height': panels.heightmap3D.heightUnits } as React.CSSProperties}>
-            <CollapsiblePanelHeader title="3D component heightmap" isCollapsed={panels.heightmap3D.isCollapsed} onToggle={() => togglePanel('heightmap3D')} status={<StatusBadge status="success" label="Synced" />} controls={<ViewerSizeControls label="3D component heightmap" viewer={panels.heightmap3D} onChange={(viewer: ViewerPreference) => updatePanel('heightmap3D', viewer)} />} />
-            {!panels.heightmap3D.isCollapsed && <>
-            <div className="pcb-visual pcb-visual--depth" role="img" aria-label="Simulated PCB component depth map">
-              <span className="depth-plane" />
-              <span className="depth-component depth-component--one" />
-              <span className="depth-component depth-component--two" />
-              <span className="depth-component depth-component--three" />
-              <span className="depth-scale">0 μm<span />2400 μm</span>
-            </div>
-            <footer><span>Photometric stereo</span><span>RMSE 0.18°</span></footer>
-            </>}
-          </article>
+          {outputViewers.twoD.map((output) => {
+            const viewer = getDashboardViewerPreference(preferences, output.key);
+            return (
+              <article className={`inspection-viewer ${viewer.isCollapsed ? 'dashboard-panel--collapsed' : ''}`} style={{ '--viewer-width': viewer.widthUnits, '--viewer-height': viewer.heightUnits } as React.CSSProperties} key={output.key}>
+                <CollapsiblePanelHeader title={`2D optical view · ${output.title}`} isCollapsed={viewer.isCollapsed} onToggle={() => updateOutputViewer(output.key, { ...viewer, isCollapsed: !viewer.isCollapsed })} status={<StatusBadge status={inspectionRun?.status === 'completed' ? 'success' : 'warning'} label={inspectionRun?.status === 'completed' ? 'Workflow output' : 'Awaiting output'} />} controls={<ViewerSizeControls label={`2D optical view ${output.title}`} viewer={viewer} onChange={(nextViewer) => updateOutputViewer(output.key, nextViewer)} />} />
+                {!viewer.isCollapsed && <>
+                  <InspectionPreview accessToken={accessToken} run={inspectionRun} nodeId={output.nodeId} />
+                  <footer><span>{output.title}</span><span>{inspectionRun?.nodeRuns.length ?? 0} nodes</span></footer>
+                </>}
+              </article>
+            );
+          })}
+          {outputViewers.threeD.map((output) => {
+            const viewer = getDashboardViewerPreference(preferences, output.key);
+            return (
+              <article className={`inspection-viewer ${viewer.isCollapsed ? 'dashboard-panel--collapsed' : ''}`} style={{ '--viewer-width': viewer.widthUnits, '--viewer-height': viewer.heightUnits } as React.CSSProperties} key={output.key}>
+                <CollapsiblePanelHeader title={`3D measurement · ${output.title}`} isCollapsed={viewer.isCollapsed} onToggle={() => updateOutputViewer(output.key, { ...viewer, isCollapsed: !viewer.isCollapsed })} status={<StatusBadge status="success" label="Workflow output" />} controls={<ViewerSizeControls label={`3D measurement ${output.title}`} viewer={viewer} onChange={(nextViewer) => updateOutputViewer(output.key, nextViewer)} />} />
+                {!viewer.isCollapsed && <>
+                  <div className="pcb-visual pcb-visual--depth" role="img" aria-label={`3D measurement output for ${output.title}`}>
+                    <span className="depth-plane" />
+                    <span className="depth-component depth-component--one" />
+                    <span className="depth-component depth-component--two" />
+                    <span className="depth-component depth-component--three" />
+                    <span className="depth-scale">0 μm<span />2400 μm</span>
+                  </div>
+                  <footer><span>{output.title}</span><span>3D measurement output</span></footer>
+                </>}
+              </article>
+            );
+          })}
         </section>
 
         <section className={`io-console ${panels.physicalIo.isCollapsed ? 'dashboard-panel--collapsed' : ''}`}>
@@ -274,7 +293,7 @@ export function DashboardPage({ accessToken, inputs, outputs, isLoading, error, 
   );
 }
 
-function InspectionPreview({ accessToken, run }: { accessToken: string; run: InspectionRun | null }) {
+function InspectionPreview({ accessToken, run, nodeId }: { accessToken: string; run: InspectionRun | null; nodeId?: string }) {
   const [objectUrl, setObjectUrl] = useState('');
   const [previewError, setPreviewError] = useState('');
 
@@ -284,7 +303,7 @@ function InspectionPreview({ accessToken, run }: { accessToken: string; run: Ins
     setObjectUrl('');
     setPreviewError('');
     if (!run || run.status !== 'completed') return () => undefined;
-    void readInspectionPreview(accessToken, run.id)
+    void readInspectionPreview(accessToken, run.id, nodeId)
       .then((blob) => {
         if (isCancelled) return;
         nextObjectUrl = URL.createObjectURL(blob);
@@ -297,7 +316,7 @@ function InspectionPreview({ accessToken, run }: { accessToken: string; run: Ins
       isCancelled = true;
       if (nextObjectUrl) URL.revokeObjectURL(nextObjectUrl);
     };
-  }, [accessToken, run?.id, run?.status]);
+  }, [accessToken, nodeId, run?.id, run?.status]);
 
   if (objectUrl) {
     return <div className="pcb-visual pcb-visual--optical"><img className="pcb-visual__image" src={objectUrl} alt={`Workflow output for ${run?.boardSerial ?? 'inspection'}`} /></div>;

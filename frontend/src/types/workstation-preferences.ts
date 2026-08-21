@@ -12,6 +12,7 @@ export interface DashboardPreferences {
     state: PanelPreference;
     optical2D: ViewerPreference;
     heightmap3D: ViewerPreference;
+    outputViewers?: Record<string, ViewerPreference>;
     physicalIo: PanelPreference;
     inspectionFlow: PanelPreference;
   };

@@ -63,7 +63,6 @@ Inputs are `image`:image. The node applies scikit-learn PCA and reconstruction-e
 
 | Key | Kind | Default | Min | Max | Options | How to enter / Meaning |
 |---|---|---|---|---|---|---|
-| `implementation` | `select` | `scikit-learn` | — | — | `scikit-learn`, `manual-python` | Choose scikit-learn PCA or NumPy singular value decomposition. |
 | `components` | `integer` | `2` | `1` | `3` | — | Number of normal color directions retained; fewer components make the detector more selective. |
 | `scorePercentile` | `number` | `99.0` | `0.0` | `100.0` | — | Image score is this percentile of the normalized anomaly map. |
 | `trainingSamples` | `json` | `[{"features": [20, 20, 20]}, {"features": [40, 40, 40]}, {"features": [60, 60, 60]}, {"features": [80, 80, 80]}]` | — | — | — | JSON list of known-normal colors: each item is {"features": [B, G, R]}. |

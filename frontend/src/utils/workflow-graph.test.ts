@@ -6,6 +6,7 @@ import {
   filterCatalog,
   isWorkflowDirty,
   moveExecutionNode,
+  resolveVirtualPinTypes,
   stableTopologicalOrder,
   validateConnection,
   validateDraft,
@@ -57,6 +58,23 @@ const decisionFusion: AlgorithmDefinition = {
   parameters: [],
   manifestVersion: 1, packageVersion: '1.0.0', executionTarget: 'local-cpu', inspectorKind: 'generic', customInspectorKey: null,
   documentationReference: null,
+};
+
+const inputPin: AlgorithmDefinition = {
+  id: 'input-pin', name: 'Input Pin', description: 'Starts a named virtual data channel.',
+  category: 'Workflow routing', documentationGroup: 'Workflow routing', availability: 'configuration-only', use: 'debug',
+  inputs: [{ key: 'value', label: 'Value', direction: 'input', dataType: 'generic', required: true, variadic: false }],
+  outputs: [], parameters: [], documentationReference: null,
+  manifestVersion: 1, packageVersion: '1.0.0', executionTarget: 'local-cpu', inspectorKind: 'generic', customInspectorKey: null,
+};
+
+const outputPin: AlgorithmDefinition = {
+  id: 'output-pin', name: 'Output Pin', description: 'Continues a named virtual data channel.',
+  category: 'Workflow routing', documentationGroup: 'Workflow routing', availability: 'configuration-only', use: 'debug',
+  inputs: [],
+  outputs: [{ key: 'value', label: 'Value', direction: 'output', dataType: 'generic', required: true, variadic: false }],
+  parameters: [], documentationReference: null,
+  manifestVersion: 1, packageVersion: '1.0.0', executionTarget: 'local-cpu', inspectorKind: 'generic', customInspectorKey: null,
 };
 
 const catalog = [imageInput, patchCore, decisionFusion];
@@ -112,6 +130,14 @@ describe('workflow graph helpers', () => {
     expect(node.ports.filter((port) => port.channel === 'control').map((port) => port.templateKey)).toEqual([
       'trigger', 'success', 'failure',
     ]);
+  });
+
+  it('creates virtual pin instances with the shared default channel name', () => {
+    const input = createNodeFromDefinition(inputPin, { x: 0, y: 0 });
+    const output = createNodeFromDefinition(outputPin, { x: 200, y: 0 });
+
+    expect(input.displayName).toBe('Pin');
+    expect(output.displayName).toBe('Pin');
   });
 
   it('rejects type mismatches, occupied inputs, and cycles', () => {
@@ -188,6 +214,70 @@ describe('workflow graph helpers', () => {
     expect(moveExecutionNode(workflow.executionOrder, workflow.nodes[1].id, -1)).toEqual([
       workflow.nodes[1].id, workflow.nodes[0].id, workflow.nodes[2].id,
     ]);
+  });
+
+  it('infers named virtual pin types and includes the virtual dependency in auto order', () => {
+    const source = createNodeFromDefinition(imageInput, { x: 0, y: 0 });
+    const input = { ...createNodeFromDefinition(inputPin, { x: 200, y: 0 }), displayName: ' Camera ' };
+    const output = { ...createNodeFromDefinition(outputPin, { x: 400, y: 0 }), displayName: 'Camera' };
+    const detector = createNodeFromDefinition(patchCore, { x: 600, y: 0 });
+    const workflow: Workflow = {
+      recipeSlug: 'virtual-pins', recipeName: 'Virtual pins', version: 2, revision: 0,
+      updatedAt: new Date(0).toISOString(), nodes: [source, input, output, detector],
+      connections: [
+        {
+          id: crypto.randomUUID(), sourceNodeId: source.id, sourcePortId: source.ports[0].id,
+          targetNodeId: input.id, targetPortId: input.ports[0].id, kind: 'data',
+        },
+        {
+          id: crypto.randomUUID(), sourceNodeId: output.id, sourcePortId: output.ports[0].id,
+          targetNodeId: detector.id, targetPortId: detector.ports[0].id, kind: 'data',
+        },
+      ],
+      executionOrder: [source.id, input.id, output.id, detector.id], migrationNotices: [],
+    };
+
+    expect(validateDraft(workflow, [imageInput, inputPin, outputPin, patchCore])).toEqual([]);
+    expect(stableTopologicalOrder(workflow, [detector.id, output.id, input.id, source.id])).toEqual([
+      source.id, input.id, output.id, detector.id,
+    ]);
+    expect(resolveVirtualPinTypes(workflow)).toEqual(new Map([
+      [input.id, 'image'],
+      [output.id, 'image'],
+    ]));
+  });
+
+  it('rejects unmatched, duplicate, case-mismatched, and conflicting virtual pins', () => {
+    const source = createNodeFromDefinition(imageInput, { x: 0, y: 0 });
+    const input = { ...createNodeFromDefinition(inputPin, { x: 200, y: 0 }), displayName: 'Frame' };
+    const duplicateInput = { ...createNodeFromDefinition(inputPin, { x: 200, y: 100 }), displayName: ' Frame ' };
+    const output = { ...createNodeFromDefinition(outputPin, { x: 400, y: 0 }), displayName: 'frame' };
+    const fusion = createNodeFromDefinition(decisionFusion, { x: 600, y: 0 });
+    const workflow: Workflow = {
+      recipeSlug: 'invalid-pins', recipeName: 'Invalid pins', version: 2, revision: 0,
+      updatedAt: new Date(0).toISOString(), nodes: [source, input, duplicateInput, output, fusion],
+      connections: [
+        {
+          id: crypto.randomUUID(), sourceNodeId: source.id, sourcePortId: source.ports[0].id,
+          targetNodeId: input.id, targetPortId: input.ports[0].id, kind: 'data',
+        },
+        {
+          id: crypto.randomUUID(), sourceNodeId: source.id, sourcePortId: source.ports[0].id,
+          targetNodeId: duplicateInput.id, targetPortId: duplicateInput.ports[0].id, kind: 'data',
+        },
+        {
+          id: crypto.randomUUID(), sourceNodeId: output.id, sourcePortId: output.ports[0].id,
+          targetNodeId: fusion.id, targetPortId: fusion.ports[0].id, kind: 'data',
+        },
+      ],
+      executionOrder: [source.id, input.id, duplicateInput.id, output.id, fusion.id], migrationNotices: [],
+    };
+
+    const issues = validateDraft(workflow, [imageInput, inputPin, outputPin, decisionFusion]);
+    expect(issues.filter((item) => item.code === 'invalid-parameter').map((item) => item.message)).toEqual(expect.arrayContaining([
+      expect.stringContaining('exactly one Input Pin'),
+      expect.stringContaining('matching Input Pin'),
+    ]));
   });
 
   it('filters every operator-facing catalog field without case sensitivity', () => {

@@ -1,0 +1,91 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`output-pin` continues a named virtual data channel. Set its display name to the exact Input Pin name, then connect its generic output to a typed consumer.",
+    "whenToUse": "a value from a distant Input Pin must continue into one or more consumers without a long visible wire.",
+    "structure": "Output `value` exposes the unchanged value captured by the single matching Input Pin. The trimmed display name is case-sensitive and the concrete type is inferred from all channel endpoints.",
+    "algorithm": [
+      "Resolve the single Input Pin with the same normalized display name.",
+      "Wait for that Input Pin to capture its incoming value.",
+      "Expose the same value object through generic output `value`.",
+      "Validate every connected consumer against the one inferred channel type."
+    ],
+    "inputGuidance": {},
+    "outputGuidance": {
+      "value": "Connect to a typed consumer. The displayed inferred type must match every other endpoint on the same channel."
+    },
+    "parameterGuidance": {},
+    "example": {
+      "goal": "Continue the named `Camera` image channel into an image-processing node.",
+      "workflow": ["output-pin", "gaussian-blur"],
+      "parameters": {},
+      "steps": [
+        "Drag **Output Pin** near the destination node.",
+        "Set Display name to exactly `Camera`.",
+        "Connect `value` to the destination image input.",
+        "Verify that the port shows `image · inferred`."
+      ],
+      "input": "The value captured by the matching Input Pin during the same workflow execution.",
+      "expectedOutput": "The downstream node receives the unchanged value with the inferred channel type."
+    },
+    "troubleshooting": [
+      {"symptom": "No matching Input Pin", "cause": "The names differ by case or no Input Pin exists.", "resolution": "Create exactly one Input Pin with the same case-sensitive display name."},
+      {"symptom": "Generic type conflict", "cause": "This consumer expects a different type from another channel endpoint.", "resolution": "Use consumers that agree on one concrete data type."},
+      {"symptom": "Cycle validation error", "cause": "The virtual dependency routes data back to an upstream node.", "resolution": "Rearrange the graph so the Input Pin always precedes every matching Output Pin."}
+    ],
+    "limitations": [
+      "An Output Pin cannot execute before its matching Input Pin.",
+      "Names are case-sensitive after outer whitespace is trimmed.",
+      "All Output Pins sharing a name expose one common value and type."
+    ],
+    "productionChecklist": [
+      "Confirm the matching Input Pin is unique.",
+      "Confirm the inferred type matches the destination port.",
+      "Validate and Auto order the workflow before saving."
+    ]
+  },
+  "vi": {
+    "overview": "`output-pin` tiếp tục một kênh dữ liệu ảo có tên. Đặt display name giống chính xác tên Input Pin, sau đó nối output generic của nó vào node tiêu thụ có kiểu.",
+    "whenToUse": "giá trị từ Input Pin ở xa cần đi tới một hoặc nhiều node tiêu thụ mà không có đường dây dài trên canvas.",
+    "structure": "Output `value` cung cấp nguyên giá trị do Input Pin duy nhất cùng tên nhận được. Display name sau khi trim vẫn phân biệt hoa thường và kiểu cụ thể được suy luận từ mọi endpoint của kênh.",
+    "algorithm": [
+      "Tìm Input Pin duy nhất có cùng display name đã chuẩn hóa.",
+      "Chờ Input Pin đó nhận giá trị đầu vào.",
+      "Cung cấp chính object giá trị đó qua output generic `value`.",
+      "Kiểm tra mọi node tiêu thụ theo một kiểu kênh đã suy luận."
+    ],
+    "inputGuidance": {},
+    "outputGuidance": {
+      "value": "Nối vào node tiêu thụ có kiểu. Kiểu suy luận hiển thị phải thống nhất với mọi endpoint khác cùng kênh."
+    },
+    "parameterGuidance": {},
+    "example": {
+      "goal": "Tiếp tục kênh ảnh `Camera` vào một node xử lý ảnh.",
+      "workflow": ["output-pin", "gaussian-blur"],
+      "parameters": {},
+      "steps": [
+        "Kéo **Output Pin** tới gần node đích.",
+        "Đặt Display name chính xác là `Camera`.",
+        "Nối `value` vào input ảnh của node đích.",
+        "Xác nhận port hiển thị `image · inferred`."
+      ],
+      "input": "Giá trị do Input Pin cùng tên nhận trong chính lần chạy workflow đó.",
+      "expectedOutput": "Node phía sau nhận giá trị không đổi với kiểu kênh đã suy luận."
+    },
+    "troubleshooting": [
+      {"symptom": "Không có Input Pin tương ứng", "cause": "Tên khác hoa thường hoặc chưa có Input Pin.", "resolution": "Tạo đúng một Input Pin có cùng display name phân biệt hoa thường."},
+      {"symptom": "Xung đột kiểu generic", "cause": "Node tiêu thụ này yêu cầu kiểu khác với endpoint còn lại.", "resolution": "Chỉ dùng các node tiêu thụ thống nhất trên một kiểu dữ liệu cụ thể."},
+      {"symptom": "Lỗi cycle", "cause": "Dependency ảo đưa dữ liệu quay lại node phía trước.", "resolution": "Sắp xếp graph để Input Pin luôn đứng trước mọi Output Pin cùng tên."}
+    ],
+    "limitations": [
+      "Output Pin không thể chạy trước Input Pin tương ứng.",
+      "Tên phân biệt hoa thường sau khi bỏ khoảng trắng đầu/cuối.",
+      "Mọi Output Pin cùng tên dùng chung một giá trị và kiểu."
+    ],
+    "productionChecklist": [
+      "Xác nhận Input Pin tương ứng là duy nhất.",
+      "Xác nhận kiểu suy luận khớp port đích.",
+      "Validate và Auto order workflow trước khi lưu."
+    ]
+  }
+}

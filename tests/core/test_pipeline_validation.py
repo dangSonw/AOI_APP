@@ -74,3 +74,11 @@ def test_invalid_parameters_and_execution_order_are_rejected() -> None:
     assert 'invalid-parameter' in issue_codes(bad_parameter)
     assert 'execution-order-mismatch' in issue_codes(missing_node)
     assert 'dependency-order' in issue_codes(dependency_after_consumer)
+
+
+def test_reference_parameters_accept_bounded_json_values() -> None:
+    from core.algorithms import ParameterKind
+    from core.pipeline.validation import _parameter_is_valid
+
+    assert _parameter_is_valid(ParameterKind.REFERENCE, [{'label': 'object', 'color': [255, 255, 255]}])
+    assert not _parameter_is_valid(ParameterKind.REFERENCE, object())

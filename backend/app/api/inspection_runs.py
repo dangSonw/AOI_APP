@@ -124,6 +124,18 @@ def read_run_preview(run_id: str, _: CurrentUser, session: DatabaseSession) -> F
     return FileResponse(path, media_type=media_type, headers={'Cache-Control': 'private, no-store'})
 
 
+@router.get('/{run_id}/preview/{node_id}', response_class=FileResponse)
+def read_node_preview(run_id: str, node_id: str, _: CurrentUser, session: DatabaseSession) -> FileResponse:
+    try:
+        artifact = get_preview_artifact(session, run_id, get_settings().captures_data_path, node_id)
+    except InspectionRunError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+    if artifact is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Inspection node preview not found.')
+    path, media_type = artifact
+    return FileResponse(path, media_type=media_type, headers={'Cache-Control': 'private, no-store'})
+
+
 @router.post('/{run_id}/cancel', response_model=InspectionRunResponse)
 def cancel_run(run_id: str, _: CurrentUser, session: DatabaseSession) -> InspectionRunResponse:
     run = request_cancellation(session, run_id)

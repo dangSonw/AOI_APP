@@ -30,6 +30,34 @@ describe('NodeInspector plugin contract', () => {
     expect(markup).not.toContain('shell');
   });
 
+  it('renders KNN segmentation features without exposing JSON configuration', () => {
+    const knnNode: WorkflowNode = {
+      ...node,
+      algorithmId: 'knn-image-segmentation',
+      parameters: {
+        foregroundLabels: ['object'],
+        trainingSamples: [
+          { label: 'background', color: [0, 0, 0] },
+          { label: 'object', color: [255, 255, 255] },
+        ],
+      },
+    };
+    const definition = {
+      ...baseDefinition,
+      id: 'knn-image-segmentation',
+      inspectorKind: 'custom' as const,
+      customInspectorKey: 'knn-image-segmentation',
+    };
+
+    const markup = renderToStaticMarkup(<NodeInspector node={knnNode} definition={definition} onChange={vi.fn()} />);
+
+    expect(markup).toContain('KNN color features');
+    expect(markup).toContain('Feature name');
+    expect(markup).toContain('Foreground features');
+    expect(markup).not.toContain('<textarea');
+    expect(markup).not.toContain('JSON');
+  });
+
   it('keeps shared identity and ports while leaving plugin content empty for none', () => {
     const definition = { ...baseDefinition, parameters: [], inspectorKind: 'none' as const, customInspectorKey: null };
     const markup = renderToStaticMarkup(<NodeInspector node={node} definition={definition} onChange={vi.fn()} />);

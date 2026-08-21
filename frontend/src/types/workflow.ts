@@ -61,6 +61,7 @@ export interface AlgorithmDefinition {
   executionTarget: 'local-cpu' | 'local-gpu' | 'adapter';
   inspectorKind: 'none' | 'generic' | 'custom';
   customInspectorKey: string | null;
+  capabilities?: string[];
 }
 
 export type DocumentationLanguage = 'en' | 'vi';

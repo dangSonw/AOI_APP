@@ -1,0 +1,102 @@
+# Node Input Pin
+
+## Mục đích và cách dùng nhanh
+
+`input-pin` bắt đầu một kênh dữ liệu ảo có tên. Nối một nguồn có kiểu vào input generic, đặt display name của node và dùng lại đúng tên đó trên một hoặc nhiều node Output Pin.
+
+**Dùng khi:** đường dây dữ liệu dài làm canvas workflow khó đọc.
+
+**Luồng nhanh:** `image-input` → `input-pin`
+
+## Cấu trúc node
+
+```text
+value
+    │
+    ▼
+[input-pin]
+    │
+    └── (no output)
+```
+
+Input `value` nhận mọi kiểu dữ liệu workflow đã khai báo. Display name sau khi bỏ khoảng trắng ngoài và vẫn phân biệt hoa thường sẽ định danh kênh ảo. Giá trị được chuyển đến mọi node `output-pin` cùng tên mà không biến đổi.
+
+## Nguyên lý xử lý
+
+- Đọc giá trị nối vào input generic `value`.
+- Chuẩn hóa tên kênh bằng cách bỏ khoảng trắng đầu/cuối nhưng giữ nguyên hoa thường.
+- Suy luận một kiểu cụ thể từ các endpoint của Input Pin và Output Pin.
+- Cấp chính object giá trị đó cho mọi Output Pin cùng tên khi chạy workflow.
+
+## Contract runtime
+
+| Trường | Giá trị |
+|---|---|
+| Node ID | `input-pin` |
+| Nhóm | Workflow routing |
+| Trạng thái | `debug` |
+| Đích thực thi | `local-cpu` |
+| Khả năng | `named-virtual-data-routing`, `generic-type-inference` |
+
+> **Lưu ý DEBUG:** Có thể chạy để phát triển/nghiên cứu, chưa được duyệt production.
+
+## Cách nhập dữ liệu và đọc output
+
+| Key | Hướng | Kiểu | Required | Variadic | Label |
+|---|---|---|---|---|---|
+| `value` | đầu vào | `generic` | có | không | Value |
+
+### Nhập input
+
+1. Nối output `generic` vào `value`. Chỉ nối đúng một nguồn. Kiểu cụ thể của nguồn tham gia suy luận kiểu của kênh.
+
+### Đọc output
+
+- —
+
+## Cách nhập tham số
+
+| Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
+|---|---|---|---|---|---|---|
+| — | — | — | — | — | — | Node không có tham số cấu hình. |
+
+## Ví dụ sử dụng có thể làm theo ngay
+
+**Mục tiêu:** Chuyển một ảnh camera tới phần workflow ở xa mà không vẽ đường dây dài.
+
+**Workflow:** `image-input` → `input-pin`
+
+- Kéo **Input Pin** vào canvas.
+- Nối output ảnh vào input `value`.
+- Đặt Display name thành `Camera`.
+- Thêm một hoặc nhiều Output Pin có tên chính xác là `Camera`.
+
+**Nhập trong bảng config:**
+
+```json
+{}
+```
+
+**Input ví dụ:** Một giá trị có kiểu như image, mask, score, decision hoặc tập detection.
+
+**Kết quả mong đợi:** Các Output Pin cùng tên nhận chính giá trị đó và hiển thị kiểu cụ thể đã suy luận.
+
+## Lỗi thường gặp
+
+| Hiện tượng | Nguyên nhân | Cách xử lý |
+|---|---|---|
+| Không có Output Pin tương ứng | Tên khác hoa thường hoặc thiếu node tương ứng. | Dùng chính xác cùng display name phân biệt hoa thường trên ít nhất một Output Pin. |
+| Lỗi trùng Input Pin | Nhiều Input Pin có cùng tên sau khi trim. | Mỗi tên kênh ảo chỉ giữ đúng một Input Pin. |
+| Xung đột kiểu generic | Các endpoint nối vào khai báo nhiều kiểu cụ thể khác nhau. | Chỉ nối một kiểu cụ thể thống nhất trên toàn bộ kênh cùng tên. |
+
+## Giới hạn và kiểm tra trước production
+
+- Tên phân biệt hoa thường sau khi bỏ khoảng trắng đầu/cuối.
+- Mỗi kênh cần đúng một Input Pin và ít nhất một Output Pin.
+- Dependency ảo phải giữ workflow không có cycle.
+
+### Checklist trước production
+
+- Dùng tên kênh dễ hiểu và duy nhất trong workflow.
+- Xác nhận kiểu suy luận hiển thị trên mọi pin cùng cặp.
+- Chạy validation và Auto order trước khi lưu.

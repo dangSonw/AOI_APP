@@ -1,0 +1,91 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`input-pin` starts a named virtual data channel. Connect one typed source to its generic input, set the node display name, and reuse that exact name on one or more Output Pin nodes.",
+    "whenToUse": "a long data wire would make the workflow canvas hard to read.",
+    "structure": "Input `value` accepts any declared workflow data type. The trimmed, case-sensitive display name identifies the virtual channel. The value is forwarded to every matching `output-pin` node without conversion.",
+    "algorithm": [
+      "Read the value connected to the generic `value` input.",
+      "Normalize the channel name by trimming outer whitespace while preserving letter case.",
+      "Infer one concrete channel type from the connected Input Pin and Output Pin endpoints.",
+      "Publish the same value object to all matching Output Pin nodes during workflow execution."
+    ],
+    "inputGuidance": {
+      "value": "Connect exactly one source. Its concrete type becomes part of the channel type inference."
+    },
+    "outputGuidance": {},
+    "parameterGuidance": {},
+    "example": {
+      "goal": "Route one camera image to a distant workflow section without drawing a long wire.",
+      "workflow": ["image-input", "input-pin"],
+      "parameters": {},
+      "steps": [
+        "Drag **Input Pin** onto the canvas.",
+        "Connect an image output to its `value` input.",
+        "Set Display name to `Camera`.",
+        "Add one or more Output Pin nodes named exactly `Camera`."
+      ],
+      "input": "A typed value such as an image, mask, score, decision, or detection collection.",
+      "expectedOutput": "Matching Output Pin nodes receive the same value and show the inferred concrete type."
+    },
+    "troubleshooting": [
+      {"symptom": "No matching Output Pin", "cause": "The names differ by case or the matching node is missing.", "resolution": "Use the exact same case-sensitive display name on at least one Output Pin."},
+      {"symptom": "Duplicate Input Pin error", "cause": "More than one Input Pin uses the same trimmed name.", "resolution": "Keep exactly one Input Pin for each virtual channel name."},
+      {"symptom": "Generic type conflict", "cause": "The connected endpoints declare different concrete data types.", "resolution": "Connect only one consistent concrete type across the named channel."}
+    ],
+    "limitations": [
+      "Names are case-sensitive after outer whitespace is trimmed.",
+      "Each channel requires exactly one Input Pin and at least one Output Pin.",
+      "The virtual dependency must remain acyclic."
+    ],
+    "productionChecklist": [
+      "Use descriptive channel names that are unique within the workflow.",
+      "Confirm the inferred type shown on every paired pin.",
+      "Run workflow validation and Auto order before saving."
+    ]
+  },
+  "vi": {
+    "overview": "`input-pin` bắt đầu một kênh dữ liệu ảo có tên. Nối một nguồn có kiểu vào input generic, đặt display name của node và dùng lại đúng tên đó trên một hoặc nhiều node Output Pin.",
+    "whenToUse": "đường dây dữ liệu dài làm canvas workflow khó đọc.",
+    "structure": "Input `value` nhận mọi kiểu dữ liệu workflow đã khai báo. Display name sau khi bỏ khoảng trắng ngoài và vẫn phân biệt hoa thường sẽ định danh kênh ảo. Giá trị được chuyển đến mọi node `output-pin` cùng tên mà không biến đổi.",
+    "algorithm": [
+      "Đọc giá trị nối vào input generic `value`.",
+      "Chuẩn hóa tên kênh bằng cách bỏ khoảng trắng đầu/cuối nhưng giữ nguyên hoa thường.",
+      "Suy luận một kiểu cụ thể từ các endpoint của Input Pin và Output Pin.",
+      "Cấp chính object giá trị đó cho mọi Output Pin cùng tên khi chạy workflow."
+    ],
+    "inputGuidance": {
+      "value": "Chỉ nối đúng một nguồn. Kiểu cụ thể của nguồn tham gia suy luận kiểu của kênh."
+    },
+    "outputGuidance": {},
+    "parameterGuidance": {},
+    "example": {
+      "goal": "Chuyển một ảnh camera tới phần workflow ở xa mà không vẽ đường dây dài.",
+      "workflow": ["image-input", "input-pin"],
+      "parameters": {},
+      "steps": [
+        "Kéo **Input Pin** vào canvas.",
+        "Nối output ảnh vào input `value`.",
+        "Đặt Display name thành `Camera`.",
+        "Thêm một hoặc nhiều Output Pin có tên chính xác là `Camera`."
+      ],
+      "input": "Một giá trị có kiểu như image, mask, score, decision hoặc tập detection.",
+      "expectedOutput": "Các Output Pin cùng tên nhận chính giá trị đó và hiển thị kiểu cụ thể đã suy luận."
+    },
+    "troubleshooting": [
+      {"symptom": "Không có Output Pin tương ứng", "cause": "Tên khác hoa thường hoặc thiếu node tương ứng.", "resolution": "Dùng chính xác cùng display name phân biệt hoa thường trên ít nhất một Output Pin."},
+      {"symptom": "Lỗi trùng Input Pin", "cause": "Nhiều Input Pin có cùng tên sau khi trim.", "resolution": "Mỗi tên kênh ảo chỉ giữ đúng một Input Pin."},
+      {"symptom": "Xung đột kiểu generic", "cause": "Các endpoint nối vào khai báo nhiều kiểu cụ thể khác nhau.", "resolution": "Chỉ nối một kiểu cụ thể thống nhất trên toàn bộ kênh cùng tên."}
+    ],
+    "limitations": [
+      "Tên phân biệt hoa thường sau khi bỏ khoảng trắng đầu/cuối.",
+      "Mỗi kênh cần đúng một Input Pin và ít nhất một Output Pin.",
+      "Dependency ảo phải giữ workflow không có cycle."
+    ],
+    "productionChecklist": [
+      "Dùng tên kênh dễ hiểu và duy nhất trong workflow.",
+      "Xác nhận kiểu suy luận hiển thị trên mọi pin cùng cặp.",
+      "Chạy validation và Auto order trước khi lưu."
+    ]
+  }
+}

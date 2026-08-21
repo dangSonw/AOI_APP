@@ -89,8 +89,11 @@ export function NodeInspector({ node, definition, onChange }: NodeInspectorProps
       <div className="workflow-inspector__body">
         <RuntimeUseBadge use={definition.use} />
         <label className="workflow-field">
-          <span>Display name</span>
+          <span>{definition.id === 'input-pin' || definition.id === 'output-pin' ? 'Pin name' : 'Display name'}</span>
           <input value={node.displayName} onChange={(event) => onChange({ ...node, displayName: event.target.value })} />
+          {(definition.id === 'input-pin' || definition.id === 'output-pin') && (
+            <small>Input Pin and Output Pin names are trimmed and case-sensitive.</small>
+          )}
         </label>
         {definition.inspectorKind === 'none' ? (
           <div data-inspector-content="empty" />
@@ -99,7 +102,7 @@ export function NodeInspector({ node, definition, onChange }: NodeInspectorProps
         ) : (
           <section className="workflow-inspector__section" data-inspector-content="generic">
             <h3>Parameters</h3>
-            {definition.parameters.map((parameter) => {
+            {definition.parameters.filter((parameter) => parameter.key !== 'implementation').map((parameter) => {
               const value = node.parameters[parameter.key];
               return (
                 <label className="workflow-field" key={parameter.key}>

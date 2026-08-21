@@ -190,7 +190,7 @@ export function WorkflowEditorPage({
       if (isEditableTarget(event.target) || (!event.ctrlKey && !event.metaKey)) return;
       const key = event.key.toLowerCase();
       const restore = (source: React.MutableRefObject<Workflow[]>, destination: React.MutableRefObject<Workflow[]>) => {
-        const snapshot = source.current.at(-1);
+        const snapshot = source.current[source.current.length - 1];
         if (!snapshot || !draftWorkflow) return;
         destination.current = [...destination.current.slice(-49), structuredClone(draftWorkflow)];
         source.current = source.current.slice(0, -1);
@@ -275,7 +275,7 @@ export function WorkflowEditorPage({
         {issues.length > 0 && (
           <details className="workflow-issues">
             <summary>Review {issues.length} workflow issue{issues.length === 1 ? '' : 's'}</summary>
-            <ul>{issues.map((issue, index) => <li key={`${issue.code}-${issue.nodeId ?? issue.connectionId ?? index}`}><code>{issue.code}</code> {issue.message}</li>)}</ul>
+            <ul>{issues.map((issue, index) => <li key={`${issue.code}-${issue.nodeId ?? issue.connectionId ?? 'workflow'}-${index}`}><code>{issue.code}</code> {issue.message}</li>)}</ul>
           </details>
         )}
       </div>

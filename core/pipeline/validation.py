@@ -9,6 +9,7 @@ from .models import (
     ValidationIssue, Workflow,
 )
 from .ordering import CycleError, stable_topological_order
+from .virtual_pins import resolve_virtual_pin_groups, virtual_pin_dependencies
 
 
 def _is_uuid(value: str) -> bool:
@@ -27,6 +28,8 @@ def _parameter_is_valid(kind: ParameterKind, value: object) -> bool:
     if kind is ParameterKind.NUMBER:
         return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
     if kind is ParameterKind.JSON:
+        return is_json_parameter_value(value)
+    if kind is ParameterKind.REFERENCE:
         return is_json_parameter_value(value)
     return isinstance(value, str)
 
@@ -106,6 +109,42 @@ def validate_workflow(workflow: Workflow) -> tuple[ValidationIssue, ...]:
                 valid = value in parameter.options
             if not valid:
                 issues.append(ValidationIssue('invalid-parameter', f'Parameter {key} is invalid.', node_id=node.id))
+
+    for group in resolve_virtual_pin_groups(workflow):
+        if not group.name:
+            for node in (*group.input_nodes, *group.output_nodes):
+                issues.append(ValidationIssue(
+                    'invalid-parameter', 'Virtual pin display name cannot be empty.', node_id=node.id,
+                ))
+            continue
+        if len(group.input_nodes) != 1:
+            for node in (*group.input_nodes, *group.output_nodes):
+                issues.append(ValidationIssue(
+                    'invalid-parameter',
+                    f'Virtual pin channel {group.name} requires exactly one Input Pin.',
+                    node_id=node.id,
+                ))
+        if not group.output_nodes:
+            for node in group.input_nodes:
+                issues.append(ValidationIssue(
+                    'invalid-parameter',
+                    f'Input Pin {group.name} requires at least one matching Output Pin.',
+                    node_id=node.id,
+                ))
+        if not group.input_nodes:
+            for node in group.output_nodes:
+                issues.append(ValidationIssue(
+                    'invalid-parameter',
+                    f'Output Pin {group.name} requires a matching Input Pin.',
+                    node_id=node.id,
+                ))
+        if len(group.concrete_types) > 1:
+            issues.append(ValidationIssue(
+                'generic-type-conflict',
+                f'Virtual pin channel {group.name} resolves to conflicting data types: '
+                f'{", ".join(sorted(item.value for item in group.concrete_types))}.',
+                node_id=(group.input_nodes or group.output_nodes)[0].id,
+            ))
 
     endpoint_counts: Counter[tuple[str, str, str, str]] = Counter()
     target_counts: Counter[tuple[str, str]] = Counter()
@@ -219,5 +258,12 @@ def validate_workflow(workflow: Workflow) -> tuple[ValidationIssue, ...]:
                 and order_index[connection.source_node_id] >= order_index[connection.target_node_id]
             ):
                 issues.append(ValidationIssue('dependency-order', 'Dependencies must execute before consumers.', connection_id=connection.id))
+        for source_node_id, target_node_id in virtual_pin_dependencies(workflow):
+            if order_index[source_node_id] >= order_index[target_node_id]:
+                issues.append(ValidationIssue(
+                    'dependency-order',
+                    'Input Pin dependencies must execute before matching Output Pins.',
+                    node_id=target_node_id,
+                ))
 
     return tuple(issues)

@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
+import struct
+import zlib
 
 import pytest
 from sqlalchemy import func, select
@@ -114,6 +116,28 @@ class VerifiedCamera:
         return VerifiedImage(self.content, 'image/png', self.sha256)
 
 
+def _rgba_png() -> bytes:
+    def chunk(chunk_type: bytes, payload: bytes) -> bytes:
+        body = chunk_type + payload
+        return struct.pack('>I', len(payload)) + body + struct.pack('>I', zlib.crc32(body) & 0xFFFFFFFF)
+
+    width = height = 2
+    raw_rows = b'\x00\x00\x00\x00\xff\xff\xff\xff\xff' + b'\x00\xff\x00\x00\xff\x00\xff\x00\xff'
+    return (
+        b'\x89PNG\r\n\x1a\n'
+        + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0))
+        + chunk(b'IDAT', zlib.compress(raw_rows))
+        + chunk(b'IEND', b'')
+    )
+
+
+class RgbaVerifiedCamera(VerifiedCamera):
+    def __init__(self) -> None:
+        self.content = _rgba_png()
+        import hashlib
+        self.sha256 = hashlib.sha256(self.content).hexdigest()
+
+
 class CancelledTimeoutCamera(VerifiedCamera):
     def __init__(self, session, run_id: str) -> None:
         super().__init__()
@@ -157,11 +181,35 @@ def test_persisted_run_completes_with_replayable_node_and_artifact_evidence(tmp_
         assert completed.node_runs[-1].algorithm_id == 'image-output'
         assert all(node.visit_index >= 1 for node in completed.node_runs)
         assert completed.input_artifact['previewRelativePath'].endswith('.png')
+        assert completed.input_artifact['previewArtifacts']
+        assert completed.input_artifact['previewArtifacts'][completed.node_runs[-1].node_id]['sha256']
         preview = get_preview_artifact(session, run.id, tmp_path / 'captures')
         assert preview is not None
         assert preview[0].read_bytes().startswith(b'\x89PNG\r\n\x1a\n')
         assert preview[1] == 'image/png'
+        node_preview = get_preview_artifact(session, run.id, tmp_path / 'captures', completed.node_runs[-1].node_id)
+        assert node_preview is not None
+        assert node_preview[0].read_bytes().startswith(b'\x89PNG\r\n\x1a\n')
 
+        decision, evidence, matches = replay_run(session, run.id, tmp_path / 'captures')
+        assert decision == completed.decision
+        assert evidence == completed.evidence_sha256
+        assert matches is True
+
+
+def test_persisted_run_accepts_rgba_png_camera_and_folder_sources(tmp_path: Path) -> None:
+    operator_id, recipe_id = _operator_and_recipe()
+    with SessionLocal() as session:
+        run = create_run(session, InspectionRunCreateRequest(
+            board_serial=f'RGBA-{uuid4().hex}', recipe_id=recipe_id, threshold=0.5,
+        ), operator_id, tmp_path / 'projects')
+
+        completed = execute_run(session, run.id, RgbaVerifiedCamera(), ReadyMotion(), tmp_path / 'captures')
+
+        assert completed.status == 'completed'
+        assert completed.input_artifact is not None
+        assert completed.input_artifact['width'] == 2
+        assert completed.input_artifact['height'] == 2
         decision, evidence, matches = replay_run(session, run.id, tmp_path / 'captures')
         assert decision == completed.decision
         assert evidence == completed.evidence_sha256

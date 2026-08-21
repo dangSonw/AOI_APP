@@ -16,7 +16,7 @@ from core.pipeline import (
     Connection, ConnectionKind, Point, PortChannel, PortInstance, PortOrigin,
     RuntimeBindingMode, ValidationIssue, Workflow, WorkflowNode,
 )
-from core.nodes import NodeUse, get_node_runtime
+from core.nodes import NodeUse, get_node_manifest_registry, get_node_runtime
 
 
 class PortDefinitionSchema(ApiSchema):
@@ -66,10 +66,12 @@ class AlgorithmDefinitionSchema(ApiSchema):
     execution_target: str
     inspector_kind: str
     custom_inspector_key: str | None
+    capabilities: tuple[str, ...] = ()
 
     @classmethod
     def from_core(cls, definition: AlgorithmDefinition) -> Self:
         runtime = get_node_runtime(definition.id)
+        manifest = get_node_manifest_registry().get(definition.id)
         if runtime is None:
             raise ValueError(f'Algorithm {definition.id} does not have a runtime package.')
         return cls(
@@ -90,6 +92,7 @@ class AlgorithmDefinitionSchema(ApiSchema):
             execution_target=definition.execution_target,
             inspector_kind=definition.inspector_kind,
             custom_inspector_key=definition.custom_inspector_key,
+            capabilities=manifest.capabilities if manifest is not None else (),
         )
 
 

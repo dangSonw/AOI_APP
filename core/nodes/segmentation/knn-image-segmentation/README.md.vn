@@ -2,7 +2,7 @@
 
 ## Mục đích và cách dùng nhanh
 
-`knn-image-segmentation` thực hiện **KNN image segmentation** trong pipeline AOI. Segments pixels by representative BGR colors and extracts object contours using OpenCV KNN matching or a manual Python KNN implementation. Người dùng cấu hình node trong Node inspector và nối output sang port cùng kiểu dữ liệu.
+`knn-image-segmentation` thực hiện **phân đoạn ảnh KNN** trong pipeline AOI. Node phân loại pixel từ các đặc tính màu BGR đại diện đã được đặt tên và trích xuất contour của đối tượng. Người dùng cấu hình tên đặc tính và màu trực tiếp trong Node inspector rồi nối output sang port cùng kiểu dữ liệu.
 
 **Dùng khi:** cần bước knn image segmentation có thể lưu trong recipe, chạy lặp lại và kiểm tra riêng.
 
@@ -24,7 +24,7 @@ Input gồm `image`:image. Node áp dụng OpenCV DescriptorMatcher.knnMatch and
 ## Nguyên lý xử lý
 
 - Kiểm tra presence, kiểu dữ liệu và shape của input theo contract `knn-image-segmentation`.
-- Các parameter `implementation`, `neighbors`, `distanceMetric`, `distanceWeighted`, `minimumConfidence`, `foregroundLabels`, `trainingSamples` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.
+- Các parameter `neighbors`, `distanceMetric`, `distanceWeighted`, `minimumConfidence`, `foregroundLabels`, `trainingSamples` quyết định cách xử lý; thay đổi từng giá trị một để truy vết ảnh hưởng.
 - Chuyển mỗi pixel thành vector BGR chuẩn hóa.
 - Tìm K mẫu màu có nhãn gần nhất theo từng batch giới hạn.
 - Đặt pixel có nhãn thắng thuộc foregroundLabels thành 255 rồi trích contour ngoài.
@@ -63,13 +63,12 @@ Input gồm `image`:image. Node áp dụng OpenCV DescriptorMatcher.knnMatch and
 
 | Key | Kind | Default | Min | Max | Options | Cách nhập / Ý nghĩa |
 |---|---|---|---|---|---|---|
-| `implementation` | `select` | `opencv` | — | — | `opencv`, `manual-python` | Use OpenCV BFMatcher KNN matching or the KNN algorithm implemented with Python/NumPy. |
 | `neighbors` | `integer` | `3` | `1` | `1000` | — | Must not exceed the number of training samples. |
-| `distanceMetric` | `select` | `euclidean` | — | — | `euclidean`, `manhattan` | OpenCV supports Euclidean; manual Python supports Euclidean and Manhattan. |
+| `distanceMetric` | `select` | `euclidean` | — | — | `euclidean`, `manhattan` | Euclidean dùng khoảng cách đường thẳng giữa màu; Manhattan cộng độ lệch từng kênh. |
 | `distanceWeighted` | `boolean` | `true` | — | — | — | Weight closer color samples more strongly. |
 | `minimumConfidence` | `number` | `0.5` | `0.0` | `1.0` | — | Pixels below this winning-vote confidence become background. |
-| `foregroundLabels` | `json` | `["object"]` | — | — | — | Labels that form the output object mask. |
-| `trainingSamples` | `json` | `[{"label": "background", "color": [0, 0, 0]}, {"label": "background", "color": [32, 32, 32]}, {"label": "object", "color": [224, 224, 224]}, {"label": "object", "color": [255, 255, 255]}]` | — | — | — | JSON samples with a label and representative BGR color. |
+| `foregroundLabels` | chọn đặc tính | `object` | — | — | tên đặc tính | Chọn các tên đặc tính sẽ tạo vùng trắng trong mask đầu ra. |
+| `trainingSamples` | trình sửa đặc tính | bốn mẫu mặc định | — | — | tên, B, G, R | Thêm tên đặc tính có ý nghĩa và màu BGR đại diện mà không cần sửa JSON. |
 
 ## Ví dụ sử dụng có thể làm theo ngay
 
@@ -79,57 +78,10 @@ Input gồm `image`:image. Node áp dụng OpenCV DescriptorMatcher.knnMatch and
 
 - Kéo **KNN image segmentation** vào canvas.
 - Nối port theo workflow mẫu.
-- Mở Node inspector và nhập config JSON bên dưới.
+- Mở Node inspector, đặt tên các đặc tính thị giác và nhập màu BGR đại diện cho từng đặc tính.
 - Bấm Run, xem output rồi chỉ chỉnh một parameter mỗi lần.
 
-**Nhập trong bảng config:**
-
-```json
-{
-  "implementation": "opencv",
-  "neighbors": 3,
-  "distanceMetric": "euclidean",
-  "distanceWeighted": true,
-  "minimumConfidence": 0.5,
-  "foregroundLabels": [
-    "object"
-  ],
-  "trainingSamples": [
-    {
-      "label": "background",
-      "color": [
-        0,
-        0,
-        0
-      ]
-    },
-    {
-      "label": "background",
-      "color": [
-        32,
-        32,
-        32
-      ]
-    },
-    {
-      "label": "object",
-      "color": [
-        224,
-        224,
-        224
-      ]
-    },
-    {
-      "label": "object",
-      "color": [
-        255,
-        255,
-        255
-      ]
-    }
-  ]
-}
-```
+**Ví dụ trên inspector:** giữ hai mẫu `background` gần BGR `(0, 0, 0)` và `(32, 32, 32)`, thêm hai mẫu `object` gần `(224, 224, 224)` và `(255, 255, 255)`, sau đó chọn **object** trong mục Đặc tính foreground.
 
 **Input ví dụ:** Dữ liệu cho `image`:image; ảnh dùng uint8 BGR 640×480, các kiểu khác dùng output trực tiếp từ node nguồn trong workflow.
 
@@ -140,9 +92,8 @@ Input gồm `image`:image. Node áp dụng OpenCV DescriptorMatcher.knnMatch and
 | Hiện tượng | Nguyên nhân | Cách xử lý |
 |---|---|---|
 | Không nối được port | Data type không trùng. | Dùng node trung gian tạo đúng kiểu trong bảng port. |
-| Invalid parameter | Ngoài Min/Max hoặc JSON sai. | Copy config ví dụ rồi thay từng giá trị. |
+| Invalid parameter | Giá trị số nằm ngoài giới hạn hoặc tên đặc tính đang rỗng. | Khôi phục mặc định rồi chỉnh từng trường một. |
 | Output rỗng/nhiễu | Input hoặc tham số không hợp giả định. | Preview input, khôi phục mặc định, tinh chỉnh từng bước. |
-| Hai implementation cho confidence hơi khác | Solver và tiêu chí dừng khác nhau. | So sánh nhãn/metric với tolerance; không yêu cầu số thực giống tuyệt đối. |
 
 ## Giới hạn và kiểm tra trước production
 
