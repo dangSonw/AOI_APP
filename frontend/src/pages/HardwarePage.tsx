@@ -54,7 +54,7 @@ export function HardwarePage({ accessToken, snapshot, error, isLoading, onRefres
   };
 
   if (!snapshot) {
-    return <div className="hardware-page"><header className="workspace-title-row"><div><span className="overline">Hardware</span><h1>Device signal bridge</h1><p>Connect camera and motion adapters through the authenticated backend.</p></div></header><p className="studio-message studio-message--error" role="alert">{error || (isLoading ? 'Reading device adapters…' : 'Device state is unavailable.')}</p></div>;
+    return <div className="hardware-page"><header className="workspace-title-row"><div><h1>Hardware</h1></div></header><p className="studio-message studio-message--error" role="alert">{error || (isLoading ? 'Reading device adapters…' : 'Device state is unavailable.')}</p></div>;
   }
 
   const camera = snapshot.devices.camera;
@@ -65,7 +65,7 @@ export function HardwarePage({ accessToken, snapshot, error, isLoading, onRefres
   return (
     <div className="hardware-page" aria-busy={isLoading}>
       <header className="workspace-title-row">
-        <div><span className="overline">Hardware</span><h1>Device signal bridge</h1><p>One configuration path for virtual adapters now and physical CSI/UART devices later.</p></div>
+        <div><h1>Hardware</h1></div>
         <StatusBadge status={camera.status === 'ready' && motion.status === 'ready' ? 'success' : 'warning'} label={modeLabel} />
       </header>
 

@@ -77,11 +77,6 @@ export function ProjectExplorer({ activeView, isCollapsed, onViewChange, onColla
           </section>
         ))}
       </nav>
-      <div className="project-explorer__recipe">
-        <span className="overline">Active recipe</span>
-        <strong>Rev C · Mainboard</strong>
-        <span>v2.14 · Production</span>
-      </div>
     </aside>
   );
 }

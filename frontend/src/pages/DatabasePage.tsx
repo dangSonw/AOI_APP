@@ -142,9 +142,7 @@ function DatabaseHeader({ activeView, onViewChange, query, setQuery, resultFilte
   return (
     <header className="workspace-title-row database-header">
       <div>
-        <span className="overline">Database</span>
         <h1>{activeView === 'inspections' ? 'Board history & evidence' : 'PostgreSQL schema'}</h1>
-        <p>{activeView === 'inspections' ? 'Review inspection results, defect records, and captured evidence.' : 'Explore read-only tables, columns, indexes, constraints, and foreign keys.'}</p>
       </div>
       <div className="database-header__actions">
         <div className="database-view-switch" aria-label="Database view">
@@ -160,9 +158,9 @@ function DatabaseHeader({ activeView, onViewChange, query, setQuery, resultFilte
               <option value="REVIEW">Review</option>
             </select>
             <label className="database-search">
+              <span className="database-search__icon" aria-hidden="true" />
               <span className="sr-only">Search inspection records</span>
-              <span aria-hidden="true">⌕</span>
-              <input value={query} placeholder="Search serial, lot, or recipe" onChange={(e) => setQuery(e.target.value)} />
+              <input aria-label="Search serial, lot, or recipe" value={query} placeholder="Search serial, lot, or recipe" onChange={(e) => setQuery(e.target.value)} />
             </label>
           </div>
         )}

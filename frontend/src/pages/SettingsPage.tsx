@@ -100,14 +100,6 @@ export function SettingsPage({ accessToken, deviceSnapshot, preferences, isDirty
 
   return (
     <div className="settings-page">
-      <header className="workspace-title-row">
-        <div>
-          <span className="overline">Settings</span>
-          <h1>Configuration control</h1>
-          <p>Version desired state, validate changes, apply safely, and preserve lineage.</p>
-        </div>
-      </header>
-
       <div className="settings-layout">
         <nav className="settings-nav" aria-label="Settings sections">
           <span className="overline">Configuration scopes</span>

@@ -39,8 +39,12 @@ export function ResearchPage({ accessToken, initialRuns = [], initialModels = []
   return (
     <section className="research-page" aria-label="Research workspace">
       <header className="research-page__header">
-        <div><span className="overline">Reproducible experiments</span><h1>Research runs</h1><p>Compare metrics, inspect lineage, browse immutable artifacts, and diagnose failures.</p></div>
-        <div className="research-search"><input aria-label="Search research runs" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Run, experiment, code revision" /><button type="button" onClick={() => void search()}>Search</button></div>
+        <div><h1>Research runs</h1></div>
+        <div className="research-search">
+          <label htmlFor="research-run-search">Search runs</label>
+          <input id="research-run-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Run, experiment, code revision" />
+          <button type="button" onClick={() => void search()}>Search</button>
+        </div>
       </header>
       {error && <div className="studio-message studio-message--error" role="alert">{error}</div>}
       <div className="research-summary"><span><small>Runs</small><strong>{runs.length}</strong></span><span><small>Completed</small><strong>{runs.filter((run) => run.status === 'completed').length}</strong></span><span><small>Failed</small><strong>{runs.filter((run) => run.status === 'failed').length}</strong></span><button type="button" disabled={selected.length < 2}>Compare selected</button></div>
@@ -57,7 +61,7 @@ export function ResearchPage({ accessToken, initialRuns = [], initialModels = []
       ))}</div>
       {runs.length === 0 && !error && <div className="workflow-empty"><strong>No research runs</strong><p>Create a node-context run from a trainable inspector.</p></div>}
       <section className="research-models" aria-label="Registered models">
-        <header><span className="overline">Registry</span><h2>Model versions</h2><p>Only validated aliases with verified artifacts can be bound to a workflow node.</p></header>
+        <header><h2>Model versions</h2></header>
         {models.map((model) => (
           <article className="research-run" key={model.name}>
             <header><strong>{model.name}</strong><span>{Object.entries(model.aliases).map(([alias, version]) => `${alias} → v${version}`).join(' · ') || 'No promoted alias'}</span></header>

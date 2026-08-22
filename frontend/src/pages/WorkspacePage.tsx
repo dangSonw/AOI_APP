@@ -37,7 +37,7 @@ import { WorkflowEditorPage } from './WorkflowEditorPage';
 
 const ACTIVE_RECIPE_SLUG = 'rev-c-mainboard';
 const DEFAULT_WORKSTATION_ID = 'station-01';
-const WORKSPACE_SHORTCUT_VIEWS: WorkspaceView[] = ['dashboard', 'database', 'research', 'models', 'hardware', 'settings'];
+const WORKSPACE_SHORTCUT_VIEWS: WorkspaceView[] = ['dashboard', 'database', 'research', 'models', 'hardware'];
 
 interface WorkspacePageProps {
   session: AuthSession;

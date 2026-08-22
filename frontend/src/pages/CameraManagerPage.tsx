@@ -32,9 +32,7 @@ export function CameraManagerPage({ preferences, onChange }: CameraManagerPagePr
     <div className="camera-page">
       <header className="workspace-title-row">
         <div>
-          <span className="overline">Camera manager</span>
-          <h1>Photometric</h1>
-          <p>Align each light vector with the camera and capture one synchronized image per light.</p>
+          <h1>Camera rig</h1>
         </div>
         <StatusBadge status="success" label="Calibration valid" />
       </header>
@@ -88,9 +86,9 @@ export function CameraManagerPage({ preferences, onChange }: CameraManagerPagePr
           <label className="range-control"><span><strong>Azimuth</strong><output>{selectedLight.azimuth}°</output></span><input type="range" min="0" max="359" value={selectedLight.azimuth} onChange={(event) => updateSelectedLight({ azimuth: Number(event.target.value) })} /></label>
           <label className="range-control"><span><strong>Elevation</strong><output>{selectedLight.elevation}°</output></span><input type="range" min="0" max="90" value={selectedLight.elevation} onChange={(event) => updateSelectedLight({ elevation: Number(event.target.value) })} /></label>
           <label className="range-control"><span><strong>Intensity</strong><output>{selectedLight.intensity}%</output></span><input type="range" min="0" max="100" value={selectedLight.intensity} onChange={(event) => updateSelectedLight({ intensity: Number(event.target.value) })} /></label>
-          <p className="camera-save-hint">Save this rig and the workspace layout from Settings.</p>
+          <p className="camera-save-hint">Save this rig from the workspace preferences when the configuration is ready.</p>
           {message && <p className="studio-message studio-message--success" role="status">{message}</p>}
-          <button className="studio-primary-button" type="button" onClick={() => setMessage('Photometric draft validated. Save it from Settings.')}>Validate configuration</button>
+          <button className="studio-primary-button" type="button" onClick={() => setMessage('Photometric draft validated. Ready to save.')}>Validate configuration</button>
         </aside>
       </section>
     </div>

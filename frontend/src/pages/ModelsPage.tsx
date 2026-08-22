@@ -55,9 +55,7 @@ export function ModelsPage({ accessToken, initialModels = [] }: ModelsPageProps)
     <section className="research-page models-page" aria-label="Models workspace">
       <header className="research-page__header">
         <div>
-          <span className="overline">Controlled model registry</span>
           <h1>Models</h1>
-          <p>Browse immutable versions, lineage, compatibility, verified artifacts, and promoted aliases.</p>
         </div>
       </header>
       {error && <div className="studio-message studio-message--error" role="alert">{error}</div>}
@@ -83,7 +81,7 @@ export function ModelsPage({ accessToken, initialModels = [] }: ModelsPageProps)
             </header>
             <p>{model.description || 'No model description.'}</p>
             {model.versions.map((version) => (
-              <details key={version.version} open>
+              <details key={version.version}>
                 <summary>v{version.version} · {version.artifactVerified ? 'artifact verified' : 'artifact unavailable'}</summary>
                 <div className="research-run__lineage">
                   <span>Run <code>{version.runId}</code></span>

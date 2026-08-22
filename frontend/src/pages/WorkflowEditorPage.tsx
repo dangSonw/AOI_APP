@@ -254,12 +254,7 @@ export function WorkflowEditorPage({
   return (
     <section className="workflow-editor" aria-busy={isLoading || isSaving}>
       <header className="workflow-editor__header">
-        <div className="workflow-editor__identity">
-          <button type="button" className="text-action" onClick={onBack}>← Back to workspace</button>
-          <span className="overline">Recipe workflow</span>
-          <h1>{draftWorkflow.recipeName}</h1>
-          <p>Configuration graph · Revision {savedWorkflow?.revision ?? draftWorkflow.revision} · Schema v{draftWorkflow.version}</p>
-        </div>
+        <button type="button" className="text-action workflow-editor__back" onClick={onBack}>← Back to workspace</button>
         <div className="workflow-editor__status">
           <span className={`workflow-state ${issues.length > 0 ? 'workflow-state--warning' : isDirty ? 'workflow-state--dirty' : 'workflow-state--valid'}`}>
             {issues.length > 0 ? `${issues.length} issue${issues.length === 1 ? '' : 's'}` : isDirty ? 'Unsaved changes' : 'Saved and valid'}
