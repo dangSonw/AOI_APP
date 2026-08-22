@@ -109,6 +109,59 @@ def test_workflow_passes_context_only_to_contextual_executor(monkeypatch: pytest
     assert received_contexts == [context]
 
 
+def test_production_workflow_rejects_portable_alias_reference() -> None:
+    from dataclasses import replace
+
+    workflow = create_default_workflow()
+    first = workflow.nodes[0]
+    workflow = replace(
+        workflow,
+        nodes=(replace(first, parameters={**first.parameters, 'model': {'modelName': 'pcb-anomaly', 'alias': 'champion'}}), *workflow.nodes[1:]),
+    )
+
+    with pytest.raises(ValueError, match='immutable'):
+        execute_workflow(workflow, source_image=np.zeros((8, 8, 3), dtype=np.uint8), production=True)
+
+
+def test_production_workflow_requires_matching_immutable_model_binding() -> None:
+    from dataclasses import replace
+    from core.nodes import ModelBinding, NodeExecutionContext
+
+    workflow = create_default_workflow()
+    first = workflow.nodes[0]
+    workflow = replace(
+        workflow,
+        nodes=(replace(first, parameters={**first.parameters, 'model': {
+            'modelName': 'pcb-anomaly', 'modelVersion': 2, 'artifactSha256': 'b' * 64,
+        }}), *workflow.nodes[1:]),
+    )
+    context = NodeExecutionContext(models={'detector': ModelBinding('pcb-anomaly', 1, 'a' * 64)})
+
+    with pytest.raises(ValueError, match='does not match'):
+        execute_workflow(workflow, source_image=np.zeros((8, 8, 3), dtype=np.uint8), context=context, production=True)
+
+
+def test_production_workflow_accepts_matching_immutable_model_binding() -> None:
+    from dataclasses import replace
+    from core.nodes import ModelBinding, NodeExecutionContext
+
+    workflow = create_default_workflow()
+    first = workflow.nodes[0]
+    workflow = replace(
+        workflow,
+        nodes=(replace(first, parameters={**first.parameters, 'model': {
+            'modelName': 'pcb-anomaly', 'modelVersion': 1, 'artifactSha256': 'a' * 64,
+        }}), *workflow.nodes[1:]),
+    )
+    context = NodeExecutionContext(models={'detector': ModelBinding('pcb-anomaly', 1, 'a' * 64)})
+
+    result = execute_workflow(
+        workflow, source_image=np.zeros((8, 8, 3), dtype=np.uint8), context=context, production=True,
+    )
+
+    assert all(record.status == 'completed' for record in result.records)
+
+
 def test_workflow_stops_before_node_execution_when_context_is_cancelled() -> None:
     from core.nodes import NodeExecutionContext
 

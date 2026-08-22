@@ -4,6 +4,14 @@ import type {
   DatasetDetail,
   DatasetListResponse,
   DatasetSummary,
+  DatasetValidationReport,
+  CsvPreviewResponse,
+  CsvPreparationResponse,
+  CsvPreparationSnapshotResponse,
+  CsvPreprocessingPreviewResponse,
+  CsvProcessedArtifactResponse,
+  CsvProcessedArtifactVerificationResponse,
+  CsvKnnTrainingJobResponse,
   ImageInfo,
   ImageListResponse,
 } from '../types/dataset';
@@ -26,6 +34,132 @@ export function createDataset(accessToken: string, name: string, description: st
 
 export function readDataset(accessToken: string, name: string): Promise<DatasetDetail> {
   return apiRequest<DatasetDetail>(`/api/datasets/${encode(name)}`, {}, accessToken);
+}
+
+export function validateDataset(accessToken: string, name: string): Promise<DatasetValidationReport> {
+  return apiRequest<DatasetValidationReport>(`/api/datasets/${encode(name)}/validate`, { method: 'POST' }, accessToken);
+}
+
+export async function previewCsv(accessToken: string, datasetName: string, file: File): Promise<CsvPreviewResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const headers = new Headers({ Authorization: `Bearer ${accessToken}` });
+  const response = await fetch(`${API_BASE_URL}/api/datasets/${encode(datasetName)}/csv-preview`, {
+    method: 'POST', headers, body: formData,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as { detail?: unknown };
+    throw new Error(typeof body.detail === 'string' ? body.detail : 'The CSV preview could not be generated.');
+  }
+  return response.json() as Promise<CsvPreviewResponse>;
+}
+
+export async function prepareCsv(
+  accessToken: string,
+  datasetName: string,
+  file: File,
+  targetColumn: string,
+  featureColumns: string[],
+  ratios: { train: number; validation: number; test: number },
+): Promise<CsvPreparationResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('targetColumn', targetColumn);
+  formData.append('featureColumns', JSON.stringify(featureColumns));
+  formData.append('trainRatio', String(ratios.train));
+  formData.append('validationRatio', String(ratios.validation));
+  formData.append('testRatio', String(ratios.test));
+  const response = await fetch(`${API_BASE_URL}/api/datasets/${encode(datasetName)}/csv-prepare`, {
+    method: 'POST', headers: new Headers({ Authorization: `Bearer ${accessToken}` }), body: formData,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as { detail?: unknown };
+    throw new Error(typeof body.detail === 'string' ? body.detail : 'The CSV preparation could not be generated.');
+  }
+  return response.json() as Promise<CsvPreparationResponse>;
+}
+
+export async function createCsvPreparationSnapshot(
+  accessToken: string,
+  datasetName: string,
+  file: File,
+  targetColumn: string,
+  featureColumns: string[],
+  ratios: { train: number; validation: number; test: number },
+  preprocessingPolicy: Record<string, string> = {},
+): Promise<CsvPreparationSnapshotResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('targetColumn', targetColumn);
+  formData.append('featureColumns', JSON.stringify(featureColumns));
+  formData.append('trainRatio', String(ratios.train));
+  formData.append('validationRatio', String(ratios.validation));
+  formData.append('testRatio', String(ratios.test));
+  formData.append('preprocessingPolicy', JSON.stringify(preprocessingPolicy));
+  const response = await fetch(`${API_BASE_URL}/api/datasets/${encode(datasetName)}/csv-preparations`, {
+    method: 'POST', headers: new Headers({ Authorization: `Bearer ${accessToken}` }), body: formData,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({})) as { detail?: unknown };
+    throw new Error(typeof body.detail === 'string' ? body.detail : 'The CSV preparation snapshot could not be created.');
+  }
+  return response.json() as Promise<CsvPreparationSnapshotResponse>;
+}
+
+export function previewCsvPreprocessing(
+  accessToken: string,
+  datasetName: string,
+  preparationId: string,
+): Promise<CsvPreprocessingPreviewResponse> {
+  return apiRequest<CsvPreprocessingPreviewResponse>(
+    `/api/datasets/${encode(datasetName)}/csv-preparations/${encode(preparationId)}/preview`,
+    { method: 'POST' },
+    accessToken,
+  );
+}
+
+export function createCsvProcessedArtifact(
+  accessToken: string,
+  datasetName: string,
+  preparationId: string,
+): Promise<CsvProcessedArtifactResponse> {
+  return apiRequest<CsvProcessedArtifactResponse>(
+    `/api/datasets/${encode(datasetName)}/csv-preparations/${encode(preparationId)}/artifacts`,
+    { method: 'POST' },
+    accessToken,
+  );
+}
+
+export function readCsvProcessedArtifacts(accessToken: string, datasetName: string, preparationId: string): Promise<CsvProcessedArtifactResponse[]> {
+  return apiRequest<{ artifacts: CsvProcessedArtifactResponse[] }>(
+    `/api/datasets/${encode(datasetName)}/csv-preparations/${encode(preparationId)}/artifacts`, {}, accessToken,
+  ).then((response) => response.artifacts);
+}
+
+export function verifyCsvProcessedArtifact(
+  accessToken: string, datasetName: string, preparationId: string, artifactId: string,
+): Promise<CsvProcessedArtifactVerificationResponse> {
+  return apiRequest<CsvProcessedArtifactVerificationResponse>(
+    `/api/datasets/${encode(datasetName)}/csv-preparations/${encode(preparationId)}/artifacts/${encode(artifactId)}/verify`,
+    { method: 'POST' }, accessToken,
+  );
+}
+
+export function createCsvKnnTrainingJob(
+  accessToken: string, datasetName: string, preparationId: string, artifactId: string, k: number,
+): Promise<CsvKnnTrainingJobResponse> {
+  return apiRequest<CsvKnnTrainingJobResponse>(
+    `/api/datasets/${encode(datasetName)}/csv-preparations/${encode(preparationId)}/artifacts/${encode(artifactId)}/knn-jobs`,
+    { method: 'POST', body: JSON.stringify({ k }) }, accessToken,
+  );
+}
+
+export function readCsvKnnTrainingJobs(
+  accessToken: string, datasetName: string, preparationId: string, artifactId: string,
+): Promise<CsvKnnTrainingJobResponse[]> {
+  return apiRequest<{ jobs: CsvKnnTrainingJobResponse[] }>(
+    `/api/datasets/${encode(datasetName)}/csv-preparations/${encode(preparationId)}/artifacts/${encode(artifactId)}/knn-jobs`, {}, accessToken,
+  ).then((response) => response.jobs);
 }
 
 export function updateDataset(

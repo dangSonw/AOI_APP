@@ -1,0 +1,76 @@
+# Thiết kế UI, model binding, hardening node và RELEASE cho AOI Studio
+
+**Trạng thái:** Baseline thiết kế đã được phê duyệt
+**Roadmap nguồn:** `docs/superpowers/plans/updateUIX_Node.md`
+**Ngày:** 2026-08-22
+
+## Vấn đề
+
+Repository đã có nền tảng đáng kể cho research run, model artifact, workflow editor, xử lý ảnh có giới hạn và dataset. Phần còn lại không phải một tính năng đơn lẻ mà gồm năm product slice độc lập. Khoảng trống hiện tại là chưa tách Models workspace khỏi Research Runs, model reference chưa kiểm tra đầy đủ compatibility ở ranh giới workflow, một số node vẫn cần tách và benchmark, chưa cài runtime deep-learning, và chưa có pipeline vượt qua cổng bằng chứng RELEASE.
+
+## Mục tiêu
+
+1. Tạo Models workspace riêng nhưng vẫn giữ Research Runs.
+2. Lưu model binding dạng portable và chạy bằng binding bất biến.
+3. Chặn compatibility, artifact và alias lỗi trước production execution.
+4. Hoàn thiện tách node OpenCV/golden-reference theo contract và benchmark.
+5. Tạo một RELEASE vertical slice có evidence và audit.
+6. Giữ deep-learning theo hướng external artifact, cô lập dependency.
+
+## Ngoài phạm vi
+
+- Không thêm PyTorch hoặc TensorFlow.
+- Không tuyên bố inference deep-learning hoàn tất nếu runtime chưa được cài và lock.
+- Không đánh dấu RELEASE chỉ dựa trên unit test.
+- Không refactor authentication, hardware hoặc database ngoài phạm vi.
+- Không xóa hoặc ghi đè thay đổi có sẵn.
+
+## Kiến trúc
+
+Frontend chỉ phụ trách hiển thị, filter, action state và gọi API. Backend là nơi quyết định policy, persistence, validation, promotion, audit, integrity artifact và alias resolution. Core phụ trách portable/immutable model contract, workflow validation, execution contract, cancellation và resource bounds. Ranh giới production chỉ nhận immutable binding cùng artifact đã verify.
+
+Triển khai theo các gate: baseline; Phase 6 Models; Phase 7 model compatibility; Phase 9 node decomposition; Phase 10 RELEASE; cuối cùng mới Phase 8 ONNX runtime sau dependency review riêng.
+
+## Phase 6 — Models workspace
+
+Research Runs và Models là hai view riêng. Models phải có list/detail/version browser. Mỗi version hiển thị run ID, validation evidence, dataset version, artifact SHA-256, trạng thái verify, compatibility và alias. Promote/rollback bắt buộc reason không rỗng. UI phải có trạng thái pending/success/error và không dùng màu làm tín hiệu duy nhất.
+
+Backend là policy authority. Promote bị từ chối khi evidence thiếu/thất bại, artifact thiếu/chưa verify hoặc version không tồn tại. Rollback tạo audit event bất biến và không sửa lịch sử version.
+
+## Phase 7 — model binding
+
+Workflow lưu `{ modelName, alias }` hoặc immutable `{ modelName, modelVersion, artifactSha256 }`. Picker filter theo task, input schema, output schema, framework, validation status và alias; đồng thời giải thích lý do model không dùng được. Warning gồm chưa validate, incompatible, thiếu artifact, node DEBUG và alias chưa resolve.
+
+Production validation/execution resolve alias một lần thành version bất biến, load qua resolver và kiểm tra SHA-256. Alias thiếu, schema không tương thích, checksum sai và artifact thiếu đều là lỗi block. Runtime không được âm thầm theo mutable alias.
+
+## Phase 9 — tách node
+
+Mỗi package có một thuật toán chính, manifest/runtime/documentation và test deterministic. Image contract dùng chung ở platform-level. Các node dùng cùng quy tắc về kích thước, finite value, dtype/channel/shape, score bounds, anomaly map, cancellation và memory limit. Benchmark dùng fixture deterministic và metric ổn định. Visualization/evidence có schema rõ ràng.
+
+Ưu tiên SSIM, Watershed/OpenCV mở rộng, visualization, evidence rồi transforms. Công việc bounded-runtime hiện có của SSIM và Watershed là baseline, không phải bằng chứng toàn bộ family đã xong.
+
+## Phase 10 — RELEASE vertical slice
+
+Ứng viên đầu tiên:
+
+```text
+image input -> preprocessing -> alignment/calibration -> golden-reference hoặc segmentation -> defect scoring -> decision output
+```
+
+Node chỉ được RELEASE khi có deterministic test, edge-case test, benchmark, input/output contract, failure behavior, resource limits, lineage, không placeholder, dữ liệu thực, calibration policy nếu cần, audit evidence và deployment check. Manifest phải khai báo rõ `RELEASE`, version, resource limit và evidence reference.
+
+## Phase 8 — external deep-learning artifact
+
+Phase 8 làm sau cùng. Hướng chọn là ONNX Runtime vì phù hợp external-artifact contract hiện có và tách training khỏi production. Trước khi code phải lock runtime version và security policy. Contract phải định nghĩa tensor name, dtype, shape, preprocessing, postprocessing, logits/probabilities/embedding, CPU/GPU, memory limit, cancellation, checksum và benchmark. CNN node chưa đưa vào Basic catalog trước khi đủ kiểm soát.
+
+## Kiểm thử và quan sát
+
+Mọi thay đổi hành vi cần unit test và integration test. Các ca bắt buộc gồm promotion rejection, rollback audit, alias resolution, compatibility filter, missing artifact, checksum mismatch, workflow round-trip, production validation, cancellation, oversized image, benchmark deterministic và RELEASE acceptance. Audit event ghi actor, action, model/version hoặc pipeline revision, reason, timestamp và result; không lưu secret.
+
+## Hoàn thành
+
+Một phase chỉ complete khi test riêng, tài liệu và bản dịch tồn tại, acceptance flow có bằng chứng và `state.md` ghi evidence. Toàn bộ roadmap chỉ complete khi Gate 1–5 đạt; repository hiện chưa đạt điều kiện này.
+
+## Rủi ro
+
+GitNexus native runtime đang mismatch nên chưa chạy được impact bắt buộc; working tree có thay đổi từ trước; ONNX Runtime tạo thêm dependency/platform work; production evidence không thể suy ra từ mock test; metadata cũ thiếu phải được hiển thị là unknown/ineligible thay vì đoán.

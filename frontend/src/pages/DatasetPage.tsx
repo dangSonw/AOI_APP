@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CaptureFile, DatasetDetail, DatasetSummary, ImageInfo } from '../types/dataset';
+import type { CaptureFile, CsvKnnTrainingJobResponse, CsvPreparationResponse, CsvPreparationSnapshotResponse, CsvPreprocessingPreviewResponse, CsvProcessedArtifactResponse, CsvProcessedArtifactVerificationResponse, CsvPreviewResponse, DatasetDetail, DatasetSummary, DatasetValidationReport, ImageInfo } from '../types/dataset';
 import { NameDialog, type NameDialogKind } from '../components/dataset/NameDialog';
+import { DatasetBrowser } from '../components/dataset/DatasetBrowser';
+import { DatasetImageGrid } from '../components/dataset/DatasetImageGrid';
+import { DatasetImageViewer } from '../components/dataset/DatasetImageViewer';
 import {
   createCategory,
   createDataset,
+  createCsvPreparationSnapshot,
+  createCsvProcessedArtifact,
   deleteCategory as deleteCategoryService,
   deleteDataset,
   deleteImage,
@@ -18,66 +23,15 @@ import {
   renameImage,
   updateDataset,
   uploadImages,
+  validateDataset,
+  previewCsv,
+  prepareCsv,
+  previewCsvPreprocessing,
+  readCsvProcessedArtifacts,
+  verifyCsvProcessedArtifact,
+  createCsvKnnTrainingJob,
+  readCsvKnnTrainingJobs,
 } from '../services/dataset-service';
-
-
-function AuthorizedThumb({
-  accessToken,
-  url,
-  filename,
-}: {
-  accessToken: string;
-  url: string;
-  filename: string;
-}) {
-  const [objectUrl, setObjectUrl] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
-      .then((response) => (response.ok ? response.blob() : Promise.reject(new Error('Failed to load image'))))
-      .then((blob) => {
-        if (!cancelled) setObjectUrl(URL.createObjectURL(blob));
-      })
-      .catch(() => { /* leave placeholder */ });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [accessToken, url, objectUrl]);
-
-  if (!objectUrl) {
-    return <span className="image-grid__thumb image-grid__thumb--placeholder">{filename}</span>;
-  }
-  return <img className="image-grid__thumb" src={objectUrl} alt={filename} draggable={false} />;
-}
-
-function AuthorizedViewerImage({
-  accessToken,
-  url,
-  alt,
-}: {
-  accessToken: string;
-  url: string;
-  alt: string;
-}) {
-  const [objectUrl, setObjectUrl] = useState('');
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
-      .then((response) => (response.ok ? response.blob() : Promise.reject(new Error('Failed'))))
-      .then((blob) => { if (!cancelled) setObjectUrl(URL.createObjectURL(blob)); })
-      .catch(() => { /* noop */ });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [accessToken, url, objectUrl]);
-
-  if (!objectUrl) return <span className="image-viewer__canvas">Loading…</span>;
-  return <img className="image-viewer__canvas" src={objectUrl} alt={alt} />;
-}
 
 
 export function DatasetPage({ accessToken }: { accessToken: string }) {
@@ -90,6 +44,29 @@ export function DatasetPage({ accessToken }: { accessToken: string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [error, setError] = useState('');
+  const [validationReport, setValidationReport] = useState<DatasetValidationReport | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+  const [csvPreview, setCsvPreview] = useState<CsvPreviewResponse | null>(null);
+  const [isPreviewingCsv, setIsPreviewingCsv] = useState(false);
+  const [csvPreparation, setCsvPreparation] = useState<CsvPreparationResponse | null>(null);
+  const [csvTargetColumn, setCsvTargetColumn] = useState('');
+  const [csvFeatureColumns, setCsvFeatureColumns] = useState<string[]>([]);
+  const [csvSplit, setCsvSplit] = useState({ train: 0.7, validation: 0.15, test: 0.15 });
+  const [isPreparingCsv, setIsPreparingCsv] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvSnapshot, setCsvSnapshot] = useState<CsvPreparationSnapshotResponse | null>(null);
+  const [isCreatingCsvSnapshot, setIsCreatingCsvSnapshot] = useState(false);
+  const [csvPolicy, setCsvPolicy] = useState({ numeric_missing: 'error', categorical_missing: 'error', scaling: 'none', categorical_encoding: 'none' });
+  const [csvProcessedPreview, setCsvProcessedPreview] = useState<CsvPreprocessingPreviewResponse | null>(null);
+  const [isPreviewingProcessedCsv, setIsPreviewingProcessedCsv] = useState(false);
+  const [csvArtifact, setCsvArtifact] = useState<CsvProcessedArtifactResponse | null>(null);
+  const [isCreatingCsvArtifact, setIsCreatingCsvArtifact] = useState(false);
+  const [csvArtifacts, setCsvArtifacts] = useState<CsvProcessedArtifactResponse[]>([]);
+  const [csvArtifactVerification, setCsvArtifactVerification] = useState<CsvProcessedArtifactVerificationResponse | null>(null);
+  const [isVerifyingCsvArtifact, setIsVerifyingCsvArtifact] = useState(false);
+  const [csvKnnK, setCsvKnnK] = useState(3);
+  const [csvKnnJobs, setCsvKnnJobs] = useState<CsvKnnTrainingJobResponse[]>([]);
+  const [isTrainingCsvKnn, setIsTrainingCsvKnn] = useState(false);
   const [viewerImage, setViewerImage] = useState<ImageInfo | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -159,6 +136,18 @@ export function DatasetPage({ accessToken }: { accessToken: string }) {
     setSelectedCategory(null);
     setImages([]);
     setViewerImage(null);
+    setValidationReport(null);
+    setCsvPreview(null);
+    setCsvPreparation(null);
+    setCsvSnapshot(null);
+    setCsvProcessedPreview(null);
+    setCsvArtifact(null);
+    setCsvArtifacts([]);
+    setCsvArtifactVerification(null);
+    setCsvKnnJobs([]);
+    setCsvArtifacts([]);
+    setCsvArtifactVerification(null);
+    setCsvFile(null);
     await loadDetail(name);
   }, [loadDetail]);
 
@@ -191,9 +180,138 @@ export function DatasetPage({ accessToken }: { accessToken: string }) {
     }
     try {
       await uploadImages(accessToken, selectedDataset, selectedCategory, Array.from(files));
+      setValidationReport(null);
       await refreshCurrent();
     } catch (ex) { setError(ease(ex)); }
   }, [accessToken, selectedDataset, selectedCategory, refreshCurrent]);
+
+  const handleValidateDataset = useCallback(async () => {
+    if (!selectedDataset) return;
+    setIsValidating(true);
+    setError('');
+    try {
+      setValidationReport(await validateDataset(accessToken, selectedDataset));
+    } catch (ex) {
+      setValidationReport(null);
+      setError(ease(ex));
+    } finally {
+      setIsValidating(false);
+    }
+  }, [accessToken, selectedDataset]);
+
+  const handleCsvPreview = useCallback(async (file: File | undefined) => {
+    if (!file || !selectedDataset) return;
+    setIsPreviewingCsv(true);
+    setError('');
+    try {
+      setCsvFile(file);
+      setCsvPreview(await previewCsv(accessToken, selectedDataset, file));
+      setCsvPreparation(null);
+      setCsvSnapshot(null);
+      setCsvProcessedPreview(null);
+      setCsvArtifact(null);
+      setCsvArtifacts([]);
+      setCsvArtifactVerification(null);
+      setCsvTargetColumn('');
+      setCsvFeatureColumns([]);
+    } catch (ex) {
+      setCsvPreview(null);
+      setError(ease(ex));
+    } finally {
+      setIsPreviewingCsv(false);
+    }
+  }, [accessToken, selectedDataset]);
+
+  const handlePrepareCsv = useCallback(async () => {
+    if (!csvFile || !selectedDataset || !csvTargetColumn || csvFeatureColumns.length === 0) return;
+    setIsPreparingCsv(true);
+    setError('');
+    try {
+      setCsvPreparation(await prepareCsv(accessToken, selectedDataset, csvFile, csvTargetColumn, csvFeatureColumns, csvSplit));
+    } catch (ex) {
+      setCsvPreparation(null);
+      setError(ease(ex));
+    } finally {
+      setIsPreparingCsv(false);
+    }
+  }, [accessToken, csvFile, csvFeatureColumns, csvSplit, csvTargetColumn, selectedDataset]);
+
+  const handleCreateCsvSnapshot = useCallback(async () => {
+    if (!csvFile || !selectedDataset || !csvTargetColumn || csvFeatureColumns.length === 0) return;
+    setIsCreatingCsvSnapshot(true);
+    setError('');
+    setCsvProcessedPreview(null);
+    setCsvArtifact(null);
+    try {
+      setCsvSnapshot(await createCsvPreparationSnapshot(accessToken, selectedDataset, csvFile, csvTargetColumn, csvFeatureColumns, csvSplit, csvPolicy));
+    } catch (ex) {
+      setCsvSnapshot(null);
+      setError(ease(ex));
+    } finally {
+      setIsCreatingCsvSnapshot(false);
+    }
+  }, [accessToken, csvFile, csvFeatureColumns, csvPolicy, csvSplit, csvTargetColumn, selectedDataset]);
+
+  const handlePreviewProcessedCsv = useCallback(async () => {
+    if (!selectedDataset || !csvSnapshot) return;
+    setIsPreviewingProcessedCsv(true);
+    setError('');
+    setCsvArtifactVerification(null);
+    try {
+      setCsvProcessedPreview(await previewCsvPreprocessing(accessToken, selectedDataset, csvSnapshot.preparationId));
+    } catch (ex) {
+      setCsvProcessedPreview(null);
+      setError(ease(ex));
+    } finally {
+      setIsPreviewingProcessedCsv(false);
+    }
+  }, [accessToken, csvSnapshot, selectedDataset]);
+
+  const handleCreateCsvArtifact = useCallback(async () => {
+    if (!selectedDataset || !csvSnapshot) return;
+    setIsCreatingCsvArtifact(true);
+    setError('');
+    setCsvArtifactVerification(null);
+    try {
+      setCsvArtifact(await createCsvProcessedArtifact(accessToken, selectedDataset, csvSnapshot.preparationId));
+      setCsvArtifacts(await readCsvProcessedArtifacts(accessToken, selectedDataset, csvSnapshot.preparationId));
+    } catch (ex) {
+      setCsvArtifact(null);
+      setError(ease(ex));
+    } finally {
+      setIsCreatingCsvArtifact(false);
+    }
+  }, [accessToken, csvSnapshot, selectedDataset]);
+
+  const handleVerifyCsvArtifact = useCallback(async (artifactId: string) => {
+    if (!selectedDataset || !csvSnapshot) return;
+    setIsVerifyingCsvArtifact(true);
+    setError('');
+    try {
+      setCsvArtifactVerification(await verifyCsvProcessedArtifact(accessToken, selectedDataset, csvSnapshot.preparationId, artifactId));
+    } catch (ex) {
+      setCsvArtifactVerification(null);
+      setError(ease(ex));
+    } finally {
+      setIsVerifyingCsvArtifact(false);
+    }
+  }, [accessToken, csvSnapshot, selectedDataset]);
+
+  const handleTrainCsvKnn = useCallback(async () => {
+    if (!selectedDataset || !csvSnapshot || !csvArtifact || !csvArtifactVerification?.isValid) return;
+    setIsTrainingCsvKnn(true);
+    setError('');
+    try {
+      const job = await createCsvKnnTrainingJob(accessToken, selectedDataset, csvSnapshot.preparationId, csvArtifact.artifactId, csvKnnK);
+      setCsvKnnJobs(await readCsvKnnTrainingJobs(accessToken, selectedDataset, csvSnapshot.preparationId, csvArtifact.artifactId));
+      setCsvArtifactVerification(await verifyCsvProcessedArtifact(accessToken, selectedDataset, csvSnapshot.preparationId, csvArtifact.artifactId));
+      if (!job) setError('KNN training returned no job result.');
+    } catch (ex) {
+      setError(ease(ex));
+    } finally {
+      setIsTrainingCsvKnn(false);
+    }
+  }, [accessToken, csvArtifact, csvArtifactVerification, csvKnnK, csvSnapshot, selectedDataset]);
 
   const handleDeleteImage = useCallback(async (filename: string) => {
     if (!selectedDataset || !selectedCategory) return;
@@ -339,72 +457,22 @@ export function DatasetPage({ accessToken }: { accessToken: string }) {
 
   return (
     <div className="dataset-page">
-      <aside className="dataset-browser">
-        <div className="panel-heading"><span>Datasets</span></div>
-        <button type="button" className="studio-primary-button dataset-browser__new" onClick={handleCreateDataset}>
-          + New dataset
-        </button>
-        {isLoading ? (
-          <p className="dataset-browser__empty">Loading…</p>
-        ) : datasets.length === 0 ? (
-          <p className="dataset-browser__empty">No datasets yet.</p>
-        ) : (
-          <ul className="dataset-browser__list">
-            {datasets.map((dataset) => {
-              const isActive = dataset.name === selectedDataset;
-              const detail = isActive ? datasetDetail : null;
-              return (
-                <li key={dataset.name} className="dataset-browser__dataset">
-                  <button
-                    type="button"
-                    className={`dataset-browser__row ${isActive ? 'dataset-browser__row--active' : ''}`}
-                    onClick={() => void selectDataset(dataset.name)}
-                  >
-                    <span className="dataset-browser__label">{dataset.name}</span>
-                    <span className="dataset-browser__meta">{dataset.totalImages} img</span>
-                  </button>
-                  {isActive && (
-                    <div className="dataset-browser__actions">
-                      <button type="button" onClick={handleRenameDataset}>Rename</button>
-                      <button type="button" onClick={handleDeleteDataset}>Delete</button>
-                      <button type="button" onClick={handleExport}>Export</button>
-                    </div>
-                  )}
-                  {isActive && (
-                    <ul className="dataset-browser__categories">
-                      {(detail?.categories ?? []).map((category) => {
-                        const catActive = category.name === selectedCategory;
-                        return (
-                          <li key={category.name}>
-                            <button
-                              type="button"
-                              className={`dataset-browser__category ${catActive ? 'dataset-browser__category--active' : ''}`}
-                              onClick={() => void selectCategory(dataset.name, category.name)}
-                            >
-                              {category.name} ({category.imageCount})
-                            </button>
-                            {catActive && (
-                              <div className="dataset-browser__actions">
-                                <button type="button" onClick={() => void handleRenameCategoryAt(category.name)}>Rename</button>
-                                <button type="button" onClick={() => void handleDeleteCategory(category.name)}>Delete</button>
-                              </div>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                  {isActive && (
-                    <button type="button" className="dataset-browser__add-category" onClick={handleCreateCategory}>
-                      + Category
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </aside>
+      <DatasetBrowser
+        datasets={datasets}
+        datasetDetail={datasetDetail}
+        selectedDataset={selectedDataset}
+        selectedCategory={selectedCategory}
+        isLoading={isLoading}
+        onCreateDataset={handleCreateDataset}
+        onSelectDataset={(name) => void selectDataset(name)}
+        onSelectCategory={(datasetName, categoryName) => void selectCategory(datasetName, categoryName)}
+        onRenameDataset={handleRenameDataset}
+        onDeleteDataset={handleDeleteDataset}
+        onExport={handleExport}
+        onCreateCategory={handleCreateCategory}
+        onRenameCategory={(categoryName) => void handleRenameCategoryAt(categoryName)}
+        onDeleteCategory={(categoryName) => void handleDeleteCategory(categoryName)}
+      />
 
       <section className="dataset-content">
         <div className="dataset-toolbar">
@@ -431,41 +499,146 @@ export function DatasetPage({ accessToken }: { accessToken: string }) {
             <button type="button" disabled={!selectedDataset || !selectedCategory} onClick={handleImport}>
               Import captures
             </button>
+            <button type="button" disabled={!selectedDataset || isValidating} onClick={() => void handleValidateDataset()}>
+              {isValidating ? 'Validating…' : 'Validate dataset'}
+            </button>
+            <label className="dataset-toolbar__file-button">
+              {isPreviewingCsv ? 'Reading CSV…' : 'Preview CSV'}
+              <input type="file" accept=".csv,text/csv" hidden disabled={!selectedDataset || isPreviewingCsv} onChange={(event) => void handleCsvPreview(event.target.files?.[0])} />
+            </label>
           </div>
         </div>
 
         {error && <div className="dataset-page__error">{error}</div>}
-
-        <div className="image-grid">
-          {isDetailLoading && images.length === 0 && <p className="image-grid__empty">Loading images…</p>}
-          {!isDetailLoading && !selectedCategory && (
-            <p className="image-grid__empty">Select a category to view its images.</p>
-          )}
-          {!isDetailLoading && selectedCategory && images.length === 0 && (
-            <p className="image-grid__empty">No images in this category. Upload or import some.</p>
-          )}
-          {images.map((image) => (
-            <div className="image-grid__item" key={image.filename}>
-              <button
-                type="button"
-                className="image-grid__thumb-button"
-                onClick={() => setViewerImage(image)}
-                aria-label={`View ${image.filename}`}
-              >
-                <AuthorizedThumb
-                  accessToken={accessToken}
-                  url={getImageUrl(selectedDataset!, selectedCategory!, image.filename)}
-                  filename={image.filename}
-                />
-              </button>
-              <span className="image-grid__label" title={image.filename}>{image.filename}</span>
-              <div className="image-grid__actions">
-                <button type="button" onClick={() => void handleRenameImage(image.filename)}>Rename</button>
-                <button type="button" onClick={() => void handleDeleteImage(image.filename)}>Delete</button>
-              </div>
+        {validationReport && (
+          <section className={`dataset-validation ${validationReport.isValid ? 'dataset-validation--valid' : 'dataset-validation--invalid'}`} aria-live="polite">
+            <div>
+              <strong>{validationReport.isValid ? 'Dataset ready' : 'Dataset needs review'}</strong>
+              <span>{validationReport.validFileCount}/{validationReport.fileCount} valid files · {validationReport.duplicateFileCount} duplicates</span>
             </div>
-          ))}
-        </div>
+            {validationReport.issues.length > 0 && (
+              <details>
+                <summary>Review {validationReport.issues.length} issue{validationReport.issues.length === 1 ? '' : 's'}</summary>
+                <ul>
+                  {validationReport.issues.map((issue) => <li key={`${issue.categoryName}-${issue.filename}-${issue.code}`}><code>{issue.code}</code> {issue.categoryName}/{issue.filename}: {issue.message}</li>)}
+                </ul>
+              </details>
+            )}
+          </section>
+        )}
+        {csvPreview && (
+          <section className="dataset-csv-preview" aria-live="polite">
+            <div className="dataset-csv-preview__heading">
+              <strong>{csvPreview.filename}</strong>
+              <span>{csvPreview.rowCount} rows · {csvPreview.columns.length} columns · delimiter {csvPreview.delimiter === '\\t' ? 'tab' : csvPreview.delimiter}</span>
+            </div>
+            <div className="dataset-csv-preview__columns">
+              {csvPreview.columns.map((column) => (
+                <label key={column.name} className="dataset-csv-preview__columns-item">
+                  <input
+                    type="checkbox"
+                    checked={csvFeatureColumns.includes(column.name)}
+                    disabled={csvTargetColumn === column.name}
+                    onChange={(event) => { setCsvFeatureColumns((current) => event.target.checked ? [...current, column.name] : current.filter((value) => value !== column.name)); setCsvPreparation(null); setCsvSnapshot(null); }}
+                  />
+                  <strong>{column.name}</strong>
+                  <small>{column.dataType} · {column.missingCount} missing</small>
+                </label>
+              ))}
+            </div>
+            <div className="dataset-csv-preview__prepare">
+              <label>Target column
+                <select value={csvTargetColumn} onChange={(event) => { setCsvTargetColumn(event.target.value); setCsvFeatureColumns((current) => current.filter((value) => value !== event.target.value)); setCsvPreparation(null); setCsvSnapshot(null); }}>
+                  <option value="">Select target</option>
+                  {csvPreview.columns.map((column) => <option key={column.name} value={column.name}>{column.name}</option>)}
+                </select>
+              </label>
+              <label>Train <input type="number" min="0.01" max="0.98" step="0.01" value={csvSplit.train} onChange={(event) => { setCsvSplit((current) => ({ ...current, train: Number(event.target.value) })); setCsvPreparation(null); setCsvSnapshot(null); }} /></label>
+              <label>Validation <input type="number" min="0.01" max="0.98" step="0.01" value={csvSplit.validation} onChange={(event) => { setCsvSplit((current) => ({ ...current, validation: Number(event.target.value) })); setCsvPreparation(null); setCsvSnapshot(null); }} /></label>
+              <label>Test <input type="number" min="0.01" max="0.98" step="0.01" value={csvSplit.test} onChange={(event) => { setCsvSplit((current) => ({ ...current, test: Number(event.target.value) })); setCsvPreparation(null); setCsvSnapshot(null); }} /></label>
+              <label>Numeric missing
+                <select value={csvPolicy.numeric_missing} onChange={(event) => { setCsvPolicy((current) => ({ ...current, numeric_missing: event.target.value })); setCsvPreparation(null); setCsvSnapshot(null); }}><option value="error">Reject</option><option value="mean">Mean</option><option value="median">Median</option></select>
+              </label>
+              <label>Categorical missing
+                <select value={csvPolicy.categorical_missing} onChange={(event) => { setCsvPolicy((current) => ({ ...current, categorical_missing: event.target.value })); setCsvPreparation(null); setCsvSnapshot(null); }}><option value="error">Reject</option><option value="most-frequent">Most frequent</option><option value="constant">Constant</option></select>
+              </label>
+              <label>Scaling
+                <select value={csvPolicy.scaling} onChange={(event) => { setCsvPolicy((current) => ({ ...current, scaling: event.target.value })); setCsvPreparation(null); setCsvSnapshot(null); }}><option value="none">None</option><option value="standard">Standard</option></select>
+              </label>
+              <label>Categories
+                <select value={csvPolicy.categorical_encoding} onChange={(event) => { setCsvPolicy((current) => ({ ...current, categorical_encoding: event.target.value })); setCsvPreparation(null); setCsvSnapshot(null); }}><option value="none">None</option><option value="one-hot">One-hot</option></select>
+              </label>
+              <button type="button" disabled={!csvTargetColumn || csvFeatureColumns.length === 0 || isPreparingCsv} onClick={() => void handlePrepareCsv()}>{isPreparingCsv ? 'Preparing…' : 'Prepare split'}</button>
+              <button type="button" disabled={!csvPreparation || isCreatingCsvSnapshot} onClick={() => void handleCreateCsvSnapshot()}>{isCreatingCsvSnapshot ? 'Saving…' : 'Save immutable snapshot'}</button>
+            </div>
+            {csvPreview.warnings.length > 0 && <p>{csvPreview.warnings.join(' ')}</p>}
+          </section>
+        )}
+        {csvPreparation && (
+          <section className="dataset-csv-preparation" aria-live="polite">
+            <strong>Preparation ready</strong>
+            <span>{csvPreparation.trainRows} train · {csvPreparation.validationRows} validation · {csvPreparation.testRows} test rows</span>
+            <span>Target: {csvPreparation.targetColumn} · Features: {csvPreparation.featureColumns.join(', ')}</span>
+            {csvPreparation.warnings.length > 0 && <p>{csvPreparation.warnings.join(' ')}</p>}
+          </section>
+        )}
+        {csvSnapshot && (
+          <section className="dataset-csv-snapshot" aria-live="polite">
+            <strong>Immutable snapshot saved</strong>
+            <span>{csvSnapshot.preparationId}</span>
+            <small>Source SHA-256: {csvSnapshot.sourceSha256}</small>
+            <button type="button" disabled={isPreviewingProcessedCsv} onClick={() => void handlePreviewProcessedCsv()}>{isPreviewingProcessedCsv ? 'Processing…' : 'Preview processed data'}</button>
+            <button type="button" disabled={!csvProcessedPreview || isCreatingCsvArtifact} onClick={() => void handleCreateCsvArtifact()}>{isCreatingCsvArtifact ? 'Materializing…' : 'Save processed artifact'}</button>
+          </section>
+        )}
+        {csvSnapshot && csvProcessedPreview && (
+          <section className="dataset-csv-processed" aria-live="polite">
+            <strong>Processed preview</strong>
+            <span>{csvProcessedPreview.trainRows} train · {csvProcessedPreview.validationRows} validation · {csvProcessedPreview.testRows} test</span>
+            <span>Columns: {csvProcessedPreview.processedColumns.join(', ')}</span>
+            {csvProcessedPreview.warnings.map((warning) => <small key={warning}>{warning}</small>)}
+          </section>
+        )}
+        {csvArtifact && (
+          <section className="dataset-csv-artifact" aria-live="polite">
+            <strong>Processed artifact saved</strong>
+            <span>{csvArtifact.artifactId}</span>
+            <small>Manifest SHA-256: {csvArtifact.manifestSha256}</small>
+            <button type="button" disabled={isVerifyingCsvArtifact} onClick={() => void handleVerifyCsvArtifact(csvArtifact.artifactId)}>{isVerifyingCsvArtifact ? 'Verifying…' : 'Verify checksums'}</button>
+            <label>K <input type="number" min="1" max="25" value={csvKnnK} onChange={(event) => setCsvKnnK(Number(event.target.value))} /></label>
+            <button type="button" disabled={!csvArtifactVerification?.isValid || isTrainingCsvKnn} onClick={() => void handleTrainCsvKnn()}>{isTrainingCsvKnn ? 'Training…' : 'Train KNN'}</button>
+          </section>
+        )}
+        {csvArtifacts.length > 0 && (
+          <section className="dataset-csv-artifact-list" aria-live="polite">
+            <strong>Saved artifacts ({csvArtifacts.length})</strong>
+            {csvArtifacts.map((artifact) => <button key={artifact.artifactId} type="button" disabled={isVerifyingCsvArtifact} onClick={() => void handleVerifyCsvArtifact(artifact.artifactId)}>{artifact.artifactId}</button>)}
+          </section>
+        )}
+        {csvArtifactVerification && (
+          <section className={`dataset-csv-verification ${csvArtifactVerification.isValid ? 'dataset-csv-verification--valid' : 'dataset-csv-verification--invalid'}`} aria-live="polite">
+            <strong>{csvArtifactVerification.isValid ? 'Artifact checksums verified' : 'Artifact integrity check failed'}</strong>
+            {csvArtifactVerification.issues.map((issue) => <small key={issue}>{issue}</small>)}
+          </section>
+        )}
+        {csvKnnJobs.length > 0 && (
+          <section className="dataset-csv-jobs" aria-live="polite">
+            <strong>KNN jobs ({csvKnnJobs.length})</strong>
+            {csvKnnJobs.map((job) => <span key={job.jobId}>{job.jobId} · k={job.k} · validation {job.validationAccuracy ?? 'n/a'} · test {job.testAccuracy ?? 'n/a'}</span>)}
+          </section>
+        )}
+
+        <DatasetImageGrid
+          accessToken={accessToken}
+          datasetName={selectedDataset}
+          categoryName={selectedCategory}
+          getImageUrl={getImageUrl}
+          images={images}
+          isLoading={isDetailLoading}
+          onSelectImage={setViewerImage}
+          onRenameImage={(filename) => void handleRenameImage(filename)}
+          onDeleteImage={(filename) => void handleDeleteImage(filename)}
+        />
 
         <footer className="dataset-status">
           <span>
@@ -475,30 +648,18 @@ export function DatasetPage({ accessToken }: { accessToken: string }) {
       </section>
 
       {viewerImage && selectedDataset && selectedCategory && (
-        <div className="image-viewer-overlay" role="dialog" aria-modal="true" aria-label="Image viewer">
-          <div className="image-viewer">
-            <div className="image-viewer__header">
-              <span className="image-viewer__name">{viewerImage.filename}</span>
-              <span className="image-viewer__meta">
-                {viewerImage.widthPx && viewerImage.heightPx
-                  ? `${viewerImage.widthPx} × ${viewerImage.heightPx}`
-                  : ''} · {formatBytes(viewerImage.sizeBytes)}
-              </span>
-              <button type="button" className="image-viewer__close" onClick={() => setViewerImage(null)}>✕</button>
-            </div>
-            <AuthorizedViewerImage
-              accessToken={accessToken}
-              url={currentThumbUrl}
-              alt={viewerImage.filename}
-            />
-            <div className="image-viewer__footer">
-              <button type="button" onClick={showPrev} disabled={images.length <= 1}>← Prev</button>
-              <span>{viewerIndex + 1} / {images.length}</span>
-              <button type="button" onClick={showNext} disabled={images.length <= 1}>Next →</button>
-              <button type="button" onClick={() => void handleDeleteImage(viewerImage.filename)}>Delete</button>
-            </div>
-          </div>
-        </div>
+        <DatasetImageViewer
+          accessToken={accessToken}
+          image={viewerImage}
+          imageIndex={viewerIndex}
+          imageCount={images.length}
+          imageUrl={currentThumbUrl}
+          formatBytes={formatBytes}
+          onClose={() => setViewerImage(null)}
+          onPrevious={showPrev}
+          onNext={showNext}
+          onDelete={() => void handleDeleteImage(viewerImage.filename)}
+        />
       )}
 
       {dialog && (() => {

@@ -31,6 +31,24 @@ def _parameter_is_valid(kind: ParameterKind, value: object) -> bool:
         return is_json_parameter_value(value)
     if kind is ParameterKind.REFERENCE:
         return is_json_parameter_value(value)
+    if kind is ParameterKind.MODEL_REFERENCE:
+        if not isinstance(value, dict):
+            return False
+        if set(value) == {'modelName', 'alias'}:
+            return (
+                isinstance(value['modelName'], str) and bool(value['modelName'].strip())
+                and isinstance(value['alias'], str) and value['alias'] in {'candidate', 'champion'}
+            )
+        if set(value) == {'modelName', 'modelVersion', 'artifactSha256'}:
+            return (
+                isinstance(value['modelName'], str) and bool(value['modelName'].strip())
+                and isinstance(value['modelVersion'], int) and not isinstance(value['modelVersion'], bool)
+                and value['modelVersion'] >= 1
+                and isinstance(value['artifactSha256'], str)
+                and len(value['artifactSha256']) == 64
+                and all(character in '0123456789abcdef' for character in value['artifactSha256'])
+            )
+        return False
     return isinstance(value, str)
 
 

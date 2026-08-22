@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
-import { searchResearchRuns } from '../services/research-service';
-import type { ResearchRun } from '../types/research';
+import { readRegisteredModels, searchResearchRuns } from '../services/research-service';
+import type { RegisteredModel, ResearchRun } from '../types/research';
 
 interface ResearchPageProps {
   accessToken: string;
   initialRuns?: ResearchRun[];
+  initialModels?: RegisteredModel[];
 }
 
-export function ResearchPage({ accessToken, initialRuns = [] }: ResearchPageProps) {
+export function ResearchPage({ accessToken, initialRuns = [], initialModels = [] }: ResearchPageProps) {
   const [runs, setRuns] = useState(initialRuns);
+  const [models, setModels] = useState(initialModels);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -19,6 +21,13 @@ export function ResearchPage({ accessToken, initialRuns = [] }: ResearchPageProp
       setError(loadError instanceof Error ? loadError.message : 'Research runs could not be loaded.');
     });
   }, [accessToken, initialRuns.length]);
+
+  useEffect(() => {
+    if (initialModels.length > 0) return;
+    readRegisteredModels(accessToken).then(setModels).catch((loadError: unknown) => {
+      setError(loadError instanceof Error ? loadError.message : 'Registered models could not be loaded.');
+    });
+  }, [accessToken, initialModels.length]);
 
   const search = async () => {
     setError('');
@@ -47,6 +56,24 @@ export function ResearchPage({ accessToken, initialRuns = [] }: ResearchPageProp
         </article>
       ))}</div>
       {runs.length === 0 && !error && <div className="workflow-empty"><strong>No research runs</strong><p>Create a node-context run from a trainable inspector.</p></div>}
+      <section className="research-models" aria-label="Registered models">
+        <header><span className="overline">Registry</span><h2>Model versions</h2><p>Only validated aliases with verified artifacts can be bound to a workflow node.</p></header>
+        {models.map((model) => (
+          <article className="research-run" key={model.name}>
+            <header><strong>{model.name}</strong><span>{Object.entries(model.aliases).map(([alias, version]) => `${alias} → v${version}`).join(' · ') || 'No promoted alias'}</span></header>
+            <p>{model.description || 'No model description.'}</p>
+            {model.versions.map((version) => (
+              <details key={version.version}>
+                <summary>v{version.version} · {version.artifactVerified ? 'artifact verified' : 'artifact unavailable'} · run {version.runId}</summary>
+                <p><code>{version.artifactSha256}</code></p>
+                <pre>{JSON.stringify({ metrics: version.validationEvidence, compatibility: version.compatibility }, null, 2)}</pre>
+                {version.deepLearningContract && <div><strong>External deep-learning artifact</strong><p>{version.deepLearningContract.format} · {version.deepLearningContract.runtime} {version.deepLearningContract.runtimeVersion}</p><p>{version.deepLearningContract.inputSchema.length} input tensor(s) → {version.deepLearningContract.outputSchema.length} output tensor(s)</p></div>}
+              </details>
+            ))}
+          </article>
+        ))}
+        {models.length === 0 && <div className="workflow-empty"><strong>No registered models</strong><p>Create a version from a completed research run and promote a validated candidate.</p></div>}
+      </section>
     </section>
   );
 }

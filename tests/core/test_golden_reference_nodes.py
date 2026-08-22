@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from core.nodes import ArtifactBinding, NodeExecutionContext, get_node_runtime
+from core.nodes.errors import NodeExecutionCancelled
 
 
 def _npy_bytes(value: np.ndarray) -> bytes:
@@ -185,3 +186,20 @@ def test_golden_manifests_declare_typed_artifact_contracts() -> None:
     assert manifests['per-pixel-mahalanobis-distance'].artifact_contracts['inputs'] == (
         'distribution-statistics:application/x-numpy-archive',
     )
+
+
+def test_ssim_rejects_oversized_image_before_processing() -> None:
+    image = np.zeros((4000, 8001), dtype=np.uint8)
+    with pytest.raises(ValueError, match='32,000,000-pixel'):
+        _invoke('ssim', {'image': image}, {'windowSize': 11}, _context('golden-image', _npy_bytes(image), 'application/x-numpy'))
+
+
+def test_ssim_honours_cancellation_checkpoint() -> None:
+    image = np.zeros((16, 16), dtype=np.uint8)
+    context = NodeExecutionContext(
+        artifacts=_context('golden-image', _npy_bytes(image), 'application/x-numpy').artifacts,
+        resolve_artifact=lambda _: _npy_bytes(image),
+        is_cancelled=lambda: True,
+    )
+    with pytest.raises(NodeExecutionCancelled):
+        _invoke('ssim', {'image': image}, {'windowSize': 11}, context)

@@ -1,0 +1,19 @@
+# Inventory benchmark node
+
+## Contract benchmark deterministic
+
+Mỗi fixture benchmark phải ghi node ID, package version, image shape, dtype, checksum input, metric thời gian chạy và resource limit. Benchmark chỉ là acceptance evidence khi được chạy trong môi trường deployment mục tiêu.
+
+## Inventory hiện tại
+
+| Family | Số package | Trạng thái runtime | Evidence |
+|---|---:|---|---|
+| Golden/reference | 10 | DEBUG | test deterministic, cancellation, oversized-input tập trung |
+| OpenCV tools | 52 | DEBUG ngoại trừ camera-undistortion | test Watershed/runtime tập trung |
+| Visualization | 5 | DEBUG | inventory contract/documentation |
+| Pipeline/evidence | 9 | DEBUG/TEST | test manifest và registry contract |
+| Family thuật toán khác | 26 | TEST/DEBUG | chưa có RELEASE acceptance evidence |
+
+## Quyết định
+
+Phase 9 vẫn chưa hoàn tất. Repository đã có manifest cấp package và image contract dùng chung, nhưng chưa phải mọi family ưu tiên đều có benchmark độc lập được ghi nhận trong môi trường mục tiêu và RELEASE acceptance evidence.

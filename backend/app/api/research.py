@@ -12,7 +12,8 @@ from app.models.research import (
     ResearchArtifact, ResearchExperiment, ResearchRun,
 )
 from app.schemas.base import ApiSchema
-from app.services.research_service import ArtifactStore, ResearchRunRecord, build_reproducibility_manifest
+from app.services.research_service import ArtifactIntegrityError, ArtifactRecord, ArtifactStore, ResearchRunRecord, build_reproducibility_manifest
+from app.services.deep_learning_contract import validate_external_artifact_contract
 
 router = APIRouter(tags=['research'])
 ARTIFACT_STORE = ArtifactStore(PROJECT_ROOT / 'data/artifacts')
@@ -50,6 +51,7 @@ class ModelVersionCreate(ApiSchema):
     run_id: str
     artifact_id: int
     validation_evidence: dict[str, JsonValue]
+    artifact_contract: dict[str, JsonValue] | None = None
 
 
 class PromotionRequest(ApiSchema):
@@ -163,21 +165,88 @@ def _model(session: DatabaseSession, name: str) -> ModelRegistryEntry:
     return model
 
 
+def _artifact_record(artifact: ResearchArtifact) -> ArtifactRecord:
+    return ArtifactRecord(artifact.sha256, artifact.media_type, artifact.byte_length, artifact.storage_uri)
+
+
+def _artifact_is_verified(artifact: ResearchArtifact) -> bool:
+    try:
+        ARTIFACT_STORE.read_verified(_artifact_record(artifact))
+    except (ArtifactIntegrityError, FileNotFoundError, OSError):
+        return False
+    return True
+
+
+def _require_verified_artifact(artifact: ResearchArtifact) -> None:
+    if not _artifact_is_verified(artifact):
+        raise HTTPException(422, 'Model artifact is missing or fails integrity verification.')
+
+
+def _compatibility(evidence: dict[str, Any]) -> dict[str, str]:
+    raw = evidence.get('compatibility', {})
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        key: value for key, value in raw.items()
+        if key in {'task', 'inputSchema', 'outputSchema', 'framework', 'status'} and isinstance(value, str) and value
+    }
+
+
+def _model_payload(model: ModelRegistryEntry, session: DatabaseSession) -> dict[str, Any]:
+    versions = list(session.scalars(select(ModelVersion).where(ModelVersion.model_id == model.id).order_by(ModelVersion.version.desc())))
+    aliases = {
+        assignment.alias: version.version
+        for assignment in session.scalars(select(ModelAlias).where(ModelAlias.model_id == model.id))
+        if (version := session.get(ModelVersion, assignment.model_version_id)) is not None
+    }
+    return {
+        'name': model.name,
+        'description': model.description,
+        'aliases': aliases,
+        'versions': [{
+            'version': version.version,
+            'runId': version.run_id,
+            'artifactSha256': artifact.sha256,
+            'artifactVerified': _artifact_is_verified(artifact),
+            'validationEvidence': version.validation_evidence,
+            'compatibility': _compatibility(version.validation_evidence),
+            'deepLearningContract': version.validation_evidence.get('deepLearningContract'),
+        } for version in versions if (artifact := session.get(ResearchArtifact, version.artifact_id)) is not None],
+    }
+
+
+@router.get('/api/models')
+def list_models(_: CurrentUser, session: DatabaseSession) -> list[dict[str, Any]]:
+    return [_model_payload(model, session) for model in session.scalars(select(ModelRegistryEntry).order_by(ModelRegistryEntry.name))]
+
+
+@router.get('/api/models/{model_name}')
+def get_model(model_name: str, _: CurrentUser, session: DatabaseSession) -> dict[str, Any]:
+    return _model_payload(_model(session, model_name), session)
+
+
 @router.post('/api/models/{model_name}/versions', status_code=status.HTTP_201_CREATED)
 def create_model_version(model_name: str, request: ModelVersionCreate, user: CurrentUser, session: DatabaseSession) -> dict[str, Any]:
     model = _model(session, model_name)
     artifact = session.get(ResearchArtifact, request.artifact_id)
     if artifact is None or artifact.run_id != request.run_id:
         raise HTTPException(422, 'Model artifact lineage does not match research run.')
+    _require_verified_artifact(artifact)
+    validation_evidence = dict(request.validation_evidence)
+    if request.artifact_contract is not None:
+        try:
+            validation_evidence['deepLearningContract'] = validate_external_artifact_contract(request.artifact_contract)
+        except ValueError as error:
+            raise HTTPException(422, f'Deep-learning artifact contract is invalid: {error}') from error
     version_number = (session.scalar(select(func.max(ModelVersion.version)).where(ModelVersion.model_id == model.id)) or 0) + 1
     version = ModelVersion(
         model_id=model.id, version=version_number, run_id=request.run_id,
-        artifact_id=artifact.id, validation_evidence=request.validation_evidence, created_by=user.id,
+        artifact_id=artifact.id, validation_evidence=validation_evidence, created_by=user.id,
     )
     session.add(version)
     session.commit()
     session.refresh(version)
-    return {'id': version.id, 'modelName': model.name, 'version': version.version, 'runId': version.run_id, 'artifactId': version.artifact_id, 'artifactSha256': artifact.sha256, 'validationEvidence': version.validation_evidence}
+    return {'id': version.id, 'modelName': model.name, 'version': version.version, 'runId': version.run_id, 'artifactId': version.artifact_id, 'artifactSha256': artifact.sha256, 'validationEvidence': version.validation_evidence, 'deepLearningContract': version.validation_evidence.get('deepLearningContract')}
 
 
 def _event_payload(event: ModelPromotionEvent, session: DatabaseSession) -> dict[str, Any]:
@@ -196,6 +265,10 @@ def promote_model(model_name: str, alias: str, request: PromotionRequest, user: 
         raise HTTPException(404, 'Model version does not exist.')
     if version.validation_evidence.get('passed') is not True:
         raise HTTPException(422, 'Model promotion requires passing validation evidence.')
+    artifact = session.get(ResearchArtifact, version.artifact_id)
+    if artifact is None:
+        raise HTTPException(422, 'Model version artifact is missing.')
+    _require_verified_artifact(artifact)
     assignment = session.scalar(select(ModelAlias).where(ModelAlias.model_id == model.id, ModelAlias.alias == alias).with_for_update())
     previous_id = assignment.model_version_id if assignment else None
     if assignment is None:
@@ -240,7 +313,12 @@ def _resolve_database_bindings(value: Any, session: DatabaseSession) -> Any:
             if assignment is None:
                 raise HTTPException(422, 'Production model alias is not assigned.')
             version = session.get(ModelVersion, assignment.model_version_id)
+            if version is None:
+                raise HTTPException(422, 'Production model alias resolves to a missing version.')
             artifact = session.get(ResearchArtifact, version.artifact_id)
+            if artifact is None:
+                raise HTTPException(422, 'Production model artifact is missing.')
+            _require_verified_artifact(artifact)
             return {'modelName': model.name, 'modelVersion': version.version, 'artifactSha256': artifact.sha256}
         return {key: _resolve_database_bindings(item, session) for key, item in value.items()}
     return value

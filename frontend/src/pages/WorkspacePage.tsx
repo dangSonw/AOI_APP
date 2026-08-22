@@ -30,13 +30,14 @@ import { DatabasePage } from './DatabasePage';
 import { DatasetPage } from './DatasetPage';
 import { HardwarePage } from './HardwarePage';
 import { ResearchPage } from './ResearchPage';
+import { ModelsPage } from './ModelsPage';
 import { SettingsPage } from './SettingsPage';
 import { WorkflowEditorPage } from './WorkflowEditorPage';
 
 
 const ACTIVE_RECIPE_SLUG = 'rev-c-mainboard';
 const DEFAULT_WORKSTATION_ID = 'station-01';
-const WORKSPACE_SHORTCUT_VIEWS: WorkspaceView[] = ['dashboard', 'database', 'research', 'hardware', 'settings'];
+const WORKSPACE_SHORTCUT_VIEWS: WorkspaceView[] = ['dashboard', 'database', 'research', 'models', 'hardware', 'settings'];
 
 interface WorkspacePageProps {
   session: AuthSession;
@@ -204,6 +205,7 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
       dataset: 'Dataset manager',
       'workflow-editor': 'Workflow editor',
       research: 'Research workspace',
+      models: 'Models workspace',
     };
     document.title = `${viewTitles[activeView]} | AOI Studio`;
   }, [activeView]);
@@ -324,6 +326,7 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
       {activeView === 'database' && <DatabasePage accessToken={session.accessToken} />}
       {activeView === 'dataset' && <DatasetPage accessToken={session.accessToken} />}
       {activeView === 'research' && <ResearchPage accessToken={session.accessToken} />}
+      {activeView === 'models' && <ModelsPage accessToken={session.accessToken} />}
       {activeView === 'workflow-editor' && (
         <WorkflowEditorPage
           accessToken={session.accessToken}

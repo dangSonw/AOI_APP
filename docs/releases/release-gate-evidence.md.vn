@@ -1,0 +1,24 @@
+# Bằng chứng cổng RELEASE
+
+## Phạm vi
+
+Vertical slice nhỏ nhất hiện có là workflow deterministic:
+
+```text
+image input -> OpenCV preprocessing -> golden/reference hoặc segmentation -> image output
+```
+
+Ứng viên chưa sẵn sàng cho RELEASE vì manifest hiện dùng `DEBUG` và catalog runtime chưa có node `RELEASE`.
+
+## Inventory
+
+- Số node manifest: 102.
+- Node DEBUG: 82.
+- Node TEST: 20.
+- Node RELEASE: 0.
+- Bằng chứng deterministic hiện có: test tập trung cho SSIM và Watershed.
+- Bằng chứng production trên dữ liệu thực: chưa có trong workspace này.
+
+## Quyết định
+
+Việc promote lên `RELEASE` bị block. Validator phải tiếp tục từ chối node DEBUG/TEST và evidence chưa đầy đủ. Không đưa ra tuyên bố production chỉ dựa trên unit test.

@@ -89,6 +89,138 @@ def test_model_registration_promotion_and_rollback_are_persisted(authenticated_c
     }
 
 
+def test_model_lifecycle_rejects_invalid_actions_and_missing_versions(authenticated_client) -> None:
+    client, headers = authenticated_client
+    suffix = uuid4().hex
+    experiment_id = f'experiment-{suffix}'
+    run_id = f'run-{suffix}'
+    model_name = f'pcb-lifecycle-{suffix}'
+    client.post('/api/research/experiments', headers=headers, json={'id': experiment_id, 'name': model_name, 'description': ''})
+    client.post('/api/research/runs', headers=headers, json={
+        'id': run_id, 'experimentId': experiment_id, 'status': 'completed', 'executionTarget': 'local-cpu',
+        'codeRevision': '9ae70df', 'nodeVersions': {}, 'environment': {}, 'randomSeeds': {},
+        'resources': {}, 'datasetVersions': {}, 'parameters': {}, 'metrics': {}, 'outputArtifacts': {}, 'error': None,
+    })
+    artifact = client.post(f'/api/research/runs/{run_id}/artifacts', headers=headers, files={
+        'file': ('weights.bin', b'lifecycle-model', 'application/octet-stream'),
+    }).json()
+    client.post('/api/models', headers=headers, json={'name': model_name, 'description': ''})
+    client.post(f'/api/models/{model_name}/versions', headers=headers, json={
+        'runId': run_id, 'artifactId': artifact['id'], 'validationEvidence': {'passed': False},
+    })
+
+    rejected_validation = client.post(
+        f'/api/models/{model_name}/aliases/champion/promotions', headers=headers,
+        json={'version': 1, 'reason': 'Not validated'},
+    )
+    missing_version = client.post(
+        f'/api/models/{model_name}/aliases/champion/promotions', headers=headers,
+        json={'version': 99, 'reason': 'Missing version'},
+    )
+    blank_reason = client.post(
+        f'/api/models/{model_name}/aliases/champion/promotions', headers=headers,
+        json={'version': 1, 'reason': ''},
+    )
+    unsupported_alias = client.post(
+        f'/api/models/{model_name}/aliases/unsupported/promotions', headers=headers,
+        json={'version': 1, 'reason': 'Unsupported alias'},
+    )
+    rollback_without_history = client.post(
+        f'/api/models/{model_name}/aliases/champion/rollback', headers=headers,
+        json={'reason': 'No history'},
+    )
+
+    assert rejected_validation.status_code == 422
+    assert missing_version.status_code == 404
+    assert blank_reason.status_code == 422
+    assert unsupported_alias.status_code == 422
+    assert rollback_without_history.status_code == 409
+
+
+def test_model_listing_exposes_lineage_compatibility_and_rejects_corrupt_alias_artifacts(authenticated_client) -> None:
+    from pathlib import Path
+
+    client, headers = authenticated_client
+    suffix = uuid4().hex
+    experiment_id = f'experiment-{suffix}'
+    run_id = f'run-{suffix}'
+    model_name = f'pcb-classifier-{suffix}'
+    client.post('/api/research/experiments', headers=headers, json={'id': experiment_id, 'name': model_name, 'description': ''})
+    client.post('/api/research/runs', headers=headers, json={
+        'id': run_id, 'experimentId': experiment_id, 'status': 'completed', 'executionTarget': 'local-cpu',
+        'codeRevision': '9ae70df', 'nodeVersions': {}, 'environment': {}, 'randomSeeds': {'python': 42},
+        'resources': {}, 'datasetVersions': {'boards': 'sha256:' + 'a' * 64}, 'parameters': {},
+        'metrics': {'accuracy': 0.99}, 'outputArtifacts': {}, 'error': None,
+    })
+    artifact = client.post(f'/api/research/runs/{run_id}/artifacts', headers=headers, files={
+        'file': ('classifier.bin', b'verified-model', 'application/octet-stream'),
+    }).json()
+    client.post('/api/models', headers=headers, json={'name': model_name, 'description': 'Verified classifier'})
+    version = client.post(f'/api/models/{model_name}/versions', headers=headers, json={
+        'runId': run_id, 'artifactId': artifact['id'], 'validationEvidence': {
+            'passed': True,
+            'compatibility': {'task': 'classification', 'inputSchema': 'features', 'outputSchema': 'label', 'framework': 'python', 'status': 'validated'},
+        },
+    })
+    promoted = client.post(f'/api/models/{model_name}/aliases/champion/promotions', headers=headers, json={'version': 1, 'reason': 'Validated artifact'})
+    listed = client.get('/api/models', headers=headers)
+
+    assert version.status_code == 201
+    assert promoted.status_code == 201
+    entry = next(item for item in listed.json() if item['name'] == model_name)
+    assert entry['aliases'] == {'champion': 1}
+    assert entry['versions'][0]['artifactVerified'] is True
+    assert entry['versions'][0]['compatibility']['inputSchema'] == 'features'
+
+    artifact_path = Path('data/artifacts') / artifact['sha256'][:2] / artifact['sha256']
+    original_content = artifact_path.read_bytes()
+    try:
+        artifact_path.write_bytes(b'corrupt')
+        resolved = client.post('/api/models/resolve-production-bindings', headers=headers, json={
+            'model': {'modelName': model_name, 'alias': 'champion'},
+        })
+        assert resolved.status_code == 422
+        assert 'integrity' in resolved.json()['detail']
+    finally:
+        artifact_path.write_bytes(original_content)
+
+
+def test_model_version_accepts_only_a_valid_external_onnx_contract(authenticated_client) -> None:
+    client, headers = authenticated_client
+    suffix = uuid4().hex
+    experiment_id = f'experiment-{suffix}'
+    run_id = f'run-{suffix}'
+    model_name = f'onnx-classifier-{suffix}'
+    client.post('/api/research/experiments', headers=headers, json={'id': experiment_id, 'name': model_name, 'description': ''})
+    client.post('/api/research/runs', headers=headers, json={
+        'id': run_id, 'experimentId': experiment_id, 'status': 'completed', 'executionTarget': 'local-cpu',
+        'codeRevision': '9ae70df', 'nodeVersions': {}, 'environment': {}, 'randomSeeds': {}, 'resources': {},
+        'datasetVersions': {}, 'parameters': {}, 'metrics': {}, 'outputArtifacts': {}, 'error': None,
+    })
+    artifact = client.post(f'/api/research/runs/{run_id}/artifacts', headers=headers, files={
+        'file': ('classifier.onnx', b'external-onnx-artifact', 'application/octet-stream'),
+    }).json()
+    client.post('/api/models', headers=headers, json={'name': model_name, 'description': 'External ONNX classifier'})
+    contract = {
+        'format': 'onnx', 'runtime': 'onnxruntime', 'runtimeVersion': '1.18.0',
+        'inputSchema': [{'name': 'image', 'dtype': 'float32', 'shape': [1, 3, 224, 224]}],
+        'outputSchema': [{'name': 'scores', 'dtype': 'float32', 'shape': [1, 2]}],
+        'preprocessing': {'channelOrder': 'RGB'}, 'postprocessing': {'kind': 'classification'},
+    }
+    version = client.post(f'/api/models/{model_name}/versions', headers=headers, json={
+        'runId': run_id, 'artifactId': artifact['id'], 'validationEvidence': {'passed': True}, 'artifactContract': contract,
+    })
+    invalid = client.post(f'/api/models/{model_name}/versions', headers=headers, json={
+        'runId': run_id, 'artifactId': artifact['id'], 'validationEvidence': {'passed': True},
+        'artifactContract': {**contract, 'runtime': 'pytorch'},
+    })
+
+    assert version.status_code == 201
+    assert version.json()['deepLearningContract']['inputSchema'][0]['name'] == 'image'
+    assert invalid.status_code == 422
+    assert 'Deep-learning artifact contract is invalid' in invalid.json()['detail']
+
+
 def test_research_api_requires_authentication() -> None:
     with TestClient(app) as client:
         assert client.get('/api/research/runs').status_code == 401

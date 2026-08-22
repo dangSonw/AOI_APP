@@ -1,0 +1,13 @@
+# Kế hoạch triển khai UI, model binding, hardening node và RELEASE
+
+Đây là bản dịch tiếng Việt của implementation plan `2026-08-22-update-uix-node-implementation.md`. Checklist và trạng thái phải được đối chiếu với bản tiếng Anh; không dùng bản dịch để thay thế acceptance evidence hoặc kết quả kiểm thử.
+
+## Trạng thái hiện tại
+
+- Phase 6: giao diện Models và lifecycle API đã triển khai; backend lifecycle tests đã bổ sung.
+- Phase 7: production binding gate và database alias resolution đã triển khai; cần hoàn tất acceptance test runtime.
+- Phase 9: đã có inventory, shared image contract và benchmark tests tập trung; chưa đủ evidence cho mọi family.
+- Phase 10: validator RELEASE đã triển khai nhưng đang block vì không có node RELEASE và production evidence thực.
+- Phase 8: ONNX Runtime chưa có trong environment được phê duyệt nên vẫn block.
+
+Các mục checklist chi tiết nằm trong bản tiếng Anh.

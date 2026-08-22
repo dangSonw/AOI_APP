@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type {
   AlgorithmDefinition, DataType, ParameterValue, PortChannel, PortDirection,
   RuntimeBindingMode, WorkflowNode,
@@ -6,12 +6,15 @@ import type {
 import { getNodeInspectorPlugin } from '../../node-plugins/registry';
 import { addCustomPort, removeCustomPort, updateCustomPort } from '../../utils/workflow-ports';
 import { RuntimeUseBadge } from '../RuntimeUseBadge';
+import { readRegisteredModels } from '../../services/research-service';
+import type { RegisteredModel } from '../../types/research';
 
 
 interface NodeInspectorProps {
   node: WorkflowNode | null;
   definition: AlgorithmDefinition | null;
   onChange: (node: WorkflowNode) => void;
+  accessToken?: string;
 }
 
 const DATA_TYPES: DataType[] = [
@@ -63,7 +66,76 @@ function CustomPortEditor({ node, onChange }: Pick<NodeInspectorProps, 'node' | 
   );
 }
 
-export function NodeInspector({ node, definition, onChange }: NodeInspectorProps) {
+function ModelReferenceField({
+  accessToken, value, onChange,
+}: {
+  accessToken?: string;
+  value: ParameterValue | undefined;
+  onChange: (value: ParameterValue) => void;
+}) {
+  const [models, setModels] = useState<RegisteredModel[]>([]);
+  const [error, setError] = useState('');
+  const [taskFilter, setTaskFilter] = useState('');
+  const [frameworkFilter, setFrameworkFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [aliasFilter, setAliasFilter] = useState('');
+
+  useEffect(() => {
+    if (!accessToken) return;
+    void readRegisteredModels(accessToken).then(setModels).catch((loadError: unknown) => {
+      setError(loadError instanceof Error ? loadError.message : 'Models could not be loaded.');
+    });
+  }, [accessToken]);
+
+  const current = value && typeof value === 'object' && !Array.isArray(value)
+    && 'modelName' in value && 'alias' in value
+    ? `${String(value.modelName)}:${String(value.alias)}` : '';
+  const candidates = models.flatMap((model) => ['candidate', 'champion'].flatMap((alias) => {
+    const versionNumber = model.aliases[alias];
+    const version = model.versions.find((item) => item.version === versionNumber);
+    const compatibility = version?.compatibility ?? {};
+    const matchesFilter = version
+      && (!taskFilter || compatibility.task === taskFilter)
+      && (!frameworkFilter || compatibility.framework === frameworkFilter)
+      && (!statusFilter || compatibility.status === statusFilter)
+      && (!aliasFilter || alias === aliasFilter);
+    return matchesFilter && version.artifactVerified && version.validationEvidence.passed === true
+      ? [{ model, alias, version }] : [];
+  }));
+  const filterOptions = (key: 'task' | 'framework' | 'status') => Array.from(new Set(models.flatMap((model) => model.versions.map((version) => version.compatibility[key]).filter((value): value is string => Boolean(value))))).sort();
+
+  return (
+    <>
+      <label className="workflow-field"><span>Filter by task</span><select aria-label="Filter by task" value={taskFilter} onChange={(event) => setTaskFilter(event.target.value)}><option value="">All tasks</option>{filterOptions('task').map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+      <label className="workflow-field"><span>Filter by framework</span><select aria-label="Filter by framework" value={frameworkFilter} onChange={(event) => setFrameworkFilter(event.target.value)}><option value="">All frameworks</option>{filterOptions('framework').map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+      <label className="workflow-field"><span>Filter by status</span><select aria-label="Filter by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">All statuses</option>{filterOptions('status').map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+      <label className="workflow-field"><span>Filter by alias</span><select aria-label="Filter by alias" value={aliasFilter} onChange={(event) => setAliasFilter(event.target.value)}><option value="">All aliases</option><option value="candidate">Candidate</option><option value="champion">Champion</option></select></label>
+      <select
+        aria-label="Model reference"
+        value={current}
+        disabled={!accessToken}
+        onChange={(event) => {
+          const [modelName, alias] = event.target.value.split(':', 2);
+          if (modelName && alias) onChange({ modelName, alias });
+        }}
+      >
+        <option value="">Select a promoted, verified model</option>
+        {candidates.map(({ model, alias, version }) => (
+          <option key={`${model.name}:${alias}`} value={`${model.name}:${alias}`}>
+            {model.name} · {alias} · v{version.version}
+          </option>
+        ))}
+      </select>
+      {!accessToken && <small className="workflow-field-error">Model selection requires an authenticated workflow session.</small>}
+      {accessToken && !error && candidates.length === 0 && <small className="workflow-field-error">No validated, promoted model with a verified artifact matches the selected filters.</small>}
+      {error && <small className="workflow-field-error" role="alert">{error}</small>}
+      {current && <small>Portable alias reference; it resolves to an immutable model version at execution.</small>}
+      {current && !models.some((model) => Object.entries(model.aliases).some(([alias, version]) => `${model.name}:${alias}` === current && model.versions.some((item) => item.version === version && item.artifactVerified && item.validationEvidence.passed === true))) && <small className="workflow-field-error">The selected model alias is unresolved, unvalidated, or has an unavailable artifact.</small>}
+    </>
+  );
+}
+
+export function NodeInspector({ node, definition, onChange, accessToken }: NodeInspectorProps) {
   if (!node || !definition) {
     return (
       <aside className="workflow-inspector" aria-label="Node inspector">
@@ -113,6 +185,8 @@ export function NodeInspector({ node, definition, onChange }: NodeInspectorProps
                     <select value={String(value)} onChange={(event) => updateParameter(parameter.key, event.target.value)}>
                       {parameter.options.map((option) => <option value={String(option)} key={String(option)}>{String(option)}</option>)}
                     </select>
+                  ) : parameter.kind === 'model-reference' ? (
+                    <ModelReferenceField accessToken={accessToken} value={value} onChange={(nextValue) => updateParameter(parameter.key, nextValue)} />
                   ) : parameter.kind === 'json' ? (
                     <textarea value={JSON.stringify(value, null, 2)} onChange={(event) => {
                       try { updateParameter(parameter.key, JSON.parse(event.target.value) as ParameterValue); } catch { /* Keep last valid JSON draft. */ }

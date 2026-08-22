@@ -7,21 +7,37 @@ interface ProjectExplorerProps {
   onCollapseToggle: () => void;
 }
 
-const EXPLORER_ITEMS: Array<{
+const EXPLORER_GROUPS: Array<{
   label: string;
-  icon: string;
-  view?: WorkspaceView;
-  isExpanded?: boolean;
+  items: Array<{ label: string; icon: string; view: WorkspaceView }>;
 }> = [
-  { label: 'Project', icon: 'P', view: 'dashboard', isExpanded: true },
-  { label: 'Hardware', icon: 'H', view: 'hardware' },
-  { label: 'Camera rig', icon: 'C', view: 'camera-manager' },
-  { label: 'Workflow', icon: 'W', view: 'workflow-editor' },
-  { label: 'Dataset', icon: 'D', view: 'dataset' },
-  { label: 'Database', icon: 'DB', view: 'database' },
-  { label: 'Plugins', icon: 'PL' },
-  { label: 'Logs', icon: 'L' },
-  { label: 'Settings', icon: 'S', view: 'settings' },
+  {
+    label: 'Operate',
+    items: [
+      { label: 'Dashboard', icon: 'P', view: 'dashboard' },
+      { label: 'Hardware', icon: 'H', view: 'hardware' },
+      { label: 'Camera rig', icon: 'C', view: 'camera-manager' },
+    ],
+  },
+  {
+    label: 'Build',
+    items: [
+      { label: 'Workflow', icon: 'W', view: 'workflow-editor' },
+      { label: 'Dataset', icon: 'D', view: 'dataset' },
+    ],
+  },
+  {
+    label: 'Review',
+    items: [
+      { label: 'Database', icon: 'DB', view: 'database' },
+      { label: 'Research', icon: 'R', view: 'research' },
+      { label: 'Models', icon: 'M', view: 'models' },
+    ],
+  },
+  {
+    label: 'System',
+    items: [{ label: 'Settings', icon: 'S', view: 'settings' }],
+  },
 ];
 
 export function ProjectExplorer({ activeView, isCollapsed, onViewChange, onCollapseToggle }: ProjectExplorerProps) {
@@ -40,25 +56,26 @@ export function ProjectExplorer({ activeView, isCollapsed, onViewChange, onColla
         </button>
       </div>
       <nav className="project-tree" aria-label="Workspace views">
-        {EXPLORER_ITEMS.map((item) => {
-          const isActive = item.view === activeView;
-          return (
-            <button
-              className={`project-tree__item ${isActive ? 'project-tree__item--active' : ''}`}
-              type="button"
-              key={item.label}
-              disabled={!item.view}
-              aria-current={isActive ? 'page' : undefined}
-              onClick={() => item.view && onViewChange(item.view)}
-            >
-              <span className="project-tree__chevron" aria-hidden="true">
-                {item.isExpanded ? '⌄' : item.view ? '›' : '·'}
-              </span>
-              <span className="project-tree__icon" aria-hidden="true">{item.icon}</span>
-              <span className="project-tree__label">{item.label}</span>
-            </button>
-          );
-        })}
+        {EXPLORER_GROUPS.map((group) => (
+          <section className="project-tree__group" key={group.label} aria-label={group.label}>
+            <h2 className="project-tree__group-label">{group.label}</h2>
+            {group.items.map((item) => {
+              const isActive = item.view === activeView;
+              return (
+                <button
+                  className={`project-tree__item ${isActive ? 'project-tree__item--active' : ''}`}
+                  type="button"
+                  key={item.label}
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={() => onViewChange(item.view)}
+                >
+                  <span className="project-tree__icon" aria-hidden="true">{item.icon}</span>
+                  <span className="project-tree__label">{item.label}</span>
+                </button>
+              );
+            })}
+          </section>
+        ))}
       </nav>
       <div className="project-explorer__recipe">
         <span className="overline">Active recipe</span>

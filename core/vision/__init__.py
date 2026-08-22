@@ -1,0 +1,1 @@
+"""Shared computer-vision contracts and utilities."""

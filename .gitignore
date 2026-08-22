@@ -38,3 +38,6 @@ data/**/*
 AGENTS.md
 CLAUDE.md
 .gitnexus
+
+tests/nodes/mnist_png
+tests/nodes/cat-and-dog

@@ -305,6 +305,7 @@ export function WorkflowEditorPage({
           node={selectedNode}
           definition={selectedDefinition}
           onChange={updateNode}
+          accessToken={accessToken}
         />
       </div>
       <ExecutionOrderRail

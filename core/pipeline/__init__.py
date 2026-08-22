@@ -7,6 +7,7 @@ from .models import (
     RuntimeBindingMode, ValidationIssue, Workflow, WorkflowNode,
 )
 from .ordering import CycleError, stable_topological_order
+from .release_validation import ReleaseValidationIssue, validate_release_workflow
 from .validation import validate_workflow
 from .virtual_pins import resolve_virtual_pin_groups, resolve_virtual_pin_types, virtual_pin_dependencies
 
@@ -28,7 +29,9 @@ __all__ = [
     'create_default_workflow',
     'execute_workflow',
     'stable_topological_order',
+    'validate_release_workflow',
     'validate_workflow',
+    'ReleaseValidationIssue',
     'resolve_virtual_pin_groups',
     'resolve_virtual_pin_types',
     'virtual_pin_dependencies',

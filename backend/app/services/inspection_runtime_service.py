@@ -7,6 +7,7 @@ import os
 import struct
 import time
 import zlib
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -16,6 +17,8 @@ import numpy as np
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
+
+from app.models.research import ModelAlias, ModelRegistryEntry, ModelVersion, ResearchArtifact
 
 from app.clients.camera_client import CameraClient
 from app.clients.device_client import DeviceServiceError
@@ -42,7 +45,7 @@ from app.services.workflow_repository import WorkflowRepository
 from core.devices.camera import CaptureRequest
 from core.devices.models import DeviceMode
 from core.devices.motion import HomeRequest
-from core.nodes import NodeExecutionCancelled, NodeExecutionContext, get_node_manifest_registry
+from core.nodes import ModelBinding, NodeExecutionCancelled, NodeExecutionContext, get_node_manifest_registry
 from core.pipeline import WorkflowExecutionRecord, execute_workflow
 
 
@@ -401,6 +404,64 @@ def _fault(session: Session, run: InspectionRun, code: str, message: str) -> Ins
     return _load_run(session, run.id) or run
 
 
+def _model_references(value: object) -> tuple[dict[str, object], ...]:
+    if isinstance(value, dict):
+        if set(value) in ({'modelName', 'alias'}, {'modelName', 'modelVersion', 'artifactSha256'}):
+            return (value,)
+        return tuple(reference for item in value.values() for reference in _model_references(item))
+    if isinstance(value, list):
+        return tuple(reference for item in value for reference in _model_references(item))
+    return ()
+
+
+def _production_node_context(
+    session: Session,
+    workflow: WorkflowSchema,
+    *,
+    is_cancelled: Callable[[], bool],
+) -> NodeExecutionContext:
+    bindings: dict[str, ModelBinding] = {}
+    for node in workflow.nodes:
+        for reference in _model_references(node.parameters):
+            model_name = str(reference['modelName'])
+            model = session.scalar(select(ModelRegistryEntry).where(ModelRegistryEntry.name == model_name))
+            if model is None:
+                raise InspectionRunError(f'Production model {model_name} does not exist.')
+            if 'alias' in reference:
+                assignment = session.scalar(select(ModelAlias).where(
+                    ModelAlias.model_id == model.id, ModelAlias.alias == str(reference['alias']),
+                ))
+                if assignment is None:
+                    raise InspectionRunError(f'Production model {model_name} alias is not assigned.')
+                version = session.get(ModelVersion, assignment.model_version_id)
+            else:
+                version = session.scalar(select(ModelVersion).where(
+                    ModelVersion.model_id == model.id, ModelVersion.version == int(reference['modelVersion']),
+                ))
+            if version is None:
+                raise InspectionRunError(f'Production model {model_name} version does not exist.')
+            artifact = session.get(ResearchArtifact, version.artifact_id)
+            if artifact is None:
+                raise InspectionRunError(f'Production model {model_name} artifact is missing.')
+            if 'artifactSha256' in reference and str(reference['artifactSha256']) != artifact.sha256:
+                raise InspectionRunError(f'Production model {model_name} artifact checksum does not match.')
+            if not artifact.storage_uri or len(artifact.sha256) != 64 or artifact.byte_length < 0:
+                raise InspectionRunError(f'Production model {model_name} artifact integrity metadata is invalid.')
+            artifact_path = Path(artifact.storage_uri).resolve()
+            try:
+                artifact_content = artifact_path.read_bytes()
+            except OSError as error:
+                raise InspectionRunError(f'Production model {model_name} artifact is unavailable.') from error
+            if len(artifact_content) != artifact.byte_length or hashlib.sha256(artifact_content).hexdigest() != artifact.sha256:
+                raise InspectionRunError(f'Production model {model_name} artifact integrity verification failed.')
+            binding = ModelBinding(model.name, version.version, artifact.sha256)
+            previous = bindings.get(model_name)
+            if previous is not None and previous != binding:
+                raise InspectionRunError(f'Production model {model_name} has conflicting immutable bindings.')
+            bindings[model_name] = binding
+    return NodeExecutionContext(models=bindings, is_cancelled=is_cancelled)
+
+
 def execute_run(
     session: Session,
     run_id: str,
@@ -479,7 +540,12 @@ def execute_run(
             session.refresh(run, attribute_names=['cancel_requested'])
             return bool(run.cancel_requested)
 
-        node_context = NodeExecutionContext(is_cancelled=workflow_is_cancelled)
+        is_production = run.commissioning_snapshot.get('deploymentMode') == 'production'
+        node_context = (
+            _production_node_context(session, workflow, is_cancelled=workflow_is_cancelled)
+            if is_production
+            else NodeExecutionContext(is_cancelled=workflow_is_cancelled)
+        )
         manifests = get_node_manifest_registry()
         active_node_runs: dict[int, InspectionNodeRun] = {}
 
@@ -523,9 +589,10 @@ def execute_run(
                 _append_workflow_log_line(run.id, record)
             session.commit()
 
+        execution_options = {'production': True} if is_production else {}
         workflow_result = execute_workflow(
             workflow, source_image=_decode_image(image.content), context=node_context,
-            observer=observe_node,
+            observer=observe_node, **execution_options,
         )
         faulted_record = next((record for record in workflow_result.records if record.status == 'faulted'), None)
         cancelled_record = next((record for record in workflow_result.records if record.status == 'cancelled'), None)

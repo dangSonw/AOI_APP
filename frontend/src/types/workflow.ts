@@ -18,7 +18,7 @@ export type PortDirection = 'input' | 'output';
 export type PortChannel = 'data' | 'control';
 export type PortOrigin = 'system' | 'default' | 'custom';
 export type RuntimeBindingMode = 'slot' | 'passthrough' | 'none';
-export type ParameterKind = 'boolean' | 'integer' | 'number' | 'text' | 'select' | 'json' | 'reference';
+export type ParameterKind = 'boolean' | 'integer' | 'number' | 'text' | 'select' | 'json' | 'reference' | 'model-reference';
 export type ParameterValue = null | boolean | number | string | ParameterValue[] | { [key: string]: ParameterValue };
 export type NodeUse = 'test' | 'debug' | 'release';
 

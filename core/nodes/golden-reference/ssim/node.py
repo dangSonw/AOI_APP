@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 from core.nodes.models import NodeExecutionContext, NodeInputs, NodeOutputs, NodeParameters, NodeUse
 from core.nodes.errors import NodeExecutionContextRequired
+from core.vision.image_contract import bounded_map, bounded_score, require_matching_images, validate_image
 
 NODE_ID = 'ssim'
 USE = NodeUse.DEBUG
@@ -102,17 +103,7 @@ def _load_npz(content: bytes, *, name: str) -> dict[str, np.ndarray]:
         raise ValueError(f'{name} is not a valid NumPy archive artifact.') from error
 
 def _image(value: object, *, name: str='Image') -> np.ndarray:
-    if not isinstance(value, np.ndarray) or value.size == 0 or value.ndim not in {2, 3}:
-        raise ValueError(f'{name} must be a non-empty two- or three-dimensional NumPy image.')
-    if value.ndim == 3 and value.shape[2] not in {1, 3}:
-        raise ValueError(f'{name} must have one or three channels.')
-    if value.dtype.kind not in {'u', 'f'} or value.dtype.itemsize > 8:
-        raise ValueError(f'{name} dtype is unsupported.')
-    if not np.all(np.isfinite(value)):
-        raise ValueError(f'{name} values must be finite.')
-    if value.dtype.kind == 'f' and (float(value.min()) < 0.0 or float(value.max()) > 1.0):
-        raise ValueError(f'{name} floating values must be between zero and one.')
-    return value
+    return validate_image(value, name=name)
 
 def _normalized(value: np.ndarray) -> np.ndarray:
     if value.dtype.kind == 'u':
@@ -134,17 +125,14 @@ def _map(value: np.ndarray) -> np.ndarray:
     return np.clip(value, 0.0, 1.0).astype(np.float32)
 
 def _outputs(anomaly_map: np.ndarray) -> NodeOutputs:
-    bounded = _map(anomaly_map)
-    return {'anomaly-map': bounded, 'score': float(bounded.mean())}
+    bounded = bounded_map(_map(anomaly_map))
+    return {'anomaly-map': bounded, 'score': bounded_score(bounded.mean())}
 
 def _golden_image(inputs: NodeInputs, context: NodeExecutionContext) -> tuple[np.ndarray, np.ndarray]:
     observed = _image(inputs.get('image'))
     content = context.read_artifact('golden-image', expected_media_types=(NUMPY_MEDIA_TYPE,))
     reference = _image(_load_npy(content, name='Golden image'), name='Golden image')
-    if reference.shape != observed.shape:
-        raise ValueError('Golden image shape must match observed image shape.')
-    if reference.dtype != observed.dtype:
-        raise ValueError('Golden image dtype must match observed image dtype.')
+    require_matching_images(observed, reference, first_name='Golden image', second_name='Observed image')
     return (observed, reference)
 
 def _absolute_difference(observed: np.ndarray, reference: np.ndarray) -> NodeOutputs:

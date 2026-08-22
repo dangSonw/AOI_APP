@@ -20,4 +20,21 @@ describe('ResearchPage', () => {
     expect(markup).toContain('9ae70df');
     expect(markup).toContain('Seed 42');
   });
+
+  it('renders registered versions with integrity and compatibility metadata', () => {
+    const markup = renderToStaticMarkup(<ResearchPage accessToken="token" initialRuns={runs} initialModels={[{
+      name: 'pcb-classifier', description: 'Board classifier', aliases: { champion: 2 }, versions: [{
+        version: 2, runId: 'run-01', artifactSha256: 'a'.repeat(64), artifactVerified: true,
+        validationEvidence: { passed: true, accuracy: 0.99 }, compatibility: { task: 'classification', inputSchema: 'features' },
+        deepLearningContract: { format: 'onnx', runtime: 'onnxruntime', runtimeVersion: '1.18.0', inputSchema: [{ name: 'image', dtype: 'float32', shape: [1, 3, 224, 224] }], outputSchema: [{ name: 'scores', dtype: 'float32', shape: [1, 2] }], preprocessing: {}, postprocessing: {} },
+      }],
+    }]} />);
+
+    expect(markup).toContain('Model versions');
+    expect(markup).toContain('champion → v2');
+    expect(markup).toContain('artifact verified');
+    expect(markup).toContain('classification');
+    expect(markup).toContain('External deep-learning artifact');
+    expect(markup).toContain('1 input tensor(s)');
+  });
 });

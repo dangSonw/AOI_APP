@@ -82,3 +82,15 @@ def test_reference_parameters_accept_bounded_json_values() -> None:
 
     assert _parameter_is_valid(ParameterKind.REFERENCE, [{'label': 'object', 'color': [255, 255, 255]}])
     assert not _parameter_is_valid(ParameterKind.REFERENCE, object())
+
+
+def test_model_references_require_portable_alias_or_immutable_version_shape() -> None:
+    from core.algorithms import ParameterKind
+    from core.pipeline.validation import _parameter_is_valid
+
+    assert _parameter_is_valid(ParameterKind.MODEL_REFERENCE, {'modelName': 'pcb-defect', 'alias': 'champion'})
+    assert _parameter_is_valid(ParameterKind.MODEL_REFERENCE, {
+        'modelName': 'pcb-defect', 'modelVersion': 2, 'artifactSha256': 'a' * 64,
+    })
+    assert not _parameter_is_valid(ParameterKind.MODEL_REFERENCE, {'modelName': 'pcb-defect', 'alias': 'draft'})
+    assert not _parameter_is_valid(ParameterKind.MODEL_REFERENCE, {'modelName': 'pcb-defect', 'artifactSha256': 'a' * 64})

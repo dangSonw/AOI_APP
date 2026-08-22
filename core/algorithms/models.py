@@ -55,6 +55,7 @@ class ParameterKind(StrEnum):
     SELECT = 'select'
     JSON = 'json'
     REFERENCE = 'reference'
+    MODEL_REFERENCE = 'model-reference'
 
 
 @dataclass(frozen=True, slots=True)

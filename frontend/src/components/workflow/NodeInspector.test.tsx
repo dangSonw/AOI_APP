@@ -22,6 +22,24 @@ describe('NodeInspector plugin contract', () => {
     expect(markup).toContain('Camera ID');
   });
 
+  it('renders a guarded model picker for model-reference parameters', () => {
+    const definition: AlgorithmDefinition = {
+      ...baseDefinition,
+      parameters: [{
+        key: 'model', label: 'Model', kind: 'model-reference', defaultValue: null, required: true,
+        minimum: null, maximum: null, options: [], description: 'A promoted inference model.',
+      }],
+    };
+    const markup = renderToStaticMarkup(<NodeInspector node={{ ...node, parameters: { model: null } }} definition={definition} onChange={vi.fn()} />);
+
+    expect(markup).toContain('Select a promoted, verified model');
+    expect(markup).toContain('Model selection requires an authenticated workflow session.');
+    expect(markup).toContain('Filter by task');
+    expect(markup).toContain('Filter by framework');
+    expect(markup).toContain('Filter by status');
+    expect(markup).toContain('Filter by alias');
+  });
+
   it('renders registered custom inspectors through safe typed props', () => {
     const definition = { ...baseDefinition, inspectorKind: 'custom' as const, customInspectorKey: 'camera-acquisition' };
     const markup = renderToStaticMarkup(<NodeInspector node={node} definition={definition} onChange={vi.fn()} />);

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ProjectExplorer } from './ProjectExplorer';
 
 describe('ProjectExplorer', () => {
-  it('keeps Database and removes Models shortcut', () => {
+  it('groups real workspace destinations without placeholder shortcuts', () => {
     const markup = renderToStaticMarkup(
       <ProjectExplorer
         activeView="database"
@@ -14,6 +14,13 @@ describe('ProjectExplorer', () => {
     );
 
     expect(markup).toContain('Database');
-    expect(markup).not.toContain('Models');
+    expect(markup).toContain('Operate');
+    expect(markup).toContain('Build');
+    expect(markup).toContain('Review');
+    expect(markup).toContain('System');
+    expect(markup).toContain('Research');
+    expect(markup).toContain('Models');
+    expect(markup).not.toContain('Plugins');
+    expect(markup).not.toContain('Logs');
   });
 });

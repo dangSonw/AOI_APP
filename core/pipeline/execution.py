@@ -3,9 +3,11 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
+
+from core.nodes.models import ModelBinding
 
 from core.algorithms import DataType
 from core.nodes import (
@@ -351,13 +353,46 @@ def _execute_token_workflow(
     return WorkflowExecutionResult(tuple(records), final_image, decision, score, dict(preview_images))
 
 
+def _model_references(value: Any) -> tuple[Mapping[str, Any], ...]:
+    if isinstance(value, dict):
+        if set(value) == {'modelName', 'modelVersion', 'artifactSha256'}:
+            return (value,)
+        return tuple(reference for item in value.values() for reference in _model_references(item))
+    if isinstance(value, list):
+        return tuple(reference for item in value for reference in _model_references(item))
+    return ()
+
+
+def _verify_production_bindings(workflow: Workflow, context: NodeExecutionContext | None) -> None:
+    if context is None:
+        raise ValueError('Production workflow execution requires an immutable node execution context.')
+    for node in workflow.nodes:
+        for reference in _model_references(node.parameters):
+            binding = ModelBinding.from_mapping(reference)
+            resolved = context.models.get(binding.model_name)
+            if resolved is None:
+                resolved = next(
+                    (candidate for candidate in context.models.values() if candidate.model_name == binding.model_name),
+                    None,
+                )
+            if resolved is None:
+                raise ValueError(f'Model {binding.model_name} is not resolved for production execution.')
+            if resolved != binding:
+                raise ValueError(
+                    f'Model {binding.model_name} immutable binding does not match the execution context.',
+                )
+
+
 def execute_workflow(
     workflow: Workflow,
     *,
     source_image: np.ndarray,
     context: NodeExecutionContext | None = None,
     observer: WorkflowExecutionObserver | None = None,
+    production: bool = False,
 ) -> WorkflowExecutionResult:
+    if production:
+        _verify_production_bindings(workflow, context)
     return _execute_token_workflow(
         workflow, source_image=source_image, context=context, observer=observer,
     )

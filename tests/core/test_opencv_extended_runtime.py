@@ -2,7 +2,8 @@ import cv2
 import numpy as np
 import pytest
 
-from core.nodes import get_node_runtime
+from core.nodes import NodeExecutionContext, get_node_runtime
+from core.nodes.errors import NodeExecutionCancelled
 
 
 def _execute(node_id: str, inputs: dict[str, object], parameters: dict[str, object]):
@@ -105,3 +106,18 @@ def test_extended_runtime_rejects_mismatched_images_and_invalid_points() -> None
             {'source-points': [[0, 0]], 'destination-points': [[1, 1]]},
             {'method': 'ransac', 'ransacThreshold': 3.0},
         )
+
+
+def test_watershed_rejects_unsupported_channels_and_oversized_images() -> None:
+    with pytest.raises(ValueError, match='one or three channels'):
+        _execute('watershed', {'image': np.zeros((8, 8, 2), np.uint8), 'mask': np.zeros((8, 8), np.uint8)}, {})
+    with pytest.raises(ValueError, match='32,000,000-pixel'):
+        _execute('watershed', {'image': np.zeros((4000, 8001), np.uint8), 'mask': np.zeros((4000, 8001), np.uint8)}, {})
+
+
+def test_watershed_context_honours_cancellation() -> None:
+    runtime = get_node_runtime('watershed')
+    assert runtime is not None
+    context = NodeExecutionContext(is_cancelled=lambda: True)
+    with pytest.raises(NodeExecutionCancelled):
+        runtime.invoke({'image': np.zeros((8, 8), np.uint8), 'mask': np.zeros((8, 8), np.uint8)}, {}, context=context)
