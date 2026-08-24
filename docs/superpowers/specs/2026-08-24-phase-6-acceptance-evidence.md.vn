@@ -1,0 +1,65 @@
+# Bằng chứng nghiệm thu vòng đời model Phase 6
+
+**Ngày:** 2026-08-24  
+**Phạm vi:** Đăng ký model, vòng đời candidate/champion, rollback ổn định, immutable production binding và SVM inference.  
+**Môi trường:** Python 3.12 trong environment `aoi-app`, integration test FastAPI dùng PostgreSQL, React 18/Vitest, local CPU.
+
+## Vertical slice tất định
+
+Automated journey `tests/integration/test_phase6_model_lifecycle_acceptance.py` thực thi:
+
+1. fixture cats/dogs tất định với immutable dataset version;
+2. train/evaluate HOG/SVM;
+3. persist model artifact có checksum vào Research run đã completed;
+4. tạo model v1 có xác thực và đăng ký immutable version đã validation;
+5. promote champion với actor, reason, previous/next version và timestamp;
+6. resolve `{modelName, alias}` portable thành `{modelName, modelVersion, artifactSha256}` chính xác;
+7. SVM inference qua artifact resolver bị ràng buộc byte length/checksum/media type;
+8. bằng chứng visualization report `aoi.table.v1` và confusion matrix `aoi.confusion-matrix.v1`.
+
+Fixture tất định tái sử dụng cho kết quả:
+
+| Trường | Bằng chứng |
+|---|---|
+| Experiment ID | `animals-svm` |
+| Run ID | `run-svm` |
+| Node ID | `svm-image-classifier` |
+| Package version | `1.0.0` |
+| Model SHA-256 | `19f2a5cb7291a933f4e06b539ca5d7aeb24bc36148e3b9398e8a34edfcfc2cbe` |
+| Model bytes | `586373` |
+| Accuracy | `1.0` |
+| Predictions | `0,0,0,1,1,1` |
+
+Các database ID runtime trong API journey có suffix UUID để tránh trùng. Model bytes và SHA-256 vẫn tất định trong môi trường đã ghi.
+
+## Bằng chứng lifecycle và failure
+
+- Registration từ chối anonymous request, duplicate name, run chưa completed, failed validation, artifact khác run, artifact thiếu và integrity failure.
+- Promotion chỉ hỗ trợ `candidate`/`champion`, revalidate evidence và artifact integrity, lock alias row và append immutable audit event.
+- Rollback bắt buộc preview thấy rõ target, từ chối preview stale, lock và revalidate target artifact trước mutation, append rollback event nhưng không tạo alias `rollback`.
+- Training cancellation được quan sát tại bounded node checkpoint và không persist partial artifact.
+- Training failure trả safe message và không persist partial artifact.
+- Production từ chối alias/version/artifact thiếu, checksum mismatch, portable alias bên trong core executor và execution-context mismatch.
+- Context đã resolve giữ nguyên version/artifact bytes ban đầu sau khi alias được đổi về sau.
+
+## Kết quả xác minh
+
+- Python matrix acceptance-critical Phase 6: **PASS 200 test** trước khi thêm aggregate journey; aggregate journey sau đó PASS độc lập (**1 test**).
+- Full frontend: **PASS 47 file / 133 test**.
+- Frontend typecheck: **PASS**.
+- Frontend production build: **PASS**; giữ warning chunk >500 kB không fatal đã có.
+- Compile Python production (`backend`, `core`): **PASS**.
+- Full Python tree sau khi đồng bộ assertion stale Phase 3/4: **525 passed, 11 unrelated failures, 2 dependency warning**.
+
+11 failure ngoài acceptance được ghi riêng và không chạm model lifecycle Phase 6:
+
+1. ba failure DEBUG KNN/documentation generator đã biết;
+2. một legacy KNN deterministic validation-accuracy expectation;
+3. sáu legacy CSV dataset API preparation/artifact failure;
+4. một legacy settings-backup checksum fixture failure.
+
+Compile toàn test tree còn lộ script demo cũ không hợp lệ `tests/nodes/knn_cat_dog.py` (`import scikit-learn as sklearn`). Production `backend` và `core` compile thành công.
+
+## Giới hạn tuyên bố
+
+Bằng chứng này hỗ trợ inference local-CPU tất định cho đúng runtime Python/OpenCV/NumPy/scikit-learn được ghi và verify trong signed SVM artifact envelope. Không tuyên bố GPU support, pickle portability khác runtime, factory accuracy, target-hardware cycle time, production uptime hoặc physical pilot acceptance.

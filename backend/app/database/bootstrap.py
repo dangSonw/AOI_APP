@@ -18,6 +18,7 @@ from app.models.settings_document import SettingsDocument  # noqa: F401
 from app.models.settings_version import SettingsVersion  # noqa: F401
 from app.services.auth_service import create_user, get_user_by_email
 from app.services.inspection_runtime_service import recover_interrupted_runs
+from app.services.training_execution_service import recover_orphaned_training_jobs
 
 
 DEFAULT_RECIPES = [
@@ -33,6 +34,7 @@ def initialize_database() -> None:
 
     with SessionLocal() as session:
         recover_interrupted_runs(session)
+        recover_orphaned_training_jobs(session)
         seed_default_operator(session)
         seed_default_recipes(session)
 

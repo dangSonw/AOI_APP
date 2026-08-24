@@ -20,6 +20,7 @@ describe('ProjectExplorer', () => {
     expect(markup).toContain('System');
     expect(markup).toContain('Research');
     expect(markup).toContain('Models');
+    expect(markup).toContain('Help');
     expect(markup).not.toContain('Active recipe');
     expect(markup).not.toContain('Plugins');
     expect(markup).not.toContain('Logs');

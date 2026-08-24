@@ -1,0 +1,29 @@
+{
+  "documentationVersion": 1,
+  "en": {
+    "overview": "`svm-image-classifier` is the workflow-owned HOG plus SVM image-classification training package.",
+    "whenToUse": "Use it for bounded classical image classification from immutable labeled datasets.",
+    "structure": "Immutable training/test datasets are transformed into HOG features, then fitted and evaluated by an SVC pipeline.",
+    "algorithm": ["Validate immutable bindings and parameters.", "Resize and extract deterministic grayscale HOG features.", "Fit, evaluate, and persist verified typed artifacts."],
+    "inputGuidance": {},
+    "outputGuidance": {"model": "Reloadable fitted pipeline.", "metrics": "Finite classification metrics.", "report": "aoi.table.v1 per-class report for an explicit table-output node.", "confusion-matrix": "aoi.confusion-matrix.v1 payload for an explicit plot-2d-output node.", "failed-images": "Safe logical item diagnostics."},
+    "parameterGuidance": {},
+    "example": {"goal": "Train a deterministic image classifier.", "workflow": ["svm-image-classifier"], "parameters": {}, "steps": ["Select immutable datasets.", "Validate HOG geometry.", "Start training and open the Research run."], "input": "Versioned labeled images.", "expectedOutput": "Verified model, metrics, report, and confusion artifacts."},
+    "troubleshooting": [{"symptom": "HOG validation fails", "cause": "Geometry is not divisible.", "resolution": "Restore the 128/16/8/8 defaults."}, {"symptom": "Training fails", "cause": "Dataset has fewer than two classes.", "resolution": "Provide at least two labeled classes."}, {"symptom": "Image is rejected", "cause": "Image is corrupt or over limits.", "resolution": "Review failed-image diagnostics by logical ID."}],
+    "limitations": ["CPU-only release target.", "No browser-side training behavior.", "Performance must be measured on target data."],
+    "productionChecklist": ["Pin immutable datasets.", "Review class metrics.", "Verify artifact checksum before promotion."]
+  },
+  "vi": {
+    "overview": "`svm-image-classifier` là package training phân loại ảnh HOG kết hợp SVM do workflow sở hữu.",
+    "whenToUse": "Dùng cho bài toán phân loại ảnh cổ điển có giới hạn tài nguyên từ dataset nhãn bất biến.",
+    "structure": "Dataset train/test bất biến được chuyển thành đặc trưng HOG rồi fitted và evaluated bằng SVC pipeline.",
+    "algorithm": ["Kiểm tra binding bất biến và tham số.", "Resize và trích xuất HOG grayscale xác định.", "Fit, evaluate và lưu typed artifact đã xác minh."],
+    "inputGuidance": {},
+    "outputGuidance": {"model": "Pipeline fitted có thể reload.", "metrics": "Classification metrics hữu hạn.", "report": "Report theo class aoi.table.v1 cho node table-output tường minh.", "confusion-matrix": "Payload aoi.confusion-matrix.v1 cho node plot-2d-output tường minh.", "failed-images": "Diagnostic dùng logical item ID an toàn."},
+    "parameterGuidance": {},
+    "example": {"goal": "Train image classifier xác định.", "workflow": ["svm-image-classifier"], "parameters": {}, "steps": ["Chọn dataset bất biến.", "Validate HOG geometry.", "Bắt đầu training và mở Research run."], "input": "Ảnh có nhãn và version.", "expectedOutput": "Model, metrics, report và confusion artifact đã xác minh."},
+    "troubleshooting": [{"symptom": "HOG validation lỗi", "cause": "Geometry không chia hết.", "resolution": "Khôi phục mặc định 128/16/8/8."}, {"symptom": "Training lỗi", "cause": "Dataset có ít hơn hai class.", "resolution": "Cung cấp ít nhất hai class có nhãn."}, {"symptom": "Ảnh bị từ chối", "cause": "Ảnh hỏng hoặc vượt giới hạn.", "resolution": "Xem failed-image diagnostic theo logical ID."}],
+    "limitations": ["Release target chỉ dùng CPU.", "Không có training behavior trong browser.", "Phải đo performance trên dữ liệu đích."],
+    "productionChecklist": ["Pin dataset bất biến.", "Review metric theo class.", "Xác minh checksum artifact trước promotion."]
+  }
+}

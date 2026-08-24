@@ -1,0 +1,429 @@
+# Kế hoạch triển khai huấn luyện qua Workflow, Research, Model Registry và trực quan hóa
+
+> **Dành cho agent:** BẮT BUỘC dùng `superpowers:subagent-driven-development` (khuyến nghị) hoặc `superpowers:executing-plans` theo từng task. Checkbox ghi bằng chứng, không ghi ý định. Sau mỗi task chạy checkpoint của task. Sau mỗi phase phải dừng và hỏi người dùng có tiếp tục không; không được tự suy diễn sự đồng ý.
+
+**Mục tiêu:** Xây nền tảng training qua workflow có audit, sửa ownership Research/Models, tạo vertical slice HOG/SVM tái sử dụng và output trực quan tường minh.
+
+**Kiến trúc:** Node package sở hữu thuật toán; frontend plugin folder tương ứng sở hữu UI đặc trưng; backend platform sở hữu immutable reference, job orchestration, artifact, research lineage và model lifecycle. Research quản lý experiments/runs, Models quản lý versions/aliases, output node tường minh chọn viewer.
+
+**Công nghệ:** Python 3.12, FastAPI, Pydantic 2, SQLAlchemy 2, PostgreSQL, pytest, NumPy, OpenCV, scikit-learn, React 18, TypeScript 5.6, Vite 8, Vitest và GitNexus hiện có.
+
+**Spec đã duyệt:** `docs/superpowers/specs/2026-08-24-workflow-training-research-model-visualization-design.md.vn`
+
+## Ràng buộc toàn cục
+
+- Tuân theo `.agents/rules/RULE.md`, `AGENTS.md`; chạy Linux command bằng Ubuntu WSL wrapper bắt buộc.
+- Giữ nguyên thay đổi không liên quan; không reset/clean/checkout/overwrite thay đổi của người dùng.
+- Code/UI/API/test/log/comment/tài liệu tiếng Anh dùng English; Markdown edit có `.md.vn`.
+- Chỉ dùng dependency hiện có. Cài dependency cần user approval riêng.
+- Trước khi sửa function/class/method, chạy GitNexus upstream impact, báo callers/processes/risk và dừng nếu HIGH/CRITICAL.
+- Trước optional commit và phase completion, chạy GitNexus change detection.
+- TDD: failing test, xác nhận fail đúng lý do, implementation tối thiểu, focused green, regression suite liên quan.
+- Frontend chỉ presentation/authenticated API; backend orchestration/policy; node algorithm behavior.
+- Không xóa persisted node ID/route trước khi migration/compatibility tests đạt.
+- Không bắt đầu phase kế tiếp khi chưa có affirmative response rõ ràng.
+
+## Checkpoint bắt buộc sau mọi task
+
+- [ ] Đọc tất cả file task đã đổi và so với Interfaces.
+- [ ] Chạy focused tests của task; ghi count/exit code vào `state.md` và `state.md.vn`.
+- [ ] Chạy `git --no-pager diff --check` và xem diff của task files.
+- [ ] Kiểm tra `git status --short`, không có file bất ngờ và không đụng thay đổi ngoài scope.
+- [ ] Chạy GitNexus change detection nếu có; ghi symbols/flows/risk. Nếu không chạy được, ghi blocker chính xác và không tuyên bố graph verified.
+- [ ] Nếu người dùng yêu cầu commit, chỉ commit task files sau change detection với Conventional Commit; nếu không ghi `No commit requested`.
+- [ ] Chỉ Complete khi đủ bằng chứng; nếu thiếu, ghi Blocked/Partially complete và dừng trước dependent task.
+
+## Cổng duyệt bắt buộc sau mỗi phase
+
+1. Chạy phase test matrix/acceptance checklist.
+2. Đọc lại phase changes so với spec.
+3. Cập nhật hai state files: Completed, Verification, Changed scope, Known limitations, Current status.
+4. Chạy diff check, full phase tests/build và change detection.
+5. Báo chính xác evidence/risk cho người dùng.
+6. Hỏi: **“Phase N đã đạt checkpoint. Có tiếp tục Phase N+1 không?”**
+7. Dừng. Chỉ `Có/Tiếp tục/Proceed` hoặc tương đương rõ ràng mới cho phép sang phase sau.
+
+---
+
+## Phase 0 — Tooling và baseline safety
+
+### Task 0.1: Sửa và xác minh GitNexus Linux
+
+**Files:** Đọc rules/GitNexus skills; chỉ sửa hai state files nếu môi trường không cần repository change.
+
+**Output:** `query/context/impact/detect_changes` chạy được với `AOI_APP`, hoặc blocker rõ ràng chặn Phase 1.
+
+- [ ] Ghi `which node`, versions, npm global root, GitNexus path và index metadata qua WSL.
+- [ ] Xác minh không load Windows `.node` binary; không tự cài package.
+- [ ] Nếu thiếu/incompatible, báo non-interactive action và hỏi dependency approval.
+- [ ] Đọc repo context; refresh stale index bằng command được tài liệu hóa.
+- [ ] Chạy impact vô hại cho `ResearchPage`, query workflow training và clean-baseline change detection.
+- [ ] Ghi command/version/freshness/result vào hai state files.
+
+### Task 0.2: Ghi baseline có thể chạy
+
+**Files:** Chỉ sửa hai state files.
+
+- [ ] Ghi git status/diff stat và Python/Node/npm versions.
+- [ ] Chạy frontend typecheck, full Vitest, production build.
+- [ ] Chạy focused research API, core registry/execution, dataset contract tests.
+- [ ] Nếu pytest blocked, compile backend/core và ghi rõ không thay thế tests.
+- [ ] Kiểm tra import/version `cv2`, `numpy`, `sklearn`, không cài gì.
+- [ ] Ghi counts/failures/warnings/pre-existing failures chính xác.
+
+### Checkpoint Phase 0
+
+- [ ] GitNexus impact/change detection hoạt động; nếu không, Phase 1 Blocked.
+- [ ] Baseline/pre-existing failures ghi song ngữ.
+- [ ] Working tree chỉ có docs dự kiến.
+- [ ] Hỏi **“Phase 0 đã đạt checkpoint. Có tiếp tục Phase 1 không?”** rồi dừng.
+
+---
+
+## Phase 1 — Sửa ownership Research và Models
+
+### Task 1.1: Xóa model registry trùng khỏi Research
+
+**Files:** `ResearchPage.tsx`, test; không đổi Models.
+
+- [ ] Impact `ResearchPage`.
+- [ ] Test fail: có Research runs nhưng không có Model versions/aliases/no-model state.
+- [ ] Xác nhận fail vì section trùng còn tồn tại.
+- [ ] Xóa model load/state/markup/import/props khỏi Research.
+- [ ] Chạy Research và Models page tests.
+
+### Task 1.2: Compare là action tường minh
+
+**Output:** Compare mở khi chọn ít nhất hai run; Close đóng; không tự hiện.
+
+- [ ] Impact lại symbol khi cần.
+- [ ] Interaction tests: disabled, open, close, remove selection.
+- [ ] Xác nhận tests fail với behavior cũ.
+- [ ] Implement comparison-open state và accessible labels.
+- [ ] Chạy focused tests/typecheck.
+
+### Task 1.3: Search đúng lời hứa
+
+**Files:** Research API/integration tests; frontend service/page tests khi copy đổi.
+
+**Output:** Case-insensitive match run ID, experiment ID/name, code revision, execution target; query tối đa 200.
+
+- [ ] Impact `search_runs`/`searchResearchRuns`.
+- [ ] Backend failing tests cho từng field và non-match.
+- [ ] Xác nhận code revision/target fail trước implementation.
+- [ ] Mở rộng SQL predicate an toàn.
+- [ ] Giữ request encoding test và placeholder đúng fields.
+- [ ] Chạy backend/frontend focused tests.
+
+### Task 1.4: UI reproducibility manifest an toàn
+
+**Files:** Tạo component/test; sửa Research/service tests/styles.
+
+**Output:** View/download in-memory JSON Blob; filename `<run-id>-reproducibility.json`; revoke URL; không host path.
+
+- [ ] Impact page/service.
+- [ ] Failing tests load/error/close/download filename.
+- [ ] Xác nhận chưa có action/dialog.
+- [ ] Implement semantic dialog, states, Blob URL cleanup.
+- [ ] Wire action mỗi run; raw JSON trong advanced disclosure.
+- [ ] Chạy tests/typecheck/keyboard label checks.
+
+### Task 1.5: Sửa alias/action và rollback preview
+
+**Files:** Frontend types/service/Models/tests; backend API/models/schema/migration/tests.
+
+**Output:** `ModelAlias = candidate | champion`; rollback là lifecycle action; preview trả current/target/stable event identity.
+
+- [ ] Impact Models/lifecycle/payload/model symbols.
+- [ ] Failing tests từ chối alias rollback, preview target, reason, stale preview.
+- [ ] Xác nhận behavior cũ sai/thiếu.
+- [ ] Implement validation, transactional preview/execution guard, typed client/copy current-target.
+- [ ] Test migration/rejection persisted rollback alias; không silent reinterpret.
+- [ ] Chạy focused tests.
+
+### Task 1.6: Structured evidence và lifecycle history
+
+**Output:** Structured compatibility/validation, source-run link, events endpoint append-only.
+
+- [ ] Impact payload/endpoints/page.
+- [ ] Failing tests event ordering/actor/time/reason/fields/raw details.
+- [ ] Implement endpoint/service.
+- [ ] Thay primary JSON bằng definition list/table; giữ advanced raw evidence.
+- [ ] Status có text, không chỉ màu.
+- [ ] Chạy tests/typecheck/build/audit nếu browser có.
+
+### Checkpoint Phase 1
+
+- [ ] Research không lặp registry; compare/search/manifest đạt.
+- [ ] Models sở hữu lifecycle, rollback thấy target, có history.
+- [ ] Full frontend/typecheck/build và focused backend integration đạt.
+- [ ] Update state/change detection.
+- [ ] Hỏi **“Phase 1 đã đạt checkpoint. Có tiếp tục Phase 2 không?”** rồi dừng.
+
+---
+
+## Phase 2 — Per-node plugin folder và extensible contract
+
+### Task 2.1: Plugin descriptor/context types
+
+- [ ] Impact plugin types/NodeInspector callers.
+- [ ] Tests valid descriptor, duplicate/empty node ID.
+- [ ] Implement `NodePluginDescriptor`, contexts, registry validator.
+- [ ] Giữ backward adapter cho inspector cũ.
+- [ ] Tests/typecheck.
+
+### Task 2.2: Chuyển inspector cũ vào folder node ID
+
+- [ ] Impact camera/KNN inspector/registry.
+- [ ] Giữ behavior bằng pre-move tests.
+- [ ] Move vào `node-plugins/<node-id>/`, thêm descriptor/index/tests.
+- [ ] Xóa flat files sau khi imports resolve.
+- [ ] Plugin/NodeInspector/typecheck/build.
+
+### Task 2.3: Build-time discovery/integrity
+
+**Output:** Deterministic map từ `import.meta.glob`; lỗi duplicate/plugin thiếu manifest/manifest thiếu plugin.
+
+- [ ] Impact registry/catalog.
+- [ ] Failing tests bốn trường hợp integrity.
+- [ ] Implement discovery và descriptive errors.
+- [ ] Pure injectable function cho tests/order.
+- [ ] Frontend/backend registry tests/build.
+
+### Task 2.4: Manifest projection v2 tùy chọn
+
+- [ ] Impact core/backend/frontend model/schema/registry; cảnh báo broad risk.
+- [ ] Python/TS fixtures v1 compatibility/v2 round-trip.
+- [ ] Strict parse action/schema; không đổi ID.
+- [ ] Parity manifest/runtime/plugin tests.
+- [ ] Catalog/workflow/frontend/node suites.
+
+### Checkpoint Phase 2
+
+- [ ] Inspector folder behavior giữ nguyên; discovery/integrity đạt.
+- [ ] Manifest v1 compatible, v2 round-trip.
+- [ ] Full frontend và core/backend contract suites.
+- [ ] Update state/change detection.
+- [ ] Hỏi **“Phase 2 đã đạt checkpoint. Có tiếp tục Phase 3 không?”** rồi dừng.
+
+---
+
+## Phase 3 — Training job, immutable dataset, artifact, progress
+
+### Task 3.1: Training schemas/state transitions
+
+**Output:** `TrainingJobCreate`, status/progress, immutable binding, transition function, parent retry.
+
+- [ ] Impact ResearchRun/migrations.
+- [ ] Failing tests mọi valid path/terminal rejection.
+- [ ] Implement pure transition/Pydantic schemas.
+- [ ] Reject client-authored results/environment/code revision/terminal status.
+- [ ] Migration fields/tests cho progress/parent/action.
+- [ ] Schema/state/migration tests.
+
+### Task 3.2: Resolve immutable dataset versions
+
+- [ ] Impact dataset symbols.
+- [ ] Tests missing/mutable/mismatch/class/split/path traversal.
+- [ ] Implement resolver bằng persistence/path utility hiện có.
+- [ ] Giới hạn count/dimension/media.
+- [ ] Dataset/security regressions.
+
+### Task 3.3: Training-job API/orchestrator boundary
+
+- [ ] Impact router/research/node registry.
+- [ ] Auth API tests create/read/cancel/unknown/invalid/duplicate.
+- [ ] Implement server metadata/transaction-safe state.
+- [ ] Algorithm nằm sau typed callable; không có SVM logic.
+- [ ] Giữ legacy read; v1 không cho client tạo result mới.
+- [ ] API/service tests.
+
+### Task 3.4: Progress/cancel/verified artifacts
+
+- [ ] Impact ArtifactStore/background execution.
+- [ ] Tests monotonic progress, cancel race, checksum/length/size/failure/terminal.
+- [ ] Safe checkpoint và atomic artifact record.
+- [ ] Verify reads, ẩn storage URI.
+- [ ] Recovery đánh dấu orphaned running job failed nếu không có valid lease.
+- [ ] Service/integration tests.
+
+### Task 3.5: Frontend training client/job panel
+
+- [ ] Impact NodeInspector/service.
+- [ ] Tests payload/polling cleanup/cancel/error/duplicate.
+- [ ] Implement service/hook bằng existing API client/auth.
+- [ ] Accessible generic panel, không algorithm fields.
+- [ ] Tests/fake timers/typecheck/build.
+
+### Checkpoint Phase 3
+
+- [ ] Fake trainable node create/progress/cancel/fail/complete verified run, không platform SVM code.
+- [ ] Dataset/artifact security đạt.
+- [ ] Backend/core integration + frontend full suites.
+- [ ] Update state/change detection.
+- [ ] Hỏi **“Phase 3 đã đạt checkpoint. Có tiếp tục Phase 4 không?”** rồi dừng.
+
+---
+
+## Phase 4 — Vertical slice SVM image classifier
+
+### Task 4.1: Manifest/docs/validation SVM
+
+**Files:** Tạo đầy đủ package `core/nodes/classification/svm-image-classifier/` và tests.
+
+- [ ] Xác nhận sklearn/OpenCV versions; impact catalog/validators.
+- [ ] Failing parity/docs tests.
+- [ ] Implement constants/strict validation/manifest v2/bilingual docs, chưa train.
+- [ ] Validate HOG divisibility/dimensions/kernel fields/bounds/target.
+- [ ] Registry/docs tests.
+
+### Task 4.2: Bounded image loading/HOG
+
+- [ ] Impact new node symbols khi quy tắc yêu cầu.
+- [ ] Tests valid/corrupt/extensions/order/empty/classes/limits/cancel.
+- [ ] Implement decode/resize/grayscale/HOG trong node.
+- [ ] Diagnostics dùng logical IDs, không host paths.
+- [ ] Focused deterministic shape tests.
+
+### Task 4.3: Train/evaluate/serialize/infer
+
+- [ ] Failing defaults tests (`128x128`, RBF, `C=10`, `gamma=scale`) với fixtures deterministic.
+- [ ] Xác nhận fail trước fitting.
+- [ ] Implement stable class order/finite bounded metrics.
+- [ ] Serialize schema/framework/version/preprocess/HOG/classes/datasets/parameters; verify checksum/signature.
+- [ ] Round-trip/cancel/malformed/one-class/reproducibility tests.
+- [ ] Focused tests/benchmark.
+
+### Task 4.4: SVM plugin UI
+
+- [ ] Failing UI tests dataset/labels/HOG/kernel/start/cancel/retry/progress/results/duplicate.
+- [ ] Controls chỉ update manifest parameters.
+- [ ] Dùng shared job panel; không HOG/SVC logic trong TS.
+- [ ] Accessible confusion/report summaries.
+- [ ] Tests/typecheck/build/audit.
+
+### Task 4.5: Workflow-to-Research integration
+
+- [ ] Failing E2E bằng immutable synthetic datasets/auth user.
+- [ ] Xác nhận boundary hỏng đầu tiên.
+- [ ] Chỉ implement adapters thiếu; không duplicate node logic.
+- [ ] Assert lineage/metrics/checksum/schema/reproducibility.
+- [ ] Cancel/failure boundary tests.
+- [ ] E2E + Phase 4 suites.
+
+### Checkpoint Phase 4
+
+- [ ] SVM đạt ý định `svm_cat_dog.py` nhưng không hard-code path/class.
+- [ ] Artifact reload/inference và vertical slice đạt.
+- [ ] Node/core/backend/frontend/benchmark/docs gates.
+- [ ] Update state/change detection.
+- [ ] Hỏi **“Phase 4 đã đạt checkpoint. Có tiếp tục Phase 5 không?”** rồi dừng.
+
+---
+
+## Phase 5 — Structured 2D/table visualization
+
+### Task 5.1: Viewer payload schemas/artifact endpoint
+
+- [ ] Impact artifact/viewer symbols.
+- [ ] Failing schemas/security tests cho confusion/table/plot, finite/dimensions/fallback/auth.
+- [ ] Implement strict schemas/safe response.
+- [ ] Giữ image/heightmap compatibility.
+- [ ] Contract tests.
+
+### Task 5.2: `plot-2d-output` và `table-output`
+
+- [ ] Failing manifest/runtime accepted/rejected tests.
+- [ ] Implement node độc lập, không import node khác.
+- [ ] Bilingual docs/artifact contracts.
+- [ ] Registry/docs/runtime tests.
+
+### Task 5.3: Dashboard structured renderers
+
+- [ ] Impact selector/Dashboard/preferences.
+- [ ] Tests zero/one/multiple/fallback/malformed/independent sizing.
+- [ ] Implement React/SVG/HTML hiện có.
+- [ ] Giữ 3D explicit, không claim interactive.
+- [ ] Tests/full frontend/typecheck/build/audits.
+
+### Task 5.4: Nối SVM results với output nodes
+
+- [ ] Failing connection/render integration tests.
+- [ ] Output projection nằm trong SVM node, không SVM code ở Dashboard.
+- [ ] Nếu Matplotlib thiếu thì bỏ static generation, không cài.
+- [ ] SVM/workflow/artifact/viewer tests.
+
+### Checkpoint Phase 5
+
+- [ ] Explicit nodes quyết định image/plot/table viewers.
+- [ ] SVM results render structured/fallback accessible.
+- [ ] Full relevant suites/build/audits/state/change detection.
+- [ ] Hỏi **“Phase 5 đã đạt checkpoint. Có tiếp tục Phase 6 không?”** rồi dừng.
+
+---
+
+## Phase 6 — Model registration và production lifecycle acceptance
+
+### Task 6.1: UI tạo model/version
+
+- [ ] Impact endpoints/pages/payload.
+- [ ] Tests auth/lineage/integrity/validation/duplicate/UI states.
+- [ ] Implement completed run -> model -> artifact -> immutable version.
+- [ ] Reject artifact sai run hoặc run/validation không đạt.
+- [ ] Focused tests.
+
+### Task 6.2: Promotion/rollback/event acceptance
+
+- [ ] Failing concurrency/full journey tests.
+- [ ] Implement locking/revalidation/audit còn thiếu.
+- [ ] Assert reason/actor/current/target/time/no rollback alias.
+- [ ] API/UI suites.
+
+### Task 6.3: Immutable production binding/inference
+
+- [ ] Impact resolver/inspection/workflow execution; cảnh báo HIGH/CRITICAL.
+- [ ] E2E valid champion/missing/alias changed/checksum/missing artifact/SVM inference.
+- [ ] Implement phần immutable resolution/verification còn thiếu.
+- [ ] Past run lineage không đổi sau promotion/rollback.
+- [ ] Production/release regression tests.
+
+### Task 6.4: Final E2E acceptance
+
+- [ ] Chạy dataset -> SVM workflow -> Research -> version -> champion -> immutable binding -> inference -> viewer, ghi IDs/checksums/counts.
+- [ ] Chạy failure/cancel/rollback journeys.
+- [ ] Chạy full frontend/backend/core/node/integration/contract/docs/benchmark/typecheck/build.
+- [ ] Ghi unrelated failures riêng; acceptance-critical failure thì phase chưa complete.
+- [ ] Change detection và so toàn scope với spec.
+
+### Checkpoint Phase 6
+
+- [ ] Complete vertical slice/lifecycle acceptance có evidence.
+- [ ] Không production claim vượt target/runtime/data đã test.
+- [ ] Update state/change detection.
+- [ ] Hỏi **“Phase 6 đã đạt checkpoint. Có tiếp tục Phase 7 không?”** rồi dừng.
+
+---
+
+## Phase 7 — Đánh giá 3D tương tác tùy chọn, scope phê duyệt riêng
+
+### Task 7.1: Đánh giá renderer, không cài đặt
+
+- [ ] Inventory dependency/bundle/browser/WebGL targets.
+- [ ] Lấy official docs/security/license cho Canvas/WebGL, Plotly, Three.js, React Three Fiber.
+- [ ] Định nghĩa benchmark data/budgets trước recommendation.
+- [ ] Khuyến nghị một lựa chọn hoặc giữ static-only.
+- [ ] Hỏi dependency/implementation approval rõ ràng rồi dừng.
+
+### Task 7.2: Chỉ implement renderer đã duyệt
+
+- [ ] Impact/dependency security/license gates.
+- [ ] Failing schema/interaction/fallback/malformed/oversized/performance/no-WebGL tests.
+- [ ] Cài đúng pinned approved dependency non-interactive hoặc dùng approved API hiện có.
+- [ ] Implement renderer tối thiểu đạt budgets.
+- [ ] Full tests/typecheck/build/audits/bundle/hardware-browser acceptance.
+
+### Checkpoint cuối Phase 7
+
+- [ ] Interactive 3D được nghiệm thu bằng evidence hoặc defer rõ ràng; static fallback hoạt động.
+- [ ] Final state/full verification/change detection.
+- [ ] Hỏi **“Phase 7 đã đạt checkpoint. Bạn muốn kết thúc chuỗi triển khai hay lập kế hoạch mở rộng khác?”** rồi dừng.

@@ -1,0 +1,26 @@
+{
+  "manifestVersion": 2,
+  "packageVersion": "1.0.0",
+  "id": "table-output",
+  "use": "release",
+  "executionTarget": "local-cpu",
+  "capabilities": ["table-preview"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 64, "gpuMemoryMegabytes": 0},
+  "actions": {},
+  "artifactContracts": {"inputs": [{"key": "table-data", "schema": "aoi.table.v1"}], "outputs": [{"key": "table-data", "schema": "aoi.table.v1"}]},
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "none", "customKey": null},
+  "definition": {
+    "id": "table-output",
+    "name": "Table output",
+    "description": "Validates an explicit structured table payload for Dashboard rendering.",
+    "category": "Visualization",
+    "documentation_group": "Output viewers",
+    "inputs": [{"key": "payload", "label": "Table payload", "direction": "input", "data_type": "generic", "required": true, "variadic": false}],
+    "outputs": [{"key": "validated-payload", "label": "Validated table payload", "direction": "output", "data_type": "generic", "required": true, "variadic": false}],
+    "parameters": [],
+    "availability": "configuration-only",
+    "documentation_reference": "aoi.table.v1"
+  },
+  "catalogOrder": 105
+}

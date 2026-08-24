@@ -177,14 +177,14 @@ def test_golden_manifests_declare_typed_artifact_contracts() -> None:
     from core.nodes import get_node_manifest_registry
 
     manifests = get_node_manifest_registry()
-    assert manifests['absolute-difference'].artifact_contracts['inputs'] == (
-        'golden-image:application/x-numpy',
+    assert tuple((item.key, item.schema) for item in manifests['absolute-difference'].artifact_contracts['inputs']) == (
+        ('golden-image:application/x-numpy', None),
     )
-    assert manifests['median-mad-robust-difference'].artifact_contracts['inputs'] == (
-        'golden-statistics:application/x-numpy-archive',
+    assert tuple((item.key, item.schema) for item in manifests['median-mad-robust-difference'].artifact_contracts['inputs']) == (
+        ('golden-statistics:application/x-numpy-archive', None),
     )
-    assert manifests['per-pixel-mahalanobis-distance'].artifact_contracts['inputs'] == (
-        'distribution-statistics:application/x-numpy-archive',
+    assert tuple((item.key, item.schema) for item in manifests['per-pixel-mahalanobis-distance'].artifact_contracts['inputs']) == (
+        ('distribution-statistics:application/x-numpy-archive', None),
     )
 
 

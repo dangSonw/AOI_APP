@@ -29,6 +29,7 @@ import { DashboardPage } from './DashboardPage';
 import { DatabasePage } from './DatabasePage';
 import { DatasetPage } from './DatasetPage';
 import { HardwarePage } from './HardwarePage';
+import { HelpPage } from './HelpPage';
 import { ResearchPage } from './ResearchPage';
 import { ModelsPage } from './ModelsPage';
 import { SettingsPage } from './SettingsPage';
@@ -46,6 +47,7 @@ interface WorkspacePageProps {
 
 export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
   const [activeView, setActiveView] = useState<WorkspaceView>('dashboard');
+  const [researchQuery, setResearchQuery] = useState('');
   const [inputs, setInputs] = useState<PhysicalInputState | null>(null);
   const [outputs, setOutputs] = useState<PhysicalOutputState | null>(null);
   const [error, setError] = useState('');
@@ -199,6 +201,7 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
     const viewTitles: Record<WorkspaceView, string> = {
       dashboard: 'Inspection workspace',
       settings: 'Settings',
+      help: 'Help center',
       hardware: 'Hardware',
       'camera-manager': 'Camera manager',
       database: 'Inspection database',
@@ -321,12 +324,13 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
         />
       )}
       {activeView === 'settings' && <SettingsPage accessToken={session.accessToken} deviceSnapshot={deviceSnapshot} preferences={draftPreferences} isDirty={isPreferencesDirty} isSaving={isSavingPreferences} error={preferenceError || deviceError} onWorkstationSelect={selectWorkstation} onPreferencesChange={setDraftPreferences} onSave={savePreferences} onOpenHardware={() => requestViewChange('hardware')} />}
+      {activeView === 'help' && <HelpPage onOpenWorkspace={requestViewChange} />}
       {activeView === 'hardware' && <HardwarePage accessToken={session.accessToken} snapshot={deviceSnapshot} error={deviceError} isLoading={isLoadingDevices} onRefresh={loadDevices} />}
       {activeView === 'camera-manager' && <CameraManagerPage preferences={draftPreferences} onChange={setDraftPreferences} />}
       {activeView === 'database' && <DatabasePage accessToken={session.accessToken} />}
       {activeView === 'dataset' && <DatasetPage accessToken={session.accessToken} />}
-      {activeView === 'research' && <ResearchPage accessToken={session.accessToken} />}
-      {activeView === 'models' && <ModelsPage accessToken={session.accessToken} />}
+      {activeView === 'research' && <ResearchPage accessToken={session.accessToken} initialQuery={researchQuery} />}
+      {activeView === 'models' && <ModelsPage accessToken={session.accessToken} onOpenResearchRun={(runId) => { setResearchQuery(runId); requestViewChange('research'); }} />}
       {activeView === 'workflow-editor' && (
         <WorkflowEditorPage
           accessToken={session.accessToken}
@@ -334,6 +338,10 @@ export function WorkspacePage({ session, onSignOut }: WorkspacePageProps) {
           onBack={() => requestViewChange('dashboard')}
           onDirtyChange={setIsWorkflowDirty}
           onWorkflowSaved={setSavedWorkflow}
+          onOpenResearchRun={(runId) => {
+            setResearchQuery(runId);
+            requestViewChange('research');
+          }}
         />
       )}
     </StudioChrome>

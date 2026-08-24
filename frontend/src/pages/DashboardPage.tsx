@@ -10,6 +10,7 @@ import { ViewerSizeControls } from '../components/ViewerSizeControls';
 import { readInspectionPreview } from '../services/inspection-service';
 import { getDashboardViewerPreference, updateDashboardViewerPreference } from '../utils/workstation-preferences';
 import { selectWorkflowOutputViewers } from '../utils/workflow-output-viewers';
+import { StructuredArtifactViewer } from '../components/visualization/StructuredVisualization';
 
 interface DashboardPageProps {
   accessToken: string;
@@ -73,7 +74,7 @@ export function DashboardPage({ accessToken, inputs, outputs, isLoading, error, 
   const orderedWorkflowNodes = workflow?.executionOrder
     .map((nodeId) => workflowNodes.get(nodeId))
     .filter((node) => node !== undefined) ?? [];
-  const outputViewers = selectWorkflowOutputViewers(workflow, algorithmCatalog);
+  const outputViewers = selectWorkflowOutputViewers(workflow, algorithmCatalog, inspectionRun?.nodeRuns ?? []);
   const updateOutputViewer = (key: string, viewer: ViewerPreference) => onPreferencesChange(
     updateDashboardViewerPreference(preferences, key, viewer),
   );
@@ -191,8 +192,22 @@ export function DashboardPage({ accessToken, inputs, outputs, isLoading, error, 
               <article className={`inspection-viewer ${viewer.isCollapsed ? 'dashboard-panel--collapsed' : ''}`} style={{ '--viewer-width': viewer.widthUnits, '--viewer-height': viewer.heightUnits } as React.CSSProperties} key={output.key}>
                 <CollapsiblePanelHeader title={`2D optical view · ${output.title}`} isCollapsed={viewer.isCollapsed} onToggle={() => updateOutputViewer(output.key, { ...viewer, isCollapsed: !viewer.isCollapsed })} status={<StatusBadge status={inspectionRun?.status === 'completed' ? 'success' : 'warning'} label={inspectionRun?.status === 'completed' ? 'Workflow output' : 'Awaiting output'} />} controls={<ViewerSizeControls label={`2D optical view ${output.title}`} viewer={viewer} onChange={(nextViewer) => updateOutputViewer(output.key, nextViewer)} />} />
                 {!viewer.isCollapsed && <>
-                  <InspectionPreview accessToken={accessToken} run={inspectionRun} nodeId={output.nodeId} />
+                  {output.kind === 'plot-2d'
+                    ? <StructuredArtifactViewer accessToken={accessToken} descriptor={output.descriptor} title={output.descriptor?.title ?? output.title} />
+                    : <InspectionPreview accessToken={accessToken} run={inspectionRun} nodeId={output.nodeId} />}
                   <footer><span>{output.title}</span><span>{inspectionRun?.nodeRuns.length ?? 0} nodes</span></footer>
+                </>}
+              </article>
+            );
+          })}
+          {outputViewers.tables.map((output) => {
+            const viewer = getDashboardViewerPreference(preferences, output.key);
+            return (
+              <article className={`inspection-viewer ${viewer.isCollapsed ? 'dashboard-panel--collapsed' : ''}`} style={{ '--viewer-width': viewer.widthUnits, '--viewer-height': viewer.heightUnits } as React.CSSProperties} key={output.key}>
+                <CollapsiblePanelHeader title={`Table · ${output.title}`} isCollapsed={viewer.isCollapsed} onToggle={() => updateOutputViewer(output.key, { ...viewer, isCollapsed: !viewer.isCollapsed })} status={<StatusBadge status={output.descriptor ? 'success' : 'warning'} label={output.descriptor ? 'Workflow output' : 'Awaiting output'} />} controls={<ViewerSizeControls label={`Table ${output.title}`} viewer={viewer} onChange={(nextViewer) => updateOutputViewer(output.key, nextViewer)} />} />
+                {!viewer.isCollapsed && <>
+                  <StructuredArtifactViewer accessToken={accessToken} descriptor={output.descriptor} title={output.descriptor?.title ?? output.title} />
+                  <footer><span>{output.title}</span><span>Structured table output</span></footer>
                 </>}
               </article>
             );
@@ -203,13 +218,15 @@ export function DashboardPage({ accessToken, inputs, outputs, isLoading, error, 
               <article className={`inspection-viewer ${viewer.isCollapsed ? 'dashboard-panel--collapsed' : ''}`} style={{ '--viewer-width': viewer.widthUnits, '--viewer-height': viewer.heightUnits } as React.CSSProperties} key={output.key}>
                 <CollapsiblePanelHeader title={`3D measurement · ${output.title}`} isCollapsed={viewer.isCollapsed} onToggle={() => updateOutputViewer(output.key, { ...viewer, isCollapsed: !viewer.isCollapsed })} status={<StatusBadge status="success" label="Workflow output" />} controls={<ViewerSizeControls label={`3D measurement ${output.title}`} viewer={viewer} onChange={(nextViewer) => updateOutputViewer(output.key, nextViewer)} />} />
                 {!viewer.isCollapsed && <>
-                  <div className="pcb-visual pcb-visual--depth" role="img" aria-label={`3D measurement output for ${output.title}`}>
+                  {output.kind === 'heightmap'
+                    ? <StructuredArtifactViewer accessToken={accessToken} descriptor={output.descriptor} title={output.descriptor?.title ?? output.title} />
+                    : <div className="pcb-visual pcb-visual--depth" role="img" aria-label={`3D measurement output for ${output.title}`}>
                     <span className="depth-plane" />
                     <span className="depth-component depth-component--one" />
                     <span className="depth-component depth-component--two" />
                     <span className="depth-component depth-component--three" />
                     <span className="depth-scale">0 μm<span />2400 μm</span>
-                  </div>
+                    </div>}
                   <footer><span>{output.title}</span><span>3D measurement output</span></footer>
                 </>}
               </article>

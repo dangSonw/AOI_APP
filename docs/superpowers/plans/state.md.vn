@@ -11,3 +11,442 @@ Bản dịch này tóm tắt `docs/superpowers/plans/state.md`; bản tiếng An
 - Node inventory: 102 manifest, 82 DEBUG, 20 TEST, 0 RELEASE.
 - ONNX Runtime chưa cài; Phase 8 bị block.
 - Phase 9 và Phase 10 chưa đạt acceptance evidence đầy đủ; không đưa ra production claim.
+
+---
+
+## Kế hoạch workflow training — Checkpoint Phase 0 — 2026-08-24
+
+### Đã hoàn thành
+
+- Xác định lỗi GitNexus WSL là lỗi command resolution: WSL mặc định chọn Windows npm shim trong `/mnt/c/Users/sonev/AppData/Roaming/npm`.
+- Xác minh native module lỗi là Windows PE32+ DLL, còn module GitNexus Linux sẵn có là ELF x86-64.
+- Tái sử dụng GitNexus Linux 1.6.9 đã có trong NVM; không cài hay nâng cấp package.
+- Tạo user-local shim `~/.local/bin/gitnexus`. `~/.profile` sẵn có đã ưu tiên thư mục này trước Windows PATH, nên WSL login shell mới tự chọn Linux CLI mà không đổi Node runtime của frontend.
+- Refresh index từ commit `d91b76e` lên commit hiện tại `2a4c1a0`.
+- Tạo spec và implementation plan song ngữ đã duyệt; không sửa application source symbol.
+
+### Xác minh GitNexus
+
+- `command -v gitnexus` trả `/home/sonev/.local/bin/gitnexus`; version `1.6.9`.
+- `gitnexus status` báo up-to-date trên `main`, commit index/current đều là `2a4c1a0`.
+- Reanalysis tạo 9.493 node, 16.217 edge, 275 cluster và 260 flow.
+- Query workflow training trả SVM script và dataset-training definitions.
+- Context `ResearchPage` trả đúng callers/callees/process.
+- Upstream impact `ResearchPage` là **LOW**: một direct caller `WorkspacePage`, hai symbol bị tác động đến depth 2, một process và một module.
+- Change detection báo không có application symbol change; thay đổi hiện tại là tài liệu untracked/tracked state.
+
+### Baseline có thể chạy
+
+- Frontend typecheck PASS.
+- Vitest PASS: 34 file, 88 test.
+- Production build PASS; còn warning chunk minified 544,13 kB đã tồn tại.
+- Compileall backend/core PASS.
+- Environment dự án: Python 3.12.13, pytest 8.3.4, NumPy 2.2.6, OpenCV headless 4.13.0.92, scikit-learn 1.7.1.
+- Research API PASS: 6 test, 2 warning.
+- Node registry/workflow execution PASS: 18 test.
+- Dataset focused baseline: 30 PASS, 7 FAIL. Đây là nhóm CSV/KNN có sẵn đã ghi trước đó: một mismatch validation accuracy và sáu lỗi CSV preparation/API HTTP 422 hoặc thiếu `preparationId`.
+
+### Phạm vi và giới hạn
+
+- Repository chỉ đổi spec/plan song ngữ mới và checkpoint state song ngữ này.
+- GitNexus shim nằm ngoài repository trong user environment.
+- Không cài dependency, không sửa source symbol và không commit.
+- Repository là checkout `main` bình thường, không phải linked worktree; tiếp tục tại workspace người dùng yêu cầu để giữ spec/plan uncommitted cùng scope.
+- Bảy dataset failure vẫn là baseline regression, không sửa trong Phase 0.
+
+### Trạng thái hiện tại
+
+Phase 0 **hoàn thành tại checkpoint**. GitNexus analyze/status/query/context/impact/change detection hoạt động trong WSL login shell mới. Baseline và lỗi có sẵn đã được ghi. Không được bắt đầu Phase 1 trước khi người dùng xác nhận rõ ràng.
+
+### Phase 1 — Checkpoint Task 1.1
+
+- Đã xóa model loading/state/props và registry markup khỏi `ResearchPage`; Models vẫn là lifecycle workspace.
+- Bằng chứng TDD: ownership test mới FAIL vì section `Model versions` cũ, sau minimal removal thì PASS.
+- Focused Research/Models: 2 file, 4 test PASS; frontend typecheck PASS.
+- GitNexus pre-edit impact cho `ResearchPage`: LOW, một direct caller và một process. Post-edit change detection: MEDIUM aggregate, một application symbol và flow `ResearchPage -> ApiError`.
+- `git diff --check` PASS. Không commit.
+
+### Phase 1 — Checkpoint Task 1.2
+
+- Thêm pure comparison transition dùng trực tiếp trong `ResearchPage`: chỉ mở sau explicit action khi có ít nhất hai run, đóng bằng action và tự đóng khi selection dưới hai.
+- Bằng chứng TDD: transition test FAIL vì function chưa tồn tại, sau implementation thì PASS.
+- Focused verification: 3 Research test PASS; frontend typecheck và diff check PASS.
+- GitNexus pre-edit impact vẫn LOW. Post-edit change detection MEDIUM aggregate với flow `ResearchPage -> ApiError`; không có HIGH/CRITICAL.
+- Không thêm dependency và không commit.
+
+### Phase 1 — Checkpoint Task 1.3
+
+- Mở rộng Research search không phân biệt hoa thường cho run ID, experiment ID/name, code revision và execution target; giữ giới hạn query 200 ký tự.
+- Sửa placeholder đúng backend contract và thêm regression test cho URL encoding.
+- Bằng chứng TDD: backend experiment-ID search và UI copy FAIL trước implementation; service encoding cũ đã PASS nên không sửa production thừa.
+- Verification: Research API 6 test PASS với 2 warning cũ; frontend service/page 7 test PASS; typecheck/diff check PASS.
+- Cả hai pre-edit impact đều LOW. Post-edit change detection MEDIUM aggregate với một frontend flow; không có HIGH/CRITICAL. Không commit.
+
+### Phase 1 — Checkpoint Task 1.4
+
+- Thêm action reproducibility manifest có xác thực cho mỗi Research run và modal accessible có loading/error, Escape/focus restore, JSON download và advanced raw disclosure.
+- Helper load/download đã test; filename được sanitize và Blob URL được revoke rõ ràng.
+- Bằng chứng TDD: tests FAIL vì chưa có component/action, sau implementation thì PASS.
+- Verification: component/page/service 11 test PASS; typecheck/diff check PASS.
+- Pre-edit impact cho `ResearchPage` và `readReproducibilityManifest` đều LOW. Change detection vẫn MEDIUM aggregate với một frontend flow. Không dependency/commit.
+
+### Phase 1 — Checkpoint Task 1.5
+
+- Sửa domain: `ModelAlias` chỉ còn `candidate` và `champion`; rollback là lifecycle action.
+- Thêm endpoint versioned preview/confirm rollback. Confirm gửi preview event identity và từ chối stale preview dưới alias locking.
+- Models tải preview trước confirmation và hiển thị rõ current/target version.
+- Promotion/preview/rollback/listing từ chối unsupported alias; persisted alias `rollback` bị reject rõ ràng, không reinterpret.
+- TDD bao phủ missing preview, rollback alias rejection, stale preview, persisted invalid alias, frontend payload và target-visible confirmation.
+- Verification: Research/model API 8 test PASS với 2 warning cũ; frontend lifecycle/Models/NodeInspector 13 test PASS; typecheck, compileall, diff check PASS.
+- Test invalid persisted alias chỉ cleanup fixture prefix `pcb-invalid-alias-*` của chính nó, không làm bẩn shared database.
+- GitNexus aggregate vẫn HIGH cho Task 1.1–1.5: 11 file, 23 symbol, 7 flow. Tất cả pre-edit impact riêng đều LOW. Người dùng đã xác nhận tiếp tục Task 1.5 sau cảnh báo. Không commit.
+
+### Phase 1 — Checkpoint Task 1.6
+
+- Thêm created timestamp cho model version và endpoint lifecycle events append-only, newest-first, có actor/reason/versions/action/alias/time.
+- Thay primary raw JSON bằng semantic compatibility/validation definition lists; raw evidence chỉ còn trong advanced disclosure.
+- Thêm lifecycle-history loading và text detail cho từng event.
+- Nối source-run navigation từ Models qua Workspace sang Research, mang run ID làm initial query.
+- Bằng chứng TDD: backend event/timestamp, frontend event client, structured labels và source-run query đều FAIL trước implementation rồi PASS.
+- Focused verification: Research/model API 8 test PASS với 2 warning cũ; Models/Research/service/App 14 test PASS; typecheck, compileall, diff check PASS.
+- Tất cả impact riêng Task 1.6 đều LOW. Không dependency/commit.
+
+---
+
+## Kế hoạch workflow training — Checkpoint Phase 1 — 2026-08-24
+
+### Đã hoàn thành
+
+- Research không còn load/render model registry; Models là lifecycle workspace duy nhất.
+- Compare run là action tường minh, đóng được và tự đóng khi còn dưới hai selection.
+- Search Research hỗ trợ run ID, experiment ID/name, code revision và execution target không phân biệt hoa thường; UI copy khớp backend.
+- Mỗi run có reproducibility manifest dialog xác thực, load/error an toàn, filename sanitize, Blob URL cleanup và advanced raw disclosure.
+- Alias chỉ còn `candidate`/`champion`. Rollback là action có preview identity server-side, stale-preview rejection, required reason, transaction locking và hiển thị current/target version.
+- Persisted unsupported alias bị reject rõ ràng, không hiển thị hoặc reinterpret âm thầm.
+- Models hiển thị structured compatibility/validation, created timestamp, source-run navigation và append-only lifecycle history có actor/reason/version/time.
+
+### Xác minh Phase
+
+- Full Vitest PASS: 35 file, 97 test.
+- Frontend typecheck PASS.
+- Production build PASS; chunk warning cũ còn tồn tại, JS minified 548,76 kB.
+- Focused Research/model API, research service và workflow execution PASS: 23 test, 2 warning cũ.
+- Compileall backend/core PASS.
+- `git diff --check` PASS.
+- Đã thử accessibility audit nhưng **bị block** vì browser connector server không có. Không đưa ra live accessibility claim; semantic/ARIA behavior có static render tests.
+
+### Risk và phạm vi
+
+- Mọi existing symbol sửa trong Phase 1 đều chạy upstream impact trước edit; tất cả risk riêng là LOW.
+- Aggregate change detection lên HIGH tại Task 1.5 vì phase chưa commit chạm frontend Research/Models, backend lifecycle, tests và state docs. Người dùng đã xác nhận tiếp tục sau cảnh báo HIGH.
+- Không thêm dependency và không commit.
+
+### Giới hạn
+
+- Dataset CSV/KNN baseline failures có sẵn vẫn ngoài Phase 1 và không bị sửa.
+- Legacy rollback endpoint giữ để tương thích nhưng đã reject unsupported alias; Models UI dùng `/api/v1` preview-confirm contract an toàn.
+- Live browser interaction/audit vẫn bị block đến khi có browser connector.
+
+### Trạng thái hiện tại
+
+Phase 1 **hoàn thành tại checkpoint** cho scope ownership/lifecycle Research/Models đã duyệt. Không được bắt đầu Phase 2 trước khi người dùng xác nhận rõ ràng.
+
+### Phase 2 — Checkpoint Task 2.1
+
+- Thêm typed contract cho plugin platform/dataset/training/navigation/result/preview/descriptor, không lộ storage/hardware/Python/shell execution.
+- Thêm deterministic `buildNodePluginRegistry` validation cho valid/duplicate/empty/malformed node ID.
+- Giữ nguyên API tương thích `getNodeInspectorPlugin(key): NodeInspectorPlugin | null` và behavior Camera/KNN.
+- Bằng chứng TDD: cả 3 registry test FAIL vì builder chưa tồn tại, sau implementation thì PASS.
+- Verification: registry/NodeInspector/App 11 test PASS; typecheck/build/diff check PASS.
+- GitNexus báo symbol-level HIGH cho `getNodeInspectorPlugin` (NodeInspector, WorkflowEditorPage, App). Người dùng đã duyệt compatibility-layer strategy trước edit. Không dependency/commit.
+
+### Phase 2 — Checkpoint Task 2.2
+
+- Chuyển Camera acquisition và KNN image segmentation inspector vào folder theo node ID, có descriptor `index.ts` và co-located tests.
+- Chỉ xóa flat inspector path cũ sau khi registry imports resolve.
+- Giữ nguyên markup/behavior và compatibility lookup.
+- Verification: plugin/registry/NodeInspector 11 test PASS; typecheck/build, flat-file absence và diff check PASS.
+- Impact riêng hai inspector đều LOW. Registry builder là symbol mới chưa index nên trả UNKNOWN, không phải HIGH. Không dependency/commit.
+
+### Phase 2 — Checkpoint Task 2.3
+
+- Thêm Vite eager build-time discovery cho `node-plugins/*/index.ts`, deterministic path order và exactly-one-descriptor validation.
+- Thêm pure integrity checks cho plugin thiếu manifest key và manifest key thiếu plugin.
+- Workflow Editor validate plugin/catalog trước khi nhận catalog đã tải.
+- Backend manifest-key projection đã PASS regression mới nên không thêm backend production change thừa.
+- Bằng chứng TDD: discovery frontend FAIL vì module chưa tồn tại, sau implementation thì toàn bộ tests PASS.
+- Verification: discovery/registry/NodeInspector/App 15 test PASS; backend schema/node registry 14 test PASS; typecheck/build/diff check PASS.
+- Impact WorkflowEditorPage/loadEditor đều LOW. Compatibility lookup HIGH đã duyệt vẫn giữ public API. Không dependency/commit.
+
+### Phase 2 — Checkpoint Task 2.4
+
+- Thêm typed manifest-v2 action/artifact contract vào `NodeManifest`, `AlgorithmDefinition`, backend schema projection và frontend workflow types.
+- Giữ nguyên 102 manifest v1, không mass edit. Legacy v1 artifact string giữ làm opaque compatible key; v2 bắt buộc strict `{key, schema}`.
+- Thêm strict v2 validation cho approved action, capability parity, dataset key, execution target, cancellation, artifact direction/key/schema.
+- Dùng temporary v2 parser/round-trip fixtures và invalid-contract cases; chưa thêm production v2 node.
+- Bằng chứng TDD: core/backend ban đầu FAIL vì chưa có v2 types/parser. Implementation đầu tiên phát hiện compatibility case v1 `key:media-type`; đã giữ tương thích trước khi suite PASS.
+- Verification: core node registry/backend workflow schema 20 test PASS; frontend manifest/plugin contract 12 test PASS; typecheck, compileall, diff check PASS.
+- GitNexus báo CRITICAL cho `NodeManifest` và HIGH cho `AlgorithmDefinition`. Người dùng đã duyệt sửa cả hai contract trước edit. Không dependency/commit.
+
+---
+
+## Kế hoạch workflow training — Checkpoint Phase 2 — 2026-08-24
+
+### Đã hoàn thành
+
+- Thêm typed plugin descriptor và optional authenticated context cho dataset/training/navigation, không lộ direct storage/hardware/Python/shell execution.
+- Giữ public inspector lookup API, thêm deterministic registry validation.
+- Chuyển Camera/KNN inspector vào folder theo node ID có descriptor/test; xóa flat file cũ.
+- Thêm Vite eager build-time discovery và strict module cardinality check.
+- Workflow Editor validate plugin/catalog integrity trước khi nhận catalog.
+- Thêm backward-compatible typed manifest-v2 actions/artifact contracts xuyên core/backend/frontend.
+- Giữ toàn bộ manifest v1 và legacy artifact-string format; chưa migrate production node sang v2.
+
+### Xác minh Phase
+
+- Full Vitest PASS: 40 file, 107 test.
+- Frontend typecheck PASS.
+- Production build PASS; chunk warning cũ còn tồn tại, JS minified 550,40 kB.
+- Focused core node registry, workflow execution, backend workflow schema/API PASS: 38 test, 2 warning cũ.
+- Compileall backend/core PASS.
+- `git diff --check` PASS.
+- Flat inspector path không còn; plugin folder theo node ID tồn tại.
+
+### Risk và phạm vi
+
+- `getNodeInspectorPlugin` có symbol-level HIGH. Người dùng duyệt compatibility-layer; public signature/behavior không đổi.
+- `NodeManifest` CRITICAL (176 symbol, 104 direct dependant) và `AlgorithmDefinition` HIGH (179 symbol). Người dùng đã duyệt sửa cả hai contract.
+- `_load_manifest`, WorkflowEditorPage/loadEditor, AlgorithmDefinitionSchema và individual inspector đều LOW.
+- Final aggregate change detection là CRITICAL vì Phase 1–2 cùng chưa commit và có core manifest-contract changes đã được duyệt: 25 indexed file, 128 changed symbol, 18 affected flow. Không thêm dependency và không commit.
+
+### Giới hạn
+
+- Chưa có persisted production manifest dùng v2; Task 2.4 chỉ chứng minh contract bằng temporary fixture.
+- Plugin discovery eager ở build-time; lazy code splitting để sau và bundle warning còn tồn tại.
+- Browser accessibility audit chưa có vì browser connector không chạy.
+- CSV/KNN baseline failures có sẵn vẫn ngoài phase.
+
+### Trạng thái hiện tại
+
+Phase 2 **hoàn thành tại checkpoint** cho plugin folder, discovery/integrity và backward-compatible manifest-v2 contract. Không được bắt đầu Phase 3 trước khi người dùng xác nhận rõ ràng.
+
+---
+
+## Kế hoạch workflow training — Checkpoint Phase 3 — 2026-08-24
+
+### Đã hoàn thành
+
+- Khôi phục scope platform Phase 3.1–3.4 chưa commit từ phiên trước: core training contract, backend schema strict, immutable dataset resolver, training-job API/service có authentication, background execution, progress/cancellation/artifact persistence, migration và recovery tests đều có trong working tree.
+- Thêm frontend types cho `TrainingJob`, create payload, dataset binding, progress, artifact và terminal status khớp camel-case API contract backend.
+- Thêm service create/read/cancel có authentication cho `/api/v1/research/training-jobs` mà không sửa shared transport `apiRequest`.
+- Thêm bounded single-flight training-job poller và React hook với immediate polling, terminal/unmount cleanup, safe error, chống create trùng và cancellation state.
+- Thêm `TrainingJobPanel` dùng chung, không chứa field thuật toán, có text status, determinate/indeterminate progress semantics, announced error và action start/cancel/open-run.
+- Mở rộng optional node-plugin platform context bằng create/read/cancel/open-run đã bind access token, recipe slug, workflow revision và node instance identity.
+- Nối Workflow Editor sang Research theo run ID qua guarded workspace navigation hiện có.
+- Thêm responsive light-theme CSS bằng dependency hiện có.
+
+### Bằng chứng TDD
+
+- Focused frontend run đầu tiên FAIL 3 suite vì chưa có `training-job-service`, `use-training-job` và `TrainingJobPanel`; NodeInspector suite hiện có vẫn PASS 7 test.
+- Sau minimal implementation, một service test phát hiện fixture dùng lại `Response` đã consume; chỉ fixture được sửa, production behavior không đổi.
+- Focused frontend run cuối: PASS, 4 file và 14 test.
+
+### Xác minh
+
+- Full frontend Vitest: PASS, 43 file và 115 test.
+- Frontend typecheck: PASS.
+- Frontend production build: PASS. Chunk warning cũ còn tồn tại; JS minified 551,08 kB.
+- Python 3.12 `compileall` backend/core: PASS.
+- Phase 3 core/backend/integration matrix: PASS, 90 test. Scope gồm contract, schema, immutable dataset resolver, job service, progress/cancellation/artifact, authenticated API, migration và orphan recovery.
+- `git diff --check`: PASS.
+- Đã đọc lại toàn bộ file Task 3.5 theo task interfaces; plugin frontend không lộ storage path, hardware access, Python/shell execution, secret hoặc behavior training theo thuật toán.
+- Không thêm dependency, không có yêu cầu commit và không tạo commit.
+
+### Risk và phạm vi thay đổi
+
+- Impact `NodeInspector` LOW: 1 direct caller, 2 affected process và tổng 3 upstream symbol.
+- Impact `WorkflowEditorPage` LOW: 1 direct caller, 1 affected process. Impact `WorkspacePage` LOW: 1 direct caller, 1 affected process.
+- GitNexus không resolve được interface-only TypeScript symbols `NodePluginPlatformContext` và `NodePluginTrainingContext`, nên graph risk là UNKNOWN; code search chỉ thấy plugin type module và typed plugin props.
+- Impact `apiRequest` CRITICAL (62 direct caller, 30 process, 114 upstream symbol). Symbol này không bị sửa; training service mới chỉ gọi API hiện có.
+- Final aggregate change detection là CRITICAL vì working tree chưa commit gộp Phase 1–3: 30 indexed file, 137 changed symbol và 18 affected flow. Các flow Task 3.5 dự kiến của `NodeInspector`, `WorkflowEditorPage`, `WorkspacePage`, App/API client nằm cùng các thay đổi Research và manifest contract có sẵn.
+
+### Môi trường và giới hạn
+
+- Người dùng đã duyệt verification trong Conda base hiện có với Python 3.14.6. Không cài được toàn bộ requirements đã pin vì NumPy/scikit-learn pins không có wheel Python 3.14 và SciPy source dependency cần Fortran compiler không có sẵn.
+- Sau đó người dùng duyệt môi trường verification tương thích Python 3.14: dùng NumPy 2.5.2, scikit-learn 1.9.0 và Pydantic 2.13.4 có sẵn; SQLAlchemy 2.0.52; pure psycopg 3.2.3; python-multipart 0.0.20; cùng các focused backend/test dependencies còn lại. `pip check` PASS. Không sửa `backend/requirements.txt`.
+- Python matrix cuối phát sinh 539 compatibility/pending-deprecation warning từ Python 3.14/FastAPI/Pydantic. Không warning nào làm test fail, nhưng bằng chứng này không khẳng định có thể thay môi trường Python 3.12 đã pin của repository bằng Conda base này.
+- Isolated service tests ban đầu phát hiện SQLAlchemy model registration chưa đầy đủ. Ba training test module giờ import production database bootstrap registration trước khi tạo ORM entity; không đổi production model/service behavior.
+- Chưa có production manifest-v2 trainable node theo chủ đích cho tới Phase 4; Task 3.5 cung cấp shared platform UI/client cho plugin tương lai.
+- Live browser accessibility audit vẫn unavailable vì browser connector không chạy. Render tests đã cover semantic role, label, text state và error announcement.
+- Bundle-size warning cũ còn tồn tại; không thêm dependency mới.
+
+### Trạng thái hiện tại
+
+Task 3.5 **đã hoàn thành và được frontend verify**. Phase 3 **hoàn thành tại checkpoint**: generic platform có thể create, progress, cancel, fail, complete, persist verified artifact, recover orphaned job và cung cấp authenticated frontend controls mà không có behavior riêng cho SVM. Không được bắt đầu Phase 4 nếu chưa có phản hồi đồng ý rõ ràng của người dùng.
+
+### Phase 4 — Checkpoint Task 4.1
+
+- Thêm production manifest-v2 package đầu tiên `svm-image-classifier`, có release/local-CPU identity, action train/evaluate/infer/export, typed model/metrics/report/confusion/failed-image artifact, strict parameter validation và tài liệu song ngữ.
+- Giữ toàn bộ 102 manifest-v1 package; inventory catalog/runtime/documentation hiện có 103 package và parity chính xác.
+- Giữ mặc định của script tham chiếu: 128×128, HOG 16/8/8/9, StandardScaler, RBF, C=10, gamma=scale và seed 42. Chưa có training behavior; runtime fail rõ ràng cho tới Task 4.2/4.3.
+- TDD: focused suite ban đầu FAIL 9 case vì package chưa tồn tại; suite cuối PASS 34 test. Compileall và diff check PASS.
+- Impact registry loader/validator LOW. Aggregate detection vẫn CRITICAL vì Phase 1–4.1 cùng chưa commit: 32 indexed file, 140 symbol, 18 flow. Không đổi repository dependency và không commit.
+
+### Phase 4 — Checkpoint Task 4.2
+
+- Thêm OpenCV image decode, resize, grayscale conversion và HOG extraction có giới hạn, xác định hoàn toàn trong package node SVM.
+- Enforce class mapping, extension cho phép, metadata/decoded-pixel limit, sample limit, fail/skip policy, thứ tự class/logical ổn định, finite feature và cancellation trước từng item.
+- Failed-image diagnostics chỉ lộ logical ID và safe reason, không lộ host path.
+- TDD: cả 5 feature test ban đầu FAIL vì chưa có `extract_dataset_features`; SVM contract/feature suite cuối PASS 9 test với feature shape 8100 như kỳ vọng. Compileall/diff check PASS. Aggregate graph scope vẫn CRITICAL do shared uncommitted worktree; symbol SVM mới chưa được index nên trả UNKNOWN, không phải HIGH.
+
+### Phase 4 — Checkpoint Task 4.3
+
+- Thêm StandardScaler/SVC fitting, evaluation, class report/confusion payload ổn định, trusted artifact persistence, reload và inference xác định trong package SVM.
+- Deterministic ZIP envelope verify outer/inner SHA-256, metadata signature, schema, node/package identity và exact Python/scikit-learn runtime compatibility trước trusted pickle deserialization. Artifact không tin cậy bị từ chối trước load; không có browser upload path.
+- TDD: training suite ban đầu FAIL 3 boundary vì thiếu train/artifact API và runtime routing; SVM/core regression cuối PASS 33 test. Synthetic 16-image train/evaluate/serialize round trip hoàn tất trong 0,80 giây.
+- Tài liệu scikit-learn chính thức xác nhận native pickle chỉ dành cho trusted source và không hỗ trợ cross-version. Ghi nhận 3 warning deprecation của scikit-learn 1.9 cho probability contract đã duyệt; repository target vẫn là 1.7.1. Compileall/diff check PASS.
+
+### Phase 4 — Checkpoint Task 4.4
+
+- Thêm discovered SVM plugin với các phần Dataset, Feature extraction, Model, Training và Results, immutable SHA-256 binding input, hướng dẫn label mapping, HOG fast feedback, field phụ thuộc kernel, shared job hook/panel và điều hướng Research.
+- Thêm table fallback accessible cho report và confusion matrix; TypeScript không chứa HOG hoặc SVC behavior.
+- TDD: plugin suite ban đầu FAIL vì thiếu inspector/result module; focused plugin/shared-panel suite PASS 13 test. Full frontend PASS 44 file và 118 test; typecheck/build PASS. Registry/workflow API PASS 21 test.
+- Build còn chunk warning hiện có; JS minified 561,91 kB. Đã thử live accessibility audit nhưng bị chặn vì browser connector unavailable; semantic render tests PASS.
+
+### Phase 4 — Checkpoint Task 4.5
+
+- Thêm generic runtime adapter resolve node theo ID, inject immutable dataset handle và cancellation probe, advance progress stage chuẩn, validate finite metrics và chuyển binary/JSON output thành verified artifact mà không import SVM implementation code.
+- Thêm bounded background dispatcher factory dùng database session riêng của worker; authenticated create endpoint trả về mà không chạy training trong request thread.
+- Thêm translation cục bộ đã được duyệt rõ từ shared contract `NodeExecutionCancelled` có impact CRITICAL sang training-platform contract `TrainingCancelled`. Không sửa exception class hoặc caller hiện có.
+- SVM E2E chứng minh completed training, exact dataset/node/package lineage, verified model/report/confusion/failed-image artifact, Research reproducibility manifest hashes/metrics, safe one-class failure và cancellation. SVM E2E cuối PASS 3 test; focused backend/API boundary PASS 30 test.
+
+---
+
+## Kế hoạch workflow training — Checkpoint Phase 4 — 2026-08-24
+
+### Đã hoàn thành
+
+- Chuyển ý định Cat/Dog reference thành release node `svm-image-classifier` không phụ thuộc tên class, có manifest-v2 actions, immutable dataset, bounded HOG extraction, StandardScaler/SVC training, evaluation, deterministic trusted artifact, reload/inference, shared frontend controls và Research lineage.
+- Giữ mặc định script mà không hard-code path hoặc label: 128×128, HOG 16/8/8/9, RBF, C=10, gamma=scale.
+- Giữ algorithm behavior trong independent node package; orchestration/UI vẫn generic.
+
+### Xác minh Phase
+
+- Selected Phase 4 Python SVM/platform/Research/workflow matrix: PASS 101 test, có warning tương thích Python 3.14.
+- Rerun SVM E2E sau lineage assertions: PASS 3 test.
+- Full frontend Vitest: PASS 44 file và 118 test.
+- Frontend typecheck và production build: PASS; JS minified 561,91 kB với chunk warning hiện có.
+- Python compileall, `git diff --check` và Conda `pip check`: PASS.
+- Bounded synthetic train/evaluate/serialize round trip: 0,80 giây.
+- Đã thử live accessibility audit nhưng bị chặn vì browser connector unavailable; semantic render tests PASS.
+
+### Risk, giới hạn và failure không liên quan
+
+- Impact `NodeExecutionCancelled` CRITICAL (30 direct dependant, 173 upstream symbol). Người dùng chỉ duyệt translation cục bộ trong adapter; shared class không bị sửa.
+- Symbol Phase 3–4 mới chưa được index nên thường trả UNKNOWN. Registry loader/validator và existing page symbols được analyze trước edit đều LOW. Aggregate detection vẫn CRITICAL vì toàn bộ Phase 1–4 cùng chưa commit.
+- Native scikit-learn pickle chỉ được nhận từ trusted artifact store đã verify checksum sau envelope verification. Tài liệu chính thức nêu untrusted pickle có thể thực thi mã tùy ý và không hỗ trợ cross-version loading.
+- Full DEBUG documentation suite còn đỏ 3 case không liên quan: tài liệu KNN custom inspector còn metadata `implementation` đã xóa, feature-editor README không dùng JSON mâu thuẫn generic JSON assertion, và thiếu `scripts/generate_node_docs.py` được tham chiếu. Phase 4 không sửa các file này; SVM bilingual/registry documentation gates PASS.
+- Verification dùng môi trường Conda tương thích Python 3.14 được người dùng duyệt và ghi ở Phase 3, không phải exact Python 3.12 pins của repository.
+
+### Trạng thái hiện tại
+
+Phase 4 **hoàn thành tại checkpoint** cho SVM vertical slice đã duyệt. Selected acceptance-critical SVM/platform/frontend matrix PASS; các legacy DEBUG documentation failure không liên quan vẫn được ghi rõ là open. Không được bắt đầu Phase 5 nếu chưa có phản hồi đồng ý rõ ràng của người dùng.
+
+### Phase 5 — Checkpoint Task 5.1
+
+- Thêm strict bounded core/frontend contract cho `aoi.confusion-matrix.v1`, `aoi.table.v1`, `aoi.plot-series.v1` và authenticated viewer descriptor.
+- Thêm authenticated raw artifact read tại `/api/v1/research/artifacts/{id}` dùng training content-addressed store, immutable metadata do DB sở hữu, checksum/length re-verification, no-store/nosniff header và safe 404/409 error không lộ storage URI.
+- TDD: core/API/frontend tests ban đầu FAIL vì thiếu contract, parser và endpoint; core/backend cuối PASS 9 test, frontend PASS 2 test, typecheck/compileall/diff check PASS.
+- `ArtifactStore.read_verified` có impact HIGH (1 direct caller, 8 upstream symbol, 3 model lifecycle process) và cố ý không bị sửa; endpoint gọi nguyên trạng. Aggregate change detection vẫn CRITICAL do shared uncommitted worktree.
+
+### Phase 5 — Checkpoint Task 5.2
+
+- Thêm hai release/v2 package độc lập `plot-2d-output` và `table-output`, có explicit preview capability, strict platform-schema validation, normalized pass-through output, typed artifact contract và tài liệu song ngữ.
+- Giữ nguyên ID `image-output` và `heightmap-output`. Inventory hiện có 105 package: 102 v1 và 3 v2.
+- TDD: 5 failure đầu chứng minh hai package chưa tồn tại; registry/runtime/catalog/workflow suite cuối PASS 31 test.
+
+### Phase 5 — Checkpoint Task 5.3
+
+- Mở rộng workflow output selector bằng capability tường minh `plot-2d-preview` và `table-preview`, đồng thời giữ tương thích legacy `image-preview`, `3d-preview`, `twoD`, `threeD`, `image-output` và `heightmap-output`. Generic output pin không thể tạo viewer kể cả khi runtime output chứa giá trị có hình dạng descriptor.
+- Thêm strict frontend descriptor validation chỉ nhận endpoint authenticated `/api/v1/research/artifacts/{id}`, authenticated no-store artifact loading với giới hạn client 2 MiB, structured JSON validation, PNG/SVG media fallback được hỗ trợ và các trạng thái loading/error/malformed/oversized.
+- Thêm confusion-matrix table và generic HTML table accessible cùng React/SVG plot renderer có giới hạn `640 × 360`, không thêm dependency. Semantic SSR tests cover caption, scoped header, SVG title/role/label, status và alert.
+- Tích hợp một Dashboard viewer có size/collapse độc lập cho mỗi explicit node bằng keyed `outputViewers` preferences hiện có. Dashboard integration chứng minh plot/table xuất hiện, generic pin không xuất hiện và preferences `4×5` / `8×7` độc lập.
+- TDD RED được xác nhận bằng 2 selector failure và 2 module chưa tồn tại. Frontend focused cuối PASS 19 test; full frontend PASS 47 file/130 test; typecheck và production build PASS. Chunk warning >500 kB hiện có vẫn còn. Live accessibility/performance audit vẫn bị chặn vì browser connector unavailable.
+
+### Phase 5 — Checkpoint Task 5.4
+
+- Project SVM classification report theo class ngay trong SVM package thành strict `aoi.table.v1` columns/rows và giữ output strict `aoi.confusion-matrix.v1` hiện có. Cập nhật manifest artifact contract và hướng dẫn song ngữ để nối các output này vào explicit node `table-output` và `plot-2d-output`.
+- Cố ý không thêm logic SVM-specific vào Dashboard hoặc tạo viewer endpoint giả trong pure node: research artifact ID chỉ tồn tại sau database persistence và viewer presence vẫn do explicit workflow-node capability điều khiển.
+- Report/confusion artifact đã persist round-trip qua checksum-verified artifact store dưới dạng `application/json`; API-facing run metadata không chứa storage URI. Không tạo optional Matplotlib fallback vì typed rendering đã hoàn chỉnh và static fallback là tùy chọn.
+- GitNexus impact cho cả `train_and_evaluate` và SVM `execute` là HIGH (22 upstream symbol, 16 direct, 2 process, 4 module). Thay đổi chỉ giới hạn ở report projection/contract/docs; model, metrics, confusion, cancellation và persistence behavior được giữ nguyên. RED tạo đúng 3 schema failure dự kiến trong khi 6 test lân cận PASS; focused GREEN PASS 9 test.
+
+---
+
+## Workflow training plan — Checkpoint Phase 5 — 2026-08-24
+
+### Đã hoàn thành
+
+- Hoàn thành authenticated structured artifact viewing, explicit plot/table output node, capability-gated Dashboard selection, accessible table/confusion/SVG rendering, bounded malformed/oversized handling, static PNG/SVG fallback support và viewer dimensions persist độc lập.
+- Nối SVM output contract với platform visualization schema mà không coupling Dashboard vào SVM và không cho generic output pin tạo viewer.
+
+### Xác minh Phase
+
+- Visualization/SVM/structured-node matrix: PASS 20 test.
+- Training backend/integration matrix: PASS 94 test với 2 dependency warning hiện có.
+- Registry/catalog/workflow/API matrix: PASS 39 test với 2 dependency warning hiện có.
+- Frontend Phase 5 focused matrix: PASS 19 test; full frontend PASS 47 file/130 test.
+- Frontend typecheck/build, Python compileall và `git diff --check`: PASS. Build giữ chunk warning >500 kB hiện có.
+- DEBUG documentation suite vẫn chỉ fail đúng 3 legacy case KNN/generator không liên quan đã ghi ở Phase 4.
+
+### Risk và giới hạn
+
+- Final aggregate `detect_changes` vẫn CRITICAL vì toàn bộ Phase 1–5 chưa commit cùng nhau; sau khi refresh index để gồm các package untracked, các lần chạy cuối báo 35 indexed file, 205 symbol và 251–294 flow. Graph mới có broad false-positive fan-out không ổn định quanh các tên test/symbol phổ biến, nhưng aggregate warning vẫn được giữ nguyên thay vì giảm nhẹ.
+- Structured artifact loading bị giới hạn 2 MiB trong browser; artifact research hợp lệ lớn hơn chủ động hiển thị safe error thay vì render.
+- Static fallback được hỗ trợ khi descriptor endpoint trả PNG/SVG. Không sinh thêm fallback artifact vì Matplotlib output là tùy chọn.
+- Không thể chạy live accessibility/performance audit khi browser connector không hoạt động; semantic renderer và Dashboard tests PASS.
+
+### Trạng thái hiện tại
+
+Phase 5 **hoàn thành tại checkpoint**. Explicit workflow output node điều khiển toàn bộ image/plot/table viewer presence, SVM report/confusion artifact dùng viewer schema được chấp nhận và mọi acceptance-critical Phase 5 suite đều PASS. Không được bắt đầu Phase 6 nếu chưa có phản hồi đồng ý rõ ràng của người dùng.
+
+## Workflow training plan — Checkpoint Phase 6 — 2026-08-24
+
+### Đã hoàn thành
+
+- Thêm route v1 có xác thực cho create/list/get/version/promotion model và giữ legacy compatibility; Models tạo/chọn model, lọc run completed, chọn artifact verified, đăng ký immutable version, refresh lifecycle và mở source run.
+- Registration từ chối run chưa completed, failed validation, artifact khác run, duplicate và artifact thiếu/corrupt. Metadata chọn artifact không lộ storage URI.
+- Promotion/rollback giữ transactional alias locking và append-only event có actor/reason/previous/next/timestamp. Confirmed rollback từ chối preview stale, revalidate target artifact và không chấp nhận alias `rollback`.
+- Production resolution pin cả `ModelBinding` lẫn artifact bytes bị ràng buộc checksum/length/media. SVM contextual inference verify exact immutable binding và signed artifact envelope trước bounded HOG inference.
+- Thêm evidence Phase 6 song ngữ và complete authenticated journey từ deterministic SVM training qua Research/model/champion resolution đến inference và structured viewer schema.
+
+### Xác minh
+
+- Python matrix acceptance-critical: PASS 200 test; aggregate vertical journey Phase 6: PASS 1 test.
+- Full frontend: PASS 47 file/133 test; typecheck và production build PASS với warning >500 kB hiện có.
+- Compile Python production (`backend`, `core`) và `git diff --check`: PASS.
+- Full Python tree: 525 passed, 11 legacy failure không liên quan, 2 dependency warning hiện có. Failure gồm 3 DEBUG docs đã biết, 1 KNN accuracy fixture, 6 CSV dataset API case và 1 settings-backup checksum fixture.
+- Compile toàn test tree còn gặp demo import cũ không hợp lệ trong `tests/nodes/knn_cat_dog.py`; production code compile thành công.
+
+### Giới hạn tuyên bố và trạng thái
+
+- Evidence chỉ áp dụng cho fixture cats/dogs local-CPU tất định và đúng signed runtime Python/OpenCV/NumPy/scikit-learn. Không tuyên bố GPU, factory accuracy, target hardware, uptime hoặc physical pilot.
+- Final aggregate `detect_changes` vẫn CRITICAL vì toàn bộ Phase 1–6 chưa commit cùng nhau: các lần chạy cuối báo 39 indexed file, 224 symbol và 251–294 flow. Graph vẫn có broad false-positive fan-out không ổn định quanh common test/symbol name; warning được giữ nguyên, không giảm nhẹ.
+- Phase 6 **hoàn thành tại checkpoint** vì toàn bộ acceptance-critical test Phase 6 PASS và failure ngoài phạm vi được tách rõ. Không bắt đầu Phase 7 nếu chưa có user approval rõ ràng.
+
+## Kế hoạch workflow training — Checkpoint Phase 7 Task 7.1 — 2026-08-24
+
+- Người dùng đã duyệt rõ việc bắt đầu Phase 7. Task 7.1 kiểm kê frontend React 18/Vite/ES2020, đường viewer structured/static hiện có, asset JavaScript chính 574.135 byte minified / 169.441 byte gzip, ràng buộc WebGL/browser và việc chưa có payload 3D typed production.
+- Đã thêm decision record song ngữ so sánh raw Canvas/WebGL, Plotly.js, Three.js và React Three Fiber cho heightmap có giới hạn cùng point-cloud/mesh tương lai. Không cài dependency và không đổi package/application source.
+- Khuyến nghị có điều kiện là Three.js trực tiếp trong chunk lazy riêng, với PNG/SVG có xác thực cùng semantic DOM là fallback acceptance-critical. Loại Plotly vì footprint/độ rộng, raw WebGL vì chi phí lifecycle riêng và R3F vì React 18 phải dùng dòng v8 cũ cùng reconciler/dependency bổ sung không đủ lợi cho một viewer cô lập.
+- Đã cố định benchmark deterministic H-S/H-M/H-L và dataset P/M tương lai, cùng budget trước implementation cho lazy bundle, first frame, FPS, idle render, memory/disposal, context loss, keyboard/reduced-motion, browser và minimum/reference hardware.
+- GitNexus không tìm thấy execution flow 3D hiện hữu. Không được bắt đầu Task 7.2 trước khi người dùng duyệt rõ dependency `three` đã pin và biên implementation chỉ gồm bounded heightmap. Point-cloud/mesh vẫn ngoài scope implementation đầu.
+
+## Kế hoạch workflow training — checkpoint tự động Phase 7 Task 7.2 — 2026-08-24
+
+- Người dùng đã duyệt exact `three@0.185.1`, scope chỉ bounded heightmap, tích hợp Dashboard production và tiếp tục sau cảnh báo GitNexus HIGH/CRITICAL. Đã thêm exact dev typings `@types/three@0.185.0`; gate MIT/license và audit sau cài đặt pass, không có production vulnerability đã biết.
+- Đã thêm contract Python/TypeScript `aoi.heightmap.v1` strict, cap 512 × 512, sample hữu hạn hoặc null, spacing dương và schema-kind khớp. Đã thêm routing descriptor persisted theo capability mà không đổi placeholder 3D legacy khi thiếu descriptor.
+- Đã thêm canvas Three.js lazy riêng với render-on-demand, cap DPR 2, indexed buffer bounded, điều khiển pointer/wheel/keyboard native, responsive sizing, trạng thái context failure/loss, restoration và dispose rõ. Tóm tắt semantic grid/sample/range/spacing/unit luôn ngoài canvas; đường fallback PNG/SVG có xác thực vẫn nguyên vẹn.
+- TDD/focused verification pass 19 test. Full frontend pass 48 file / 140 test; TypeScript, production build, Python production compile/assertion contract trực tiếp, dependency audit và `git diff --check` pass. Không chạy được Python pytest vì `/usr/bin/python3` thiếu pytest.
+- Bằng chứng build: main 579,26 kB / 172,99 kB gzip (tăng 5,13 kB / 3,55 kB gzip); chunk heightmap lazy 518,85 kB / 130,00 kB gzip. Budget kích thước đạt. Check model H-S/H-M/H-L deterministic hoàn tất tổng 109 ms và dữ liệu position/index packed H-L dưới 10 MiB.
+- Matrix browser/hardware về latency, FPS, resize, context-loss, heap recovery và Safari/Chrome/Edge/Firefox vẫn chờ; interactive 3D chỉ được chấp nhận có điều kiện, chưa được chấp nhận trên hardware production. Point-cloud và mesh vẫn ngoài scope.
+- Final GitNexus aggregate detection CRITICAL: 41 file indexed, 224 symbol và 294 flow trên worktree chưa commit gộp Phases 1–7, gồm broad false-positive fan-out đã biết.

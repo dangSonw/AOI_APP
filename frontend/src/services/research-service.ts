@@ -1,8 +1,12 @@
 import type {
   ModelAlias,
   ModelPromotionEvent,
+  ModelRollbackPreview,
+  ModelCreateRequest,
+  ModelVersionCreateRequest,
   RegisteredModel,
   ResearchRun,
+  ResearchRunArtifact,
 } from '../types/research';
 import { apiRequest } from './api-client';
 
@@ -15,7 +19,29 @@ export function readReproducibilityManifest(accessToken: string, runId: string):
 }
 
 export function readRegisteredModels(accessToken: string): Promise<RegisteredModel[]> {
-  return apiRequest('/api/models', {}, accessToken);
+  return apiRequest('/api/v1/models', {}, accessToken);
+}
+
+export function createRegisteredModel(accessToken: string, request: ModelCreateRequest): Promise<{ id: number; name: string; description: string }> {
+  return apiRequest('/api/v1/models', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  }, accessToken);
+}
+
+export function createRegisteredModelVersion(
+  accessToken: string,
+  modelName: string,
+  request: ModelVersionCreateRequest,
+): Promise<{ id: number; modelName: string; version: number; runId: string; artifactId: number; artifactSha256: string }> {
+  return apiRequest(`/api/v1/models/${encodeURIComponent(modelName)}/versions`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  }, accessToken);
+}
+
+export function readResearchRunArtifacts(accessToken: string, runId: string): Promise<ResearchRunArtifact[]> {
+  return apiRequest(`/api/v1/research/runs/${encodeURIComponent(runId)}/artifacts`, {}, accessToken);
 }
 
 export function promoteModel(
@@ -25,7 +51,7 @@ export function promoteModel(
   version: number,
   reason: string,
 ): Promise<ModelPromotionEvent> {
-  return apiRequest(`/api/models/${encodeURIComponent(modelName)}/aliases/${alias}/promotions`, {
+  return apiRequest(`/api/v1/models/${encodeURIComponent(modelName)}/aliases/${alias}/promotions`, {
     method: 'POST',
     body: JSON.stringify({ version, reason }),
   }, accessToken);
@@ -36,11 +62,24 @@ export function rollbackModel(
   modelName: string,
   alias: ModelAlias,
   reason: string,
+  previewEventId: number,
 ): Promise<ModelPromotionEvent> {
-  return apiRequest(`/api/models/${encodeURIComponent(modelName)}/aliases/${alias}/rollback`, {
+  return apiRequest(`/api/v1/models/${encodeURIComponent(modelName)}/aliases/${alias}/rollback`, {
     method: 'POST',
-    body: JSON.stringify({ reason }),
+    body: JSON.stringify({ reason, previewEventId }),
   }, accessToken);
+}
+
+export function readModelRollbackPreview(
+  accessToken: string,
+  modelName: string,
+  alias: ModelAlias,
+): Promise<ModelRollbackPreview> {
+  return apiRequest(`/api/v1/models/${encodeURIComponent(modelName)}/aliases/${alias}/rollback-preview`, {}, accessToken);
+}
+
+export function readModelEvents(accessToken: string, modelName: string): Promise<ModelPromotionEvent[]> {
+  return apiRequest(`/api/v1/models/${encodeURIComponent(modelName)}/events`, {}, accessToken);
 }
 
 export interface ImmutableModelBinding {

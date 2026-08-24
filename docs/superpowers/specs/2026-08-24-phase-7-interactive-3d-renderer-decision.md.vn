@@ -1,0 +1,235 @@
+# Biên bản quyết định renderer 3D tương tác Phase 7
+
+Ngày: 2026-08-24  
+Trạng thái: **Hoàn tất implementation tự động Task 7.2; còn chờ acceptance browser/hardware**  
+Phạm vi: chỉ renderer heightmap bounded; point-cloud và mesh vẫn bị loại khỏi scope.
+
+## 1. Quyết định
+
+Khuyến nghị dùng **Three.js trực tiếp, tải bằng frontend chunk lazy riêng** cho heightmap tương tác có giới hạn ở Task 7.2. Luôn giữ đường dẫn artifact PNG/SVG có xác thực làm fallback và cung cấp tóm tắt dữ liệu semantic ngoài canvas.
+
+Không chọn raw WebGL, Plotly.js hoặc React Three Fiber (R3F) cho renderer đầu tiên:
+
+- raw WebGL có chi phí framework nhỏ nhất nhưng gánh nặng implementation, độ tin cậy, tương tác và kiểm thử lớn nhất;
+- Plotly.js có tính năng biểu đồ khoa học sẵn mạnh nhất nhưng quá lớn so với bundle hiện tại và cho ít quyền kiểm soát hơn đối với contract AOI hẹp;
+- R3F thêm một React renderer cùng nhiều runtime dependency nhưng vẫn cần hiểu, giới hạn và kiểm thử Three.js. Ứng dụng React 18 còn phải pin R3F 8 thay vì dùng R3F 9 hiện tại.
+
+Đây là dependency gate, không phải phê duyệt cài đặt. Không được thêm `three` trước khi người dùng duyệt rõ Task 7.2. Contract point-cloud và mesh vẫn là công việc tương lai, không tự động vào runtime scope chỉ vì renderer được chọn có khả năng hỗ trợ.
+
+## 2. Kiểm kê hệ thống hiện tại
+
+| Khu vực | Baseline quan sát được |
+|---|---|
+| Frontend runtime | React 18.3.1, React DOM 18.3.1, Vite 8.2.0, TypeScript strict, target ES2020 và DOM |
+| Dependency đồ họa hiện có | Không có thư viện 3D; XYFlow và Dagre dùng cho workflow editor |
+| Production assets | JavaScript chính 574.135 byte minified và 169.441 byte gzip; CSS 100.000 byte |
+| Cảnh báo hiện có | JavaScript chính đã vượt ngưỡng cảnh báo chunk 500 kB của Vite |
+| Viewer contract | Chỉ có confusion matrix, table và plot 2D; `heightmap` là descriptor kind nhưng chưa có payload typed hay renderer |
+| Output 3D hiện có | `heightmap-output` legacy/configuration-only, manifest v1, capability `3d-preview`, artifact contract tương thích image |
+| Output tương lai | Point-cloud và mesh là capability sau phê duyệt; chưa có production contract |
+| Fallback hiện có | Hiển thị artifact PNG/SVG có xác thực, kiểm checksum, cùng trạng thái loading/error an toàn |
+| Giới hạn client hiện có | Đọc structured artifact tối đa 2 MiB |
+| Browser target | Không có Browserslist rõ ràng; output ES2020 ngụ ý browser hiện đại nhưng WebGL vẫn phụ thuộc thiết bị/GPU |
+
+GitNexus không tìm thấy execution flow 3D hiện hữu. Các contract được index gần nhất là `ViewerDescriptor`, `parseVisualizationPayload` và `StructuredVisualization`; vì vậy Task 7.2 sẽ thêm capability mới chứ không thay một đường 3D đang hoạt động.
+
+## 3. Workload yêu cầu
+
+Quyết định được đánh giá theo ba họ payload riêng:
+
+1. **Heightmap:** grid `z[row][column]` hữu hạn, đều, có khoảng cách vật lý x/y và đơn vị x/y/z; sample thiếu/không hợp lệ phải biểu diễn rõ, không suy diễn từ object tùy ý.
+2. **Point cloud (tương lai):** vị trí x/y/z packed hữu hạn, có intensity scalar hoặc color data có giới hạn tùy chọn.
+3. **Triangle mesh (tương lai):** vị trí vertex packed hữu hạn và index tam giác integer đã validate, có normals/intensity scalar tùy chọn.
+
+Mọi payload phải do platform định nghĩa, có version, xác thực, kiểm checksum và giới hạn trước khi cấp phát tài nguyên browser/GPU. Renderer không được nhận Python figure object, shader source tùy ý, URL tùy ý hay filesystem path từ browser.
+
+## 4. Các lựa chọn
+
+### 4.1 SVG/Canvas hiện có cộng raw WebGL
+
+**Độ phù hợp:** hỗ trợ kỹ thuật cả ba workload, không có chi phí license/package bên thứ ba. React/SVG hiện tại tiếp tục cung cấp view static và semantic.
+
+**Chi phí/rủi ro:** WebGL là API low-level. Ứng dụng phải tự sở hữu shader, matrix, geometry buffer, camera/control, picking, color scale, overlay text/axis, context loss/restoration, dispose GPU resource, resize và xử lý capability thiết bị. Đây là lựa chọn nhiều code riêng và khó chứng minh đúng trên nhiều GPU nhất.
+
+**Kết luận:** loại cho slice đầu; chỉ giữ Canvas/SVG cho fallback và semantic alternative.
+
+### 4.2 Plotly.js
+
+**Độ phù hợp:** trace `surface`, `scatter3d`, `mesh3d` khớp trực tiếp với height grid, point cloud và mesh tam giác indexed/tự suy ra. Có sẵn camera interaction, hover label, color bar, modebar/download, static mode và responsive resize.
+
+**License/footprint:** MIT. Metadata registry ngày 2026-08-24 báo `plotly.js-dist-min@3.7.0` có 4.854.193 byte unpacked. Source package có 98.161.486 byte unpacked, 1.115 file và dependency graph rộng. Unpacked size không đồng nhất với gzip size được ship, nhưng đủ chứng minh full distribution không thể vào main chunk hiện tại. Custom partial bundle có thể nhỏ hơn nhưng tạo thêm bề mặt đóng gói/nâng cấp riêng cần benchmark.
+
+**Accessibility/testing:** label/control sẵn có hữu ích, nhưng WebGL chart vẫn không thể là biểu diễn accessible duy nhất. Có thể kiểm DOM/config deterministic; hành vi visual/WebGL vẫn cần real browser.
+
+**Kết luận:** loại cho viewer hẹp vì footprint và độ rộng framework lớn hơn lợi ích chart sẵn. Xem xét lại nếu sản phẩm cần platform biểu đồ khoa học rộng.
+
+### 4.3 Three.js trực tiếp
+
+**Độ phù hợp:** mô hình renderer/scene/camera/geometry/material bao phủ surface đều, points và indexed mesh, nhưng hẹp hơn Plotly. `BufferGeometry`, typed attributes, `Points`, `Mesh` cho phép ánh xạ trực tiếp platform bounds sang GPU allocation. Controls import riêng dưới dạng addon.
+
+**License/footprint:** MIT, bản quyền Three.js authors. Metadata registry ngày 2026-08-24 báo `three@0.185.1` có 23.172.772 byte unpacked và 1.195 file; số này gồm source, build, examples, addons, metadata và không phải kích thước bundle ship. ES module cùng dynamic import riêng cho phép Vite tạo viewer chunk riêng; chỉ import addon cần thiết.
+
+**Accessibility/testing:** Three.js không biến canvas geometry thành semantic. AOI phải sở hữu keyboard controls, hướng dẫn/status nhìn thấy được, tóm tắt dimensions/units/min/max semantic, reduced motion và fallback ảnh static. Hàm pure chuyển payload sang buffer/camera/color có thể unit-test không cần WebGL; context, tương tác, rendering và loss/restoration cần real browser.
+
+**Vận hành:** sở hữu trực tiếp cho phép render-on-demand, cap device-pixel ratio, dispose rõ, giới hạn draw call và degradation deterministic; đồng thời bắt buộc lifecycle discipline và kiểm target hardware thật.
+
+**Kết luận:** khuyến nghị có điều kiện.
+
+### 4.4 React Three Fiber
+
+**Độ phù hợp:** cung cấp React component declarative trên Three.js và hỗ trợ cùng primitive. `Canvas` hỗ trợ fallback, DPR/performance, frameloop, resize và unmount. Ecosystem có test renderer và helper accessibility riêng.
+
+**Compatibility/footprint:** MIT, bản quyền Poimandres. R3F 9 hiện tại cần React 19; hướng dẫn chính thức ghép R3F 8 với React 18. Package tương thích `@react-three/fiber@8.18.0` có 423.267 byte unpacked nhưng vẫn cần Three.js và thêm React reconciler, Zustand, scheduler, measurement, suspension, buffer/base64 và runtime helper.
+
+**Đánh đổi:** composition declarative có giá trị cho ứng dụng 3D lớn. AOI hiện cần một viewer cô lập có giới hạn chặt, nên renderer/reconciler và version pin bổ sung tăng độ phức tạp lifecycle/nâng cấp mà không giảm trách nhiệm Three.js/GPU nền.
+
+**Kết luận:** loại cho slice đầu; xem xét lại khi nhiều scene 3D tái sử dụng làm composition declarative có lợi rõ.
+
+## 5. Bảng điểm so sánh
+
+Điểm tương đối cho slice AOI: 5 là tốt nhất. Điểm bundle giả định lazy load khi khả thi.
+
+| Tiêu chí | Trọng số | Raw WebGL | Plotly.js | Three.js | R3F |
+|---|---:|---:|---:|---:|---:|
+| Phù hợp heightmap/point/mesh | 20 | 5 | 5 | 5 | 5 |
+| Kiểm soát performance có giới hạn | 20 | 5 | 3 | 5 | 4 |
+| Chi phí implementation/bảo trì | 15 | 1 | 5 | 3 | 3 |
+| Kỷ luật bundle/dependency | 15 | 5 | 1 | 4 | 2 |
+| Tích hợp React 18 | 10 | 3 | 3 | 4 | 2 |
+| Khả năng kiểm thử | 10 | 2 | 3 | 4 | 4 |
+| Kiểm soát accessibility/fallback | 10 | 3 | 3 | 4 | 4 |
+| **Tổng có trọng số / 5** | **100** | **3,65** | **3,35** | **4,30** | **3,55** |
+
+License không phân biệt ba lựa chọn bên thứ ba: Plotly.js, Three.js và R3F đều MIT. Distribution chứa phần đáng kể phải giữ thông báo license.
+
+## 6. Benchmark dataset được cố định trước implementation
+
+Task 7.2 phải sinh fixture deterministic bằng công thức và seed cố định, không cần dữ liệu sản xuất riêng:
+
+| Dataset | Kích thước | Mục đích |
+|---|---:|---|
+| H-S | 128 × 128 = 16.384 sample | heightmap low-end/smoke |
+| H-M | 256 × 256 = 65.536 sample | heightmap acceptance mặc định |
+| H-L | 512 × 512 = 262.144 sample | heightmap tối đa được nhận |
+| P-M (tương lai) | 100.000 point | tương tác point-cloud danh định |
+| P-L (tương lai) | 250.000 point | point cloud tối đa |
+| M-M (tương lai) | 100.000 vertex, 200.000 triangle | mesh danh định |
+| M-L (tương lai) | 250.000 vertex, 500.000 triangle | mesh tối đa |
+
+Heightmap dùng plane deterministic cộng Gaussian bump, sinusoidal texture và missing-sample mask có giới hạn. Point data dùng sample bề mặt phân tầng với seed cố định. Mesh dùng indexed grid deterministic với bounds/normals đã biết. Mỗi fixture ghi schema version, dimensions/counts, byte length, SHA-256, min/max, units và seed/formula revision.
+
+Task 7.2 ban đầu chỉ có thể implement H-S/H-M/H-L. P-* và M-* chỉ là benchmark tương lai được khai báo trước, không phải phê duyệt thêm runtime contract.
+
+## 7. Acceptance budget được cố định trước implementation
+
+Đo bằng production build, cold navigation tới lazy viewer, browser performance mark và ít nhất năm lượt sau một warm-up. Báo median/worst, browser/version, OS, CPU, GPU, devicePixelRatio, viewport, power mode và hardware acceleration. CI tự động có thể kiểm contract/fallback nhưng không thay hardware matrix.
+
+### 7.1 Kích thước và loading
+
+- `three` và code viewer 3D không được có trong initial application chunk; chỉ request khi mở descriptor 3D hợp lệ.
+- Main entry tăng gzip **≤ 10 KiB** so với baseline trước Task 7.
+- Chunk viewer 3D riêng **≤ 180 KiB gzip**; tổng JavaScript 3D mới tải lần đầu **≤ 220 KiB gzip**.
+- Không dùng CDN runtime; package/lockfile pin version được duyệt.
+- Lỗi lazy-load/renderer vẫn phải để fallback có xác thực hoạt động.
+
+### 7.2 Performance heightmap
+
+- H-M first interactive frame: **≤ 1,5 s median, ≤ 2,5 s worst** trên desktop tham chiếu; **≤ 3,0 s worst** trên minimum hardware.
+- H-L first interactive frame: **≤ 3,0 s worst** trên desktop tham chiếu; nếu không thì reject an toàn hoặc downsample deterministic được thông báo rõ.
+- Khi orbit H-M 5 giây: **≥ 45 FPS median desktop, ≥ 30 FPS median minimum hardware**, không có long task trên 200 ms do tương tác viewer.
+- Viewer idle dùng render-on-demand, không chạy animation loop liên tục.
+- Resize ổn định trong **250 ms**, không tạo context trùng.
+
+### 7.3 Tài nguyên và độ tin cậy
+
+- Payload tối đa H-L; tương lai P-L/M-L. Reject count/dimension, non-finite value, malformed index, byte length hoặc allocation estimate vượt bound trước GPU allocation.
+- Cap device pixel ratio ở **2**, có thể giảm xuống 1 trên minimum hardware.
+- Dữ liệu CPU cộng GPU do viewer sở hữu ước tính cho H-L **≤ 64 MiB**; JS heap đo được phải trở về trong **10 MiB** so với baseline trước mở sau năm chu kỳ mở/đóng và forced test GC khi hỗ trợ.
+- Chính xác một WebGL context hoạt động trên mỗi viewer nhìn thấy. Dispose geometry, material, texture, controls, listener, animation frame và renderer khi thay/unmount.
+- Mô phỏng `webglcontextlost` phải hiện text status và fallback static không reload; restoration có thể tái tạo từ data đã validate. Context creation failure theo cùng fallback path.
+- Không uncaught console error hay WebGL error trong acceptance journey.
+
+### 7.4 Accessibility và tương tác
+
+- Canvas không bao giờ là biểu diễn duy nhất. Title, dimensions, axes, units, min/max, số missing sample và fallback image/table hoặc summary phải có trong semantic DOM.
+- Mọi action có label nhìn thấy và thao tác keyboard. Tối thiểu: focus viewer, arrow-key orbit, `+`/`-` zoom, `0` reset camera, Escape/blur thoát không keyboard trap.
+- Pointer gesture có keyboard equivalent được mô tả; focus indicator và status update nhìn thấy và screen reader đọc được.
+- Tôn trọng `prefers-reduced-motion`; không auto rotate. Color scale không phải tín hiệu duy nhất và đi kèm số/legend.
+- Fallback static vẫn có khi JavaScript, dynamic import, WebGL, GPU acceleration hoặc interaction không hoạt động.
+
+### 7.5 Browser và hardware matrix
+
+- Chrome và Edge stable mới nhất trên Windows/Linux với hardware acceleration.
+- Firefox stable mới nhất trên Windows/Linux.
+- Safari stable mới nhất trên macOS khi có hardware.
+- Minimum profile: integrated GPU, 4 logical CPU core, RAM 8 GiB, viewport 1920 × 1080 tại DPR 1.
+- Reference profile: integrated hoặc entry discrete GPU, 8 logical CPU core, RAM 16 GiB.
+- Ít nhất một lượt software-rendered/WebGL-disabled phải chứng minh fallback; không yêu cầu đạt FPS tương tác.
+
+## 8. Biên Task 7.2 đề xuất sau khi duyệt
+
+1. Chỉ thêm dependency `three` đã pin sau license/security review và phê duyệt rõ.
+2. Thêm schema heightmap versioned, strict, bounded trong core và frontend; không overload schema plot 2D.
+3. Giữ artifact verification có xác thực và transport bound 2 MiB trừ khi có review độc lập cho thay đổi bound.
+4. Implement adapter Three.js heightmap dynamic import, render-on-demand, dispose rõ, xử lý context failure/loss, không shader hay URL tùy ý.
+5. Thêm semantic summary, static fallback, keyboard controls, reduced-motion và responsive sizing.
+6. Xác minh H-S/H-M/H-L cùng browser/hardware matrix theo tài liệu này; ghi raw measurement và build chunk size làm acceptance evidence.
+7. Không thêm output node/schema point-cloud/mesh trong Task 7.2 nếu chưa có quyết định scope riêng.
+
+## 9. Shortcut bị loại
+
+- Không đưa thư viện 3D vào eager main bundle.
+- Không dùng CDN script hay dependency không pin.
+- Không render JSON chưa validate hay nhận shader/material code từ người dùng.
+- Không tuyên bố accessibility chỉ dựa trên canvas label.
+- Không âm thầm truncate/sample/downscale; degradation deterministic phải được báo trong status/evidence.
+- Không suy diễn hỗ trợ GPU/hardware production từ headless CI.
+
+## 10. Nguồn tham khảo
+
+Truy cập ngày 2026-08-24:
+
+- MDN, **WebGL: 2D and 3D graphics for the web**: WebGL là canvas API tăng tốc phần cứng trên browser hiện đại nhưng phụ thuộc thiết bị; context creation/loss/restoration là lifecycle rõ. https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API
+- MDN, **WebGL best practices**: loại WebGL error, query limit/extension, xóa resource sớm, tránh blocking call, budget VRAM theo pixel, batch draw, cân nhắc back buffer nhỏ, cap high-DPI và xử lý context lifecycle. https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/WebGL_best_practices
+- Plotly.js 3D charts và figure reference cho `surface`, `scatter3d`, `mesh3d`. https://plotly.com/javascript/3d-charts/ ; https://plotly.com/javascript/reference/surface/ ; https://plotly.com/javascript/reference/scatter3d/ ; https://plotly.com/javascript/reference/mesh3d/
+- Hướng dẫn configuration/responsive Plotly.js. https://plotly.com/javascript/configuration-options/ ; https://plotly.com/javascript/responsive-fluid-layout/
+- License MIT Plotly.js. https://github.com/plotly/plotly.js/blob/master/LICENSE
+- Fundamentals/installation Three.js: trách nhiệm renderer, scene graph, camera, geometry/material, khuyến nghị npm/build tool, ES module và addon import riêng. https://threejs.org/manual/en/fundamentals.html ; https://threejs.org/manual/en/installation.html
+- License MIT Three.js. https://github.com/mrdoob/three.js/blob/dev/LICENSE
+- Introduction/installation R3F chính thức: React renderer trên Three.js; R3F 8 ghép React 18, R3F 9 ghép React 19; package testing/a11y là ecosystem riêng. https://github.com/pmndrs/react-three-fiber/blob/master/docs/getting-started/introduction.mdx ; https://github.com/pmndrs/react-three-fiber/blob/master/docs/getting-started/installation.mdx
+- License MIT và security page R3F (không phát hiện SECURITY.md tại thời điểm đánh giá). https://github.com/pmndrs/react-three-fiber/blob/master/LICENSE ; https://github.com/pmndrs/react-three-fiber/security
+- Metadata npm registry được query không cài đặt cho `three@0.185.1`, `plotly.js@3.7.0`, `plotly.js-dist-min@3.7.0`, `@react-three/fiber@8.18.0`.
+
+## 11. Cổng phê duyệt
+
+Task 7.1 đã hoàn tất. Bước tiếp theo cần người dùng duyệt rõ:
+
+- thêm `three` đã pin làm dependency runtime 3D mới duy nhất;
+- chỉ implement heightmap bounded trước;
+- áp dụng dataset và budget trong tài liệu này;
+- giữ fallback static/semantic là hành vi acceptance-critical.
+
+Trước phê duyệt đó, không được đổi package file hay application source cho Task 7.2.
+
+## 12. Bằng chứng implementation Task 7.2
+
+Người dùng đã duyệt rõ dependency được pin, chấp nhận cảnh báo tích hợp GitNexus HIGH/CRITICAL và duyệt nối vào Dashboard production. Task 7.2 thêm runtime exact `three@0.185.1` cùng `@types/three@0.185.0` chỉ dùng lúc phát triển; cả hai là MIT. Audit production sau cài đặt báo không có vulnerability đã biết.
+
+Phạm vi đã implement:
+
+- contract `aoi.heightmap.v1` strict trong Python và TypeScript, giới hạn 2–512 hàng/cột, spacing dương hữu hạn, unit có giới hạn, sample hữu hạn hoặc null và ít nhất một sample hợp lệ;
+- validation descriptor `heightmap` khớp schema và routing Dashboard theo capability, vẫn giữ placeholder static legacy khi không có typed descriptor;
+- chunk Three.js lazy riêng, chỉ render-on-demand, cap DPR 2, một indexed geometry, cleanup rõ listener/observer/geometry/material/renderer/context, resize responsive, trạng thái context loss/restoration và context-creation failure an toàn;
+- điều khiển pointer, wheel, phím mũi tên, `+`/`-`, `0`, Home và Escape, không có chuyển động tự động;
+- tóm tắt semantic DOM ngoài canvas gồm grid, sample hợp lệ/thiếu, range, spacing và unit; xử lý artifact PNG/SVG có xác thực không đổi.
+
+Bằng chứng tự động trên CI host hiện có:
+
+- Đã quan sát TDD RED do thiếu contract/model heightmap; GREEN kết thúc với 19 focused test pass.
+- Full frontend: 48 file / 140 test pass; TypeScript và production build pass.
+- Pure model deterministic H-S/H-M/H-L pass; ba fixture hoàn tất tổng cộng 109 ms trên host này. Positions cộng indices packed của H-L dưới 10 MiB; positions, indices và normals đã compute cùng bản sao CPU/GPU ước tính khoảng 24 MiB, dưới budget viewer-owned 64 MiB.
+- Production build: JavaScript main eager 579,26 kB / 172,99 kB gzip, tăng khoảng 5,13 kB / 3,55 kB gzip so với baseline; `HeightmapCanvas` lazy 518,85 kB / 130,00 kB gzip. Cả hai budget tăng gzip đều đạt và Three.js không nằm trong eager chunk.
+- Python production compile cùng assertion trực tiếp cho heightmap hợp lệ/non-finite pass. `/usr/bin/python3` hiện không có module pytest nên không thể chạy file pytest Python trong environment này.
+- `git diff --check` pass. Final GitNexus aggregate change detection vẫn CRITICAL với 41 file indexed, 224 symbol và 294 flow vì worktree chưa commit gộp Phases 1–7 và vẫn có broad false-positive edge đã biết.
+
+Biên tuyên bố: chưa đo first-frame latency, FPS tương tác, resize timing, hành vi WebGL/context-loss trong browser, heap recovery qua năm chu kỳ và matrix Chrome/Edge/Firefox/Safari trên minimum/reference hardware thật. Code và automated gate Task 7.2 đã hoàn tất, nhưng interactive 3D chỉ được **chấp nhận có điều kiện** cho đến khi ghi matrix thủ công đó.

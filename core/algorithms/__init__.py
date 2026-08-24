@@ -1,6 +1,8 @@
 from .catalog import get_algorithm_catalog, get_algorithm_definition
 from .models import (
+    AlgorithmActionDefinition,
     AlgorithmDefinition,
+    ArtifactContractDefinition,
     DataType,
     ParameterDefinition,
     ParameterKind,
@@ -12,6 +14,8 @@ from .models import (
 
 __all__ = [
     'AlgorithmDefinition',
+    'AlgorithmActionDefinition',
+    'ArtifactContractDefinition',
     'DataType',
     'ParameterDefinition',
     'ParameterKind',

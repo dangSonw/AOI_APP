@@ -1,0 +1,22 @@
+# Node đầu ra bảng
+
+## Mục đích và cách dùng nhanh
+`table-output` là cổng workflow rõ ràng cho viewer HTML table có kiểu và giới hạn.
+
+## Cấu trúc node
+```text
+table payload -> [table-output] -> validated payload
+```
+
+## Cách nhập tham số
+Node không có tham số. Nối payload `aoi.table.v1`.
+
+## Ví dụ sử dụng có thể làm theo ngay
+```json
+{"schema":"aoi.table.v1","columns":[{"key":"label","label":"Label","type":"string"}],"rows":[{"label":"OK"}]}
+```
+
+## Lỗi thường gặp
+- Thêm explicit node này khi bảng không xuất hiện.
+- Khớp mọi row key với column đã khai báo.
+- Khớp value với declared type.

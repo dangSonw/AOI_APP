@@ -13,7 +13,29 @@ export interface ResearchRun {
   metrics: Record<string, number>;
   outputArtifacts: Record<string, string>;
   error: string | null;
-  createdAt: string;
+  createdAt?: string;
+}
+
+export interface ResearchRunArtifact {
+  id: number;
+  runId: string;
+  name: string;
+  sha256: string;
+  mediaType: string;
+  byteLength: number;
+  verified: boolean;
+}
+
+export interface ModelCreateRequest {
+  name: string;
+  description: string;
+}
+
+export interface ModelVersionCreateRequest {
+  runId: string;
+  artifactId: number;
+  validationEvidence: Record<string, unknown>;
+  artifactContract?: DeepLearningArtifactContract;
 }
 
 export interface ModelCompatibility {
@@ -48,6 +70,7 @@ export interface RegisteredModelVersion {
   validationEvidence: Record<string, unknown>;
   compatibility: ModelCompatibility;
   deepLearningContract?: DeepLearningArtifactContract;
+  createdAt: string;
 }
 
 export interface RegisteredModel {
@@ -57,8 +80,15 @@ export interface RegisteredModel {
   versions: RegisteredModelVersion[];
 }
 
-export type ModelAlias = 'candidate' | 'champion' | 'rollback';
+export type ModelAlias = 'candidate' | 'champion';
 export type ModelLifecycleAction = 'promote' | 'rollback';
+
+export interface ModelRollbackPreview {
+  alias: ModelAlias;
+  currentVersion: number;
+  targetVersion: number;
+  previewEventId: number;
+}
 
 export interface ModelPromotionEvent {
   id: number;
@@ -67,4 +97,6 @@ export interface ModelPromotionEvent {
   previousVersion: number | null;
   nextVersion: number;
   reason: string;
+  actor: { id: number; email: string; fullName: string } | null;
+  createdAt: string;
 }

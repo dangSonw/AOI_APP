@@ -8,6 +8,8 @@ import { addCustomPort, removeCustomPort, updateCustomPort } from '../../utils/w
 import { RuntimeUseBadge } from '../RuntimeUseBadge';
 import { readRegisteredModels } from '../../services/research-service';
 import type { RegisteredModel } from '../../types/research';
+import type { NodePluginPlatformContext } from '../../node-plugins/types';
+import { cancelTrainingJob, createTrainingJob, readTrainingJob } from '../../services/training-job-service';
 
 
 interface NodeInspectorProps {
@@ -15,6 +17,9 @@ interface NodeInspectorProps {
   definition: AlgorithmDefinition | null;
   onChange: (node: WorkflowNode) => void;
   accessToken?: string;
+  recipeSlug?: string;
+  workflowRevision?: number;
+  onOpenRun?: (runId: string) => void;
 }
 
 const DATA_TYPES: DataType[] = [
@@ -135,7 +140,9 @@ function ModelReferenceField({
   );
 }
 
-export function NodeInspector({ node, definition, onChange, accessToken }: NodeInspectorProps) {
+export function NodeInspector({
+  node, definition, onChange, accessToken, recipeSlug, workflowRevision, onOpenRun,
+}: NodeInspectorProps) {
   if (!node || !definition) {
     return (
       <aside className="workflow-inspector" aria-label="Node inspector">
@@ -151,6 +158,22 @@ export function NodeInspector({ node, definition, onChange, accessToken }: NodeI
   });
 
   const CustomInspector = definition.inspectorKind === 'custom' ? getNodeInspectorPlugin(definition.customInspectorKey) : null;
+  const context: NodePluginPlatformContext | undefined = accessToken && recipeSlug && workflowRevision && node
+    ? {
+      accessToken,
+      recipeSlug,
+      workflowRevision,
+      nodeInstanceId: node.id,
+      training: {
+        create: (request) => createTrainingJob(accessToken, {
+          ...request, recipeSlug, workflowRevision, nodeInstanceId: node.id,
+        }),
+        read: (runId) => readTrainingJob(accessToken, runId),
+        cancel: (runId) => cancelTrainingJob(accessToken, runId),
+        openRun: onOpenRun ?? (() => undefined),
+      },
+    }
+    : undefined;
 
   return (
     <aside className="workflow-inspector" aria-label="Node inspector">
@@ -170,7 +193,7 @@ export function NodeInspector({ node, definition, onChange, accessToken }: NodeI
         {definition.inspectorKind === 'none' ? (
           <div data-inspector-content="empty" />
         ) : CustomInspector ? (
-          <CustomInspector node={node} definition={definition} updateParameter={updateParameter} />
+          <CustomInspector node={node} definition={definition} updateParameter={updateParameter} context={context} />
         ) : (
           <section className="workflow-inspector__section" data-inspector-content="generic">
             <h3>Parameters</h3>

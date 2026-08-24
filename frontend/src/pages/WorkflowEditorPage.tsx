@@ -4,6 +4,7 @@ import { ExecutionOrderRail } from '../components/workflow/ExecutionOrderRail';
 import { NodeInspector } from '../components/workflow/NodeInspector';
 import { WorkflowCanvas } from '../components/workflow/WorkflowCanvas';
 import { NodeDocumentationDialog } from '../components/workflow/NodeDocumentationDialog';
+import { validateRegisteredNodePlugins } from '../node-plugins/registry';
 import { ApiError } from '../services/api-client';
 import { readAlgorithmCatalog, readWorkflow, saveWorkflow } from '../services/workflow-service';
 import type {
@@ -27,6 +28,7 @@ interface WorkflowEditorPageProps {
   onBack: () => void;
   onDirtyChange: (isDirty: boolean) => void;
   onWorkflowSaved: (workflow: Workflow) => void;
+  onOpenResearchRun: (runId: string) => void;
 }
 
 export function WorkflowEditorPage({
@@ -35,6 +37,7 @@ export function WorkflowEditorPage({
   onBack,
   onDirtyChange,
   onWorkflowSaved,
+  onOpenResearchRun,
 }: WorkflowEditorPageProps) {
   const [catalog, setCatalog] = useState<AlgorithmDefinition[]>([]);
   const [savedWorkflow, setSavedWorkflow] = useState<Workflow | null>(null);
@@ -59,6 +62,7 @@ export function WorkflowEditorPage({
         readAlgorithmCatalog(accessToken),
         readWorkflow(accessToken, recipeSlug),
       ]);
+      validateRegisteredNodePlugins(nextCatalog);
       setCatalog(nextCatalog);
       setSavedWorkflow(nextWorkflow);
       setDraftWorkflow(structuredClone(nextWorkflow));
@@ -301,6 +305,9 @@ export function WorkflowEditorPage({
           definition={selectedDefinition}
           onChange={updateNode}
           accessToken={accessToken}
+          recipeSlug={draftWorkflow.recipeSlug}
+          workflowRevision={draftWorkflow.revision}
+          onOpenRun={onOpenResearchRun}
         />
       </div>
       <ExecutionOrderRail

@@ -1,5 +1,7 @@
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from enum import StrEnum
+from types import MappingProxyType
 from typing import TypeAlias
 
 
@@ -82,6 +84,19 @@ class ParameterDefinition:
 
 
 @dataclass(frozen=True, slots=True)
+class AlgorithmActionDefinition:
+    dataset_inputs: tuple[str, ...] = ()
+    execution_targets: tuple[str, ...] = ()
+    cancellable: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactContractDefinition:
+    key: str
+    schema: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class AlgorithmDefinition:
     id: str
     name: str
@@ -99,3 +114,6 @@ class AlgorithmDefinition:
     execution_target: str = 'local-cpu'
     inspector_kind: str = 'generic'
     custom_inspector_key: str | None = None
+    capabilities: tuple[str, ...] = ()
+    actions: Mapping[str, AlgorithmActionDefinition] = field(default_factory=lambda: MappingProxyType({}))
+    artifact_contracts: Mapping[str, tuple[ArtifactContractDefinition, ...]] = field(default_factory=lambda: MappingProxyType({}))

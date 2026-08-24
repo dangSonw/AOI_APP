@@ -5,7 +5,7 @@ from pydantic import Field, JsonValue, field_serializer
 
 from app.schemas.base import ApiSchema
 from core.algorithms import (
-    AlgorithmDefinition,
+    AlgorithmActionDefinition, AlgorithmDefinition, ArtifactContractDefinition,
     DataType,
     ParameterDefinition,
     ParameterKind,
@@ -48,6 +48,25 @@ class ParameterDefinitionSchema(ApiSchema):
         return cls.model_validate(parameter)
 
 
+class AlgorithmActionDefinitionSchema(ApiSchema):
+    dataset_inputs: tuple[str, ...] = ()
+    execution_targets: tuple[str, ...] = ()
+    cancellable: bool = False
+
+    @classmethod
+    def from_core(cls, action: AlgorithmActionDefinition) -> Self:
+        return cls.model_validate(action)
+
+
+class ArtifactContractDefinitionSchema(ApiSchema):
+    key: str
+    schema_id: str | None = Field(default=None, alias='schema')
+
+    @classmethod
+    def from_core(cls, contract: ArtifactContractDefinition) -> Self:
+        return cls.model_validate(contract)
+
+
 class AlgorithmDefinitionSchema(ApiSchema):
     id: str
     name: str
@@ -67,6 +86,8 @@ class AlgorithmDefinitionSchema(ApiSchema):
     inspector_kind: str
     custom_inspector_key: str | None
     capabilities: tuple[str, ...] = ()
+    actions: dict[str, AlgorithmActionDefinitionSchema] = Field(default_factory=dict)
+    artifact_contracts: dict[str, tuple[ArtifactContractDefinitionSchema, ...]] = Field(default_factory=dict)
 
     @classmethod
     def from_core(cls, definition: AlgorithmDefinition) -> Self:
@@ -92,7 +113,12 @@ class AlgorithmDefinitionSchema(ApiSchema):
             execution_target=definition.execution_target,
             inspector_kind=definition.inspector_kind,
             custom_inspector_key=definition.custom_inspector_key,
-            capabilities=manifest.capabilities if manifest is not None else (),
+            capabilities=definition.capabilities,
+            actions={key: AlgorithmActionDefinitionSchema.from_core(value) for key, value in definition.actions.items()},
+            artifact_contracts={
+                direction: tuple(ArtifactContractDefinitionSchema.from_core(contract) for contract in contracts)
+                for direction, contracts in definition.artifact_contracts.items()
+            },
         )
 
 

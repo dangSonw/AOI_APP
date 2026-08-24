@@ -1,0 +1,40 @@
+# Node phân loại ảnh SVM
+
+## Mục đích và cách dùng nhanh
+
+`svm-image-classifier` train pipeline HOG kết hợp scikit-learn SVC có giới hạn tài nguyên từ dataset ảnh có nhãn và bất biến. Node giữ ý định `128 × 128`, RBF, `C=10` và `gamma=scale` của script tham chiếu nhưng không hard-code đường dẫn hoặc tên class.
+
+## Cấu trúc node
+
+```text
+dataset train/test bất biến
+           │
+           ▼
+ [svm-image-classifier]
+           │
+           ├── model và metrics
+           ├── classification report aoi.table.v1
+           └── aoi.confusion-matrix.v1 / ảnh lỗi
+```
+
+## Cách nhập tham số
+
+Dùng các phần Dataset, Feature extraction, Model, Training và Results trong custom inspector. Kích thước block HOG phải chia hết cho cell, stride phải thẳng hàng với cell và window phải bằng ảnh sau resize.
+
+Nối `report` vào node `table-output` tường minh và `confusion-matrix` vào node `plot-2d-output` tường minh để bật viewer trên Dashboard. Generic output pin không tạo viewer.
+
+## Ví dụ sử dụng có thể làm theo ngay
+
+```json
+{"imageWidth":128,"imageHeight":128,"hogBlockWidth":16,"hogBlockStrideX":8,"hogCellWidth":8,"hogBins":9,"useScaler":true,"kernel":"rbf","c":10,"gamma":"scale","randomSeed":42}
+```
+
+## Lỗi thường gặp
+
+- Khôi phục `128/16/8/8/9` khi HOG geometry validation lỗi.
+- Cung cấp ít nhất hai class để fit SVC.
+- Xem logical ID của ảnh lỗi; không bao giờ lộ storage path.
+
+## Giới hạn và kiểm tra production
+
+Node chỉ dùng CPU. Training behavior được thêm sau contract manifest và phải nằm trong package này. Xác minh dataset version, metrics và artifact checksum trước model promotion.

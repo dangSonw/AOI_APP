@@ -43,6 +43,17 @@ export interface ParameterDefinition {
   description: string;
 }
 
+export interface AlgorithmActionDefinition {
+  datasetInputs: string[];
+  executionTargets: Array<'local-cpu' | 'local-gpu' | 'adapter'>;
+  cancellable: boolean;
+}
+
+export interface ArtifactContractDefinition {
+  key: string;
+  schema: string | null;
+}
+
 export interface AlgorithmDefinition {
   id: string;
   name: string;
@@ -62,6 +73,8 @@ export interface AlgorithmDefinition {
   inspectorKind: 'none' | 'generic' | 'custom';
   customInspectorKey: string | null;
   capabilities?: string[];
+  actions?: Record<string, AlgorithmActionDefinition>;
+  artifactContracts?: Record<string, ArtifactContractDefinition[]>;
 }
 
 export type DocumentationLanguage = 'en' | 'vi';

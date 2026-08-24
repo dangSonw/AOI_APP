@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import replace
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
@@ -6,14 +7,19 @@ from types import ModuleType
 from typing import Any
 
 from core.algorithms.models import (
-    AlgorithmDefinition, DataType, ParameterDefinition, ParameterKind,
-    PortDefinition, PortDirection, is_json_parameter_value,
+    AlgorithmActionDefinition, AlgorithmDefinition, ArtifactContractDefinition, DataType,
+    ParameterDefinition, ParameterKind, PortDefinition, PortDirection, is_json_parameter_value,
 )
 
 from .models import NodeManifest, NodeRuntime, NodeUse
 
 
 NODES_ROOT = Path(__file__).parent
+SUPPORTED_MANIFEST_VERSIONS = {1, 2}
+SUPPORTED_ACTIONS = {'configure', 'train', 'evaluate', 'infer', 'visualize', 'export'}
+SUPPORTED_EXECUTION_TARGETS = {'local-cpu', 'local-gpu', 'adapter'}
+CONTRACT_KEY_PATTERN = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
+SCHEMA_PATTERN = re.compile(r'^[a-z0-9]+(?:[.-][a-z0-9]+)+$')
 
 
 class InvalidNodeRuntime(RuntimeError):
@@ -51,11 +57,72 @@ def _parameter(payload: dict[str, Any]) -> ParameterDefinition:
     )
 
 
+def _actions(payload: object, *, manifest_version: int, capabilities: tuple[str, ...]) -> dict[str, AlgorithmActionDefinition]:
+    if payload is None and manifest_version == 1:
+        return {}
+    if not isinstance(payload, dict):
+        raise ValueError('Node manifest actions must be an object.')
+    actions: dict[str, AlgorithmActionDefinition] = {}
+    for name, value in payload.items():
+        if name not in SUPPORTED_ACTIONS or not isinstance(value, dict):
+            raise ValueError('Node manifest action is unsupported.')
+        dataset_inputs = value.get('datasetInputs', [])
+        execution_targets = value.get('executionTargets', [])
+        cancellable = value.get('cancellable', False)
+        if (
+            not isinstance(dataset_inputs, list)
+            or any(not isinstance(item, str) or not CONTRACT_KEY_PATTERN.fullmatch(item) for item in dataset_inputs)
+            or not isinstance(execution_targets, list)
+            or any(item not in SUPPORTED_EXECUTION_TARGETS for item in execution_targets)
+            or not isinstance(cancellable, bool)
+            or name not in capabilities
+        ):
+            raise ValueError('Node manifest action contract is invalid.')
+        actions[name] = AlgorithmActionDefinition(
+            dataset_inputs=tuple(dataset_inputs), execution_targets=tuple(execution_targets), cancellable=cancellable,
+        )
+    return actions
+
+
+def _artifact_contracts(payload: object, *, manifest_version: int) -> dict[str, tuple[ArtifactContractDefinition, ...]]:
+    if not isinstance(payload, dict):
+        raise ValueError('Node manifest artifact contracts must be an object.')
+    contracts: dict[str, tuple[ArtifactContractDefinition, ...]] = {}
+    for direction, values in payload.items():
+        if direction not in {'inputs', 'outputs'} or not isinstance(values, list):
+            raise ValueError('Node manifest artifact contract direction is invalid.')
+        parsed: list[ArtifactContractDefinition] = []
+        for value in values:
+            if manifest_version == 1 and isinstance(value, str) and value:
+                parsed.append(ArtifactContractDefinition(key=value))
+                continue
+            if (
+                manifest_version == 2
+                and isinstance(value, dict)
+                and set(value) == {'key', 'schema'}
+                and isinstance(value['key'], str)
+                and CONTRACT_KEY_PATTERN.fullmatch(value['key'])
+                and isinstance(value['schema'], str)
+                and SCHEMA_PATTERN.fullmatch(value['schema'])
+            ):
+                parsed.append(ArtifactContractDefinition(key=value['key'], schema=value['schema']))
+                continue
+            raise ValueError('Node manifest artifact contract is invalid.')
+        contracts[direction] = tuple(parsed)
+    return contracts
+
+
 def _load_manifest(path: Path) -> NodeManifest:
     try:
         payload = json.loads(path.read_text(encoding='utf-8'))
+        manifest_version = int(payload['manifestVersion'])
         definition_payload = payload['definition']
         inspector = payload['inspector']
+        capabilities = tuple(payload.get('capabilities', ()))
+        if any(capability not in SUPPORTED_ACTIONS and not CONTRACT_KEY_PATTERN.fullmatch(capability) for capability in capabilities):
+            raise ValueError('Node manifest capability is invalid.')
+        actions = _actions(payload.get('actions'), manifest_version=manifest_version, capabilities=capabilities)
+        artifact_contracts = _artifact_contracts(payload.get('artifactContracts', {}), manifest_version=manifest_version)
         definition = AlgorithmDefinition(
             id=definition_payload['id'], name=definition_payload['name'],
             description=definition_payload['description'], category=definition_payload['category'],
@@ -69,22 +136,23 @@ def _load_manifest(path: Path) -> NodeManifest:
             manifest_version=payload['manifestVersion'], package_version=payload['packageVersion'],
             execution_target=payload['executionTarget'], inspector_kind=inspector['kind'],
             custom_inspector_key=inspector.get('customKey'),
+            capabilities=capabilities, actions=actions, artifact_contracts=artifact_contracts,
         )
         manifest = NodeManifest(
-            manifest_version=payload['manifestVersion'], catalog_order=payload['catalogOrder'], package_version=payload['packageVersion'],
+            manifest_version=manifest_version, catalog_order=payload['catalogOrder'], package_version=payload['packageVersion'],
             id=payload['id'], use=NodeUse(payload['use']), execution_target=payload['executionTarget'],
-            capabilities=tuple(payload.get('capabilities', ())),
+            capabilities=capabilities,
             resource_hints=dict(payload.get('resourceHints', {})),
-            artifact_contracts={key: tuple(value) for key, value in payload.get('artifactContracts', {}).items()},
+            artifact_contracts=artifact_contracts,
             parameter_migration_hooks=tuple(payload.get('parameterMigrationHooks', ())),
             inspector_kind=inspector['kind'], custom_inspector_key=inspector.get('customKey'),
-            definition=definition,
+            definition=definition, actions=actions,
         )
     except (KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
         raise InvalidNodeRuntime(f'Node manifest {path.parent.name} has an invalid contract.') from error
-    if manifest.manifest_version != 1 or manifest.id != path.parent.name or manifest.definition.id != manifest.id:
+    if manifest.manifest_version not in SUPPORTED_MANIFEST_VERSIONS or manifest.id != path.parent.name or manifest.definition.id != manifest.id:
         raise InvalidNodeRuntime(f'Node manifest {path.parent.name} identity is invalid.')
-    if manifest.execution_target not in {'local-cpu', 'local-gpu', 'adapter'}:
+    if manifest.execution_target not in SUPPORTED_EXECUTION_TARGETS:
         raise InvalidNodeRuntime(f'Node manifest {manifest.id} execution target is unsupported.')
     if manifest.inspector_kind not in {'none', 'generic', 'custom'}:
         raise InvalidNodeRuntime(f'Node manifest {manifest.id} inspector contract is unsupported.')

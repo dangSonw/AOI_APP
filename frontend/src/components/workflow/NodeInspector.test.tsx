@@ -48,6 +48,22 @@ describe('NodeInspector plugin contract', () => {
     expect(markup).not.toContain('shell');
   });
 
+  it('supplies authenticated workflow identity to custom plugin context', () => {
+    const definition = { ...baseDefinition, inspectorKind: 'custom' as const, customInspectorKey: 'camera-acquisition' };
+    const markup = renderToStaticMarkup(
+      <NodeInspector
+        node={node}
+        definition={definition}
+        onChange={vi.fn()}
+        accessToken="token"
+        recipeSlug="recipe-01"
+        workflowRevision={4}
+      />,
+    );
+
+    expect(markup).toContain('Camera acquisition profile');
+  });
+
   it('renders KNN segmentation features without exposing JSON configuration', () => {
     const knnNode: WorkflowNode = {
       ...node,

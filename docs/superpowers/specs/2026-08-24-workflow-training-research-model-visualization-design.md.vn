@@ -1,0 +1,301 @@
+# Thiết kế huấn luyện qua Workflow, Research, Model Registry và trực quan hóa
+
+**Trạng thái:** Hướng thiết kế đã duyệt, chờ triển khai theo phase
+**Bản tiếng Anh:** `2026-08-24-workflow-training-research-model-visualization-design.md`
+**Kế hoạch:** `../plans/2026-08-24-workflow-training-research-model-visualization-implementation.md.vn`
+
+## 1. Mục đích
+
+Xác định ranh giới để workflow AOI cấu hình node có khả năng huấn luyện, lưu research run tái lập được, quản trị model version bất biến và hiển thị output 2D/3D tường minh. Vertical slice đầu tiên chuyển `tests/nodes/svm_cat_dog.py` thành node phân loại ảnh HOG + SVM tái sử dụng được.
+
+Chiến lược đã duyệt: sửa đúng Research/Models trước, xây contract dùng chung, kiểm chứng bằng một node SVM end-to-end rồi mới tổng quát hóa.
+
+## 2. Mục tiêu
+
+1. Research là workspace experiment/run, không lặp model registry.
+2. Models là workspace duy nhất quản trị vòng đời model.
+3. Mọi `core/nodes/**/node.py` độc lập và thay thế được.
+4. UI đặc trưng của node nằm trong plugin folder tương ứng.
+5. Có thể bắt đầu, theo dõi, hủy, xem và tái lập training từ node workflow đang chọn.
+6. Lưu lineage bất biến của dataset, run, artifact và model.
+7. Viewer chỉ xuất hiện khi có visualization output node tường minh.
+8. Chứng minh thiết kế bằng SVM image classifier chạy thật.
+9. Dừng sau mỗi phase và phải có user approval rõ ràng mới tiếp tục.
+
+## 3. Ngoài phạm vi
+
+- Chạy Python, shell, notebook hoặc truy cập filesystem tùy ý từ browser.
+- Universal node chứa chung SVM, KNN, CNN và anomaly implementation không liên quan.
+- Biến node inspector thành UI quản lý experiment duy nhất.
+- Training trong production inspection bình thường.
+- Thêm Plotly, Three.js, React Three Fiber, ONNX Runtime hoặc dependency khác khi chưa có gate phê duyệt riêng.
+- Xóa legacy node ID khi chưa impact analysis và migration persisted workflow.
+- Tuyên bố 3D tương tác khi chưa có renderer và bằng chứng nghiệm thu phần cứng.
+
+## 4. Ràng buộc bắt buộc
+
+- Tuân thủ `.agents/rules/RULE.md` và `AGENTS.md`.
+- Code, UI text, API key, log, test, comment và tài liệu tiếng Anh dùng tiếng Anh.
+- Markdown được tạo/sửa có bản `.md.vn`.
+- Frontend chỉ render UI và gọi service xác thực; không chứa training business logic.
+- Backend sở hữu validation, persistence, authorization, orchestration và lifecycle policy.
+- Core node package sở hữu hành vi thuật toán.
+- Node chỉ giao tiếp qua contract và không import implementation node khác.
+- Chỉ dùng dependency hiện có trừ khi người dùng phê duyệt.
+- Chạy GitNexus upstream impact trước khi sửa function/class/method. HIGH/CRITICAL phải cảnh báo và chờ quyết định.
+- Chạy GitNexus change detection trước commit hoặc tuyên bố hoàn thành phase.
+
+## 5. Review hiện trạng
+
+### 5.1 Research
+
+Research hiện tìm/chọn run, hiển thị metrics, lineage, parameters/environment dạng thô, artifacts và lỗi. Backend có experiments, runs, content-addressed artifacts và reproducibility manifests.
+
+Thiếu sót:
+
+- Search hứa tìm code revision nhưng backend chỉ tìm run ID và experiment name.
+- `Compare selected` không có click behavior; comparison tự hiện.
+- Research lặp registry của Models.
+- Reproducibility service có nhưng UI chưa dùng.
+- Chưa nối tạo experiment, immutable dataset, submit/cancel job, progress, evaluation và model registration.
+- `POST /api/research/runs` nhận status/metrics/artifacts do client khai; chỉ ghi ledger, chưa chạy training.
+
+### 5.2 Models
+
+Models hiển thị versions, source runs, integrity, compatibility, aliases, promotion/rollback, reason và event gần nhất. Workflow inspector chọn được promoted validated model.
+
+Thiếu sót:
+
+- API tạo model/version có nhưng UI chưa hoàn chỉnh.
+- Validation/compatibility chủ yếu là raw JSON.
+- Rollback confirmation không nêu target version.
+- `rollback` bị coi sai là alias; nó là action trên `candidate`/`champion`.
+- Thiếu lifecycle history append-only đầy đủ.
+
+### 5.3 Plugin và visualization
+
+Hybrid manifest/inspector đã có nhưng custom inspector là file phẳng, registry tập trung và thiếu dataset/job/result context. `image-output`/`heightmap-output` chọn viewer tường minh đúng hướng; payload chưa đủ cho plot, table, point cloud, mesh và 3D tương tác.
+
+## 6. Ranh giới sở hữu
+
+### Workflow Editor
+
+- Ghép/cấu hình node; chọn immutable dataset/model reference.
+- Launch capability như training và hiện job của node instance.
+- Thêm visualization output node.
+- Lưu portable configuration, không lưu mutable runtime result.
+
+### Research
+
+- Tạo/xem experiment; tìm/lọc/so sánh run.
+- Hiển thị progress, lineage, metrics, resources, parameters, datasets, artifacts và lỗi.
+- Xuất reproducibility manifest; điều hướng về workflow/node.
+- Khởi tạo model registration từ completed validated run.
+
+Research không quản lý alias promotion và không lặp model registry.
+
+### Models
+
+- Tạo model record/version bất biến từ verified run artifact.
+- Hiển thị compatibility/validation.
+- Chỉ có alias `candidate` và `champion`.
+- Preview/thực hiện promotion/rollback có reason.
+- Hiện append-only history/source-run link và cung cấp workflow reference.
+
+### Node runtime/plugin/platform
+
+Runtime package sở hữu validation, preprocessing, training, evaluation, inference, export và output formatting đặc trưng. Plugin tương ứng sở hữu UI cấu hình/kết quả, gọi API xác thực và không mở host path/chạy code. Platform sở hữu auth, immutable-reference resolution, job state, cancellation, resource limits, progress, artifact/checksum, research persistence và lifecycle policy; không chứa logic SVM/HOG.
+
+## 7. Cấu trúc package
+
+```text
+core/nodes/<category>/<node-id>/
+  __init__.py
+  node.py
+  manifest.json
+  documentation.json
+  README.md
+  README.md.vn
+
+frontend/src/node-plugins/<node-id>/
+  index.ts
+  inspector.tsx
+  inspector.test.tsx
+  services.ts
+  types.ts
+  optional result-view.tsx
+  optional preview.tsx
+```
+
+Hai cây dùng chung `nodeId` ổn định nhưng giữ ranh giới Python/Vite.
+
+## 8. Manifest và plugin contract
+
+Manifest v1 vẫn đọc được. V2 thêm action và typed artifact contract tùy chọn:
+
+```json
+{
+  "manifestVersion": 2,
+  "id": "svm-image-classifier",
+  "capabilities": ["configure", "train", "evaluate", "infer", "export"],
+  "actions": {
+    "train": {
+      "datasetInputs": ["training-dataset", "test-dataset"],
+      "executionTargets": ["local-cpu"],
+      "cancellable": true
+    }
+  },
+  "artifactContracts": {
+    "outputs": [
+      {"key": "model", "schema": "aoi.sklearn-pipeline.v1"},
+      {"key": "metrics", "schema": "aoi.classification-metrics.v1"},
+      {"key": "confusion-matrix", "schema": "aoi.confusion-matrix.v1"}
+    ]
+  },
+  "inspector": {"kind": "custom", "customKey": "svm-image-classifier"}
+}
+```
+
+```ts
+interface NodePluginDescriptor {
+  nodeId: string;
+  Inspector?: NodeInspectorPlugin;
+  ResultView?: NodeResultPlugin;
+  Preview?: NodePreviewPlugin;
+}
+```
+
+Plugin context gồm node/manifest, callback parameter, dataset/job client xác thực, recipe/revision/node-instance và navigation callback. Chỉ thay central registry bằng build-time discovery sau khi duplicate/missing tests đạt. Display name và port editor chung ở ngoài plugin.
+
+## 9. Training contract/state machine
+
+Browser gửi intent, không gửi kết quả:
+
+```json
+{
+  "experimentId": "cat-dog-svm",
+  "recipeSlug": "rev-c-mainboard",
+  "workflowRevision": 4,
+  "nodeInstanceId": "node-svm-01",
+  "nodeId": "svm-image-classifier",
+  "nodePackageVersion": "1.0.0",
+  "executionTarget": "local-cpu",
+  "datasetBindings": {
+    "training-dataset": {"datasetId": "cat-dog", "version": "sha256:..."},
+    "test-dataset": {"datasetId": "cat-dog-test", "version": "sha256:..."}
+  },
+  "parameters": {},
+  "randomSeeds": {"python": 42, "numpy": 42}
+}
+```
+
+Server tự ghi code revision, environment, resources, timestamps, metrics, artifacts và errors; từ chối node/action/target sai, dataset mutable/missing, parameter lỗi và request không quyền.
+
+```text
+queued -> preparing-dataset -> validating -> training
+       -> evaluating -> persisting-artifacts -> completed
+
+queued -> cancelled
+safe running state -> cancelling -> cancelled
+any non-terminal state -> failed
+```
+
+Terminal state không chuyển tiếp. Cancellation ở bounded safe checkpoint. Retry tạo run mới tham chiếu parent. Bản đầu dùng bounded polling; SSE/WebSocket để tối ưu sau.
+
+## 10. Hướng API
+
+Contract mới dùng `/api/v1`; route cũ giữ đến khi migration tests đạt:
+
+```text
+POST /api/v1/research/experiments
+GET  /api/v1/research/experiments
+POST /api/v1/research/training-jobs
+GET  /api/v1/research/training-jobs/{runId}
+POST /api/v1/research/training-jobs/{runId}/cancellations
+GET  /api/v1/research/runs
+GET  /api/v1/research/runs/{runId}/reproducibility-manifest
+
+POST /api/v1/models
+GET  /api/v1/models
+POST /api/v1/models/{modelName}/versions
+GET  /api/v1/models/{modelName}/events
+POST /api/v1/models/{modelName}/aliases/{alias}/promotions
+GET  /api/v1/models/{modelName}/aliases/{alias}/rollback-preview
+POST /api/v1/models/{modelName}/aliases/{alias}/rollback
+```
+
+Chỉ `candidate`/`champion` là alias. Promotion cần passed validation và verified artifact. Rollback preview/execution dùng transactional history để target không bị đổi âm thầm.
+
+## 11. Toàn vẹn dataset/artifact
+
+Node nhận immutable dataset handle do platform resolve, không nhận filesystem path từ browser. Dataset version lưu ID, hash/version, split, class mapping, item count và integrity. Artifact lưu SHA-256, media type, byte length, schema, source run và internal URI; không lộ host path. Model version chỉ tham chiếu verified artifact thuộc completed source run.
+
+## 12. Vertical slice SVM
+
+Node ID `svm-image-classifier`, category `classification`, dùng configurable HOG, optional StandardScaler và scikit-learn SVC. Cats/Dogs là dataset label, không phải node identity.
+
+Dataset settings gồm immutable train/test hoặc deterministic split, class mapping, image extensions, invalid-image policy và giới hạn sample/dimension. Feature settings gồm ảnh `128 x 128`, grayscale và HOG window/block/stride/cell/bin đã validate. Model settings gồm scaler, kernel, `C=10`, `gamma=scale`, degree, class weight, probability và seed hỗ trợ.
+
+Output gồm reloadable pipeline, class/preprocessing signature, accuracy, classification-report table, structured confusion matrix, failed-image report, timing và optional PNG/SVG. Artifact phải giữ framework/node/dataset/parameter/checksum lineage và reload được để inference.
+
+## 13. Visualization contract
+
+Generic output pin không tạo viewer. Output node đầu tiên:
+
+- `image-output`: image tensor/PNG/JPEG;
+- `plot-2d-output`: line/scatter/histogram/confusion matrix/static fallback;
+- `table-output`: typed rows/columns;
+- `heightmap-output`: grid/axes/units/fallback;
+- sau khi duyệt: point-cloud, mesh, volume.
+
+Viewer descriptor gồm node instance, title, kind, schemas, artifact endpoint, dimensions, axes/labels/units, interactions và fallback media type. Matplotlib chạy trong Python và xuất PNG/SVG; renderer tương tác nhận typed data, không nhận Python figure. SVM dùng structured confusion matrix, report table và optional static plot. 3D tương tác vẫn dependency-gated.
+
+## 14. Security, lỗi và UX
+
+- Server validation là thẩm quyền; plugin validation chỉ phản hồi nhanh.
+- Error có stable code/message an toàn, không stack trace/host path.
+- Resource limits giới hạn file, byte, dimension, sample, runtime, memory và artifact size.
+- Artifact read xác minh lại checksum/length.
+- Audit append actor, reason, action, previous/next version, timestamp.
+- Production resolve alias thành immutable version + SHA-256 trước execution.
+- Research/Models dùng light responsive layout, semantic heading, keyboard, text status và loading/empty/error state.
+- Structured field là chính; raw JSON chỉ trong advanced details.
+- Training gồm Dataset, Feature extraction, Model, Training, Results; action chống submit trùng và có pending/success/error.
+
+## 15. Migration và tái lập
+
+- Manifest v1/inspector key cũ tương thích trong migration.
+- Route cũ giữ đến khi caller migration/contract tests đạt.
+- Persisted `rollback` alias phải migrate/reject rõ ràng, không reinterpret âm thầm.
+- `image-output`/`heightmap-output` giữ ID.
+- Không xóa persisted node ID khi chưa có impact/migration evidence.
+- Mỗi run ghi experiment, recipe/workflow revision, node instance/package, code revision, immutable datasets, parameters, seeds, environment, resources, state times, metrics, warnings, artifacts, terminal error và actor.
+- Reproducibility JSON không chứa secret/host path.
+
+## 16. Phase và điểm dừng bắt buộc
+
+1. Phase 0 — Tooling và baseline safety.
+2. Phase 1 — Sửa ownership Research/Models.
+3. Phase 2 — Per-node plugin folder/contract.
+4. Phase 3 — Training-job, dataset, artifact, progress platform.
+5. Phase 4 — Vertical slice SVM image classifier.
+6. Phase 5 — Structured 2D/table visualization.
+7. Phase 6 — Nghiệm thu registration, promotion, rollback và production binding.
+8. Phase 7 — Đánh giá dependency/renderer 3D tương tác tùy chọn.
+
+Mỗi task nhỏ kết thúc bằng task checkpoint. Mỗi phase kết thúc bằng full phase checkpoint, cập nhật state và câu hỏi bắt buộc. Không bắt đầu phase kế tiếp nếu chưa có câu trả lời đồng ý rõ ràng.
+
+## 17. Tiêu chí nghiệm thu
+
+- Research có experiment/run và không lặp registry.
+- Models là lifecycle UI duy nhất, có tạo model/version, candidate/champion, rollback thấy target và history.
+- Search đúng lời hứa; comparison tường minh/accessible.
+- Reproducibility manifest xem/tải được.
+- SVM workflow node chọn immutable dataset, launch/cancel, hiện progress và mở run.
+- Training tạo verified reloadable artifact, metrics, report, confusion matrix.
+- Validated run thành immutable version/champion binding.
+- Production resolve alias thành immutable version + SHA-256.
+- Explicit output node quyết định viewer.
+- Node/plugin independence và manifest-integrity tests đạt.
+- Gate frontend/backend/core/integration/build/diff/GitNexus liên quan đạt.
+- Không phase nào tiếp tục nếu chưa ghi nhận user approval sau checkpoint trước.

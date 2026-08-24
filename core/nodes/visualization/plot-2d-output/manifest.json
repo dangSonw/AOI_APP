@@ -1,0 +1,29 @@
+{
+  "manifestVersion": 2,
+  "packageVersion": "1.0.0",
+  "id": "plot-2d-output",
+  "use": "release",
+  "executionTarget": "local-cpu",
+  "capabilities": ["plot-2d-preview"],
+  "resourceHints": {"cpuCores": 1, "memoryMegabytes": 64, "gpuMemoryMegabytes": 0},
+  "actions": {},
+  "artifactContracts": {
+    "inputs": [{"key": "plot-data", "schema": "aoi.plot-series.v1"}, {"key": "confusion-matrix", "schema": "aoi.confusion-matrix.v1"}],
+    "outputs": [{"key": "plot-data", "schema": "aoi.plot-series.v1"}, {"key": "confusion-matrix", "schema": "aoi.confusion-matrix.v1"}]
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "none", "customKey": null},
+  "definition": {
+    "id": "plot-2d-output",
+    "name": "Plot 2D output",
+    "description": "Validates an explicit structured 2D plot or confusion-matrix payload for Dashboard rendering.",
+    "category": "Visualization",
+    "documentation_group": "Output viewers",
+    "inputs": [{"key": "payload", "label": "Plot payload", "direction": "input", "data_type": "generic", "required": true, "variadic": false}],
+    "outputs": [{"key": "validated-payload", "label": "Validated plot payload", "direction": "output", "data_type": "generic", "required": true, "variadic": false}],
+    "parameters": [],
+    "availability": "configuration-only",
+    "documentation_reference": "aoi.plot-series.v1 and aoi.confusion-matrix.v1"
+  },
+  "catalogOrder": 104
+}

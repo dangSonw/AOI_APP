@@ -1,4 +1,4 @@
-import type { NodeInspectorPluginProps } from './types';
+import type { NodeInspectorPluginProps } from '../types';
 
 export function CameraAcquisitionInspector({ node, updateParameter }: NodeInspectorPluginProps) {
   return (

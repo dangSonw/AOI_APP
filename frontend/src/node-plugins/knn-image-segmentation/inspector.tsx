@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { NodeInspectorPluginProps } from './types';
+import type { NodeInspectorPluginProps } from '../types';
 
 type ColorFeature = { label: string; color: [number, number, number] };
 

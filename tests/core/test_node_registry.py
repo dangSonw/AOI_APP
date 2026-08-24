@@ -1,4 +1,5 @@
 import pytest
+import json
 from pathlib import Path
 
 from core.algorithms import get_algorithm_catalog
@@ -9,7 +10,7 @@ def test_every_catalog_definition_has_one_runtime_package() -> None:
     catalog = get_algorithm_catalog()
     registry = get_node_registry()
 
-    assert len(registry) == len(catalog) == 102
+    assert len(registry) == len(catalog) == 105
     assert set(registry) == {definition.id for definition in catalog}
 
 
@@ -36,10 +37,96 @@ def test_every_runtime_package_owns_one_versioned_manifest() -> None:
 
     manifests = get_node_manifest_registry()
 
-    assert len(manifests) == 102
+    assert len(manifests) == 105
     assert set(manifests) == set(get_node_registry())
-    assert all(manifest.manifest_version == 1 for manifest in manifests.values())
+    assert sum(manifest.manifest_version == 1 for manifest in manifests.values()) == 102
+    assert {key for key, value in manifests.items() if value.manifest_version == 2} == {'svm-image-classifier', 'plot-2d-output', 'table-output'}
     assert all(manifest.execution_target in {'local-cpu', 'local-gpu', 'adapter'} for manifest in manifests.values())
+
+
+def test_manifest_v2_projects_typed_actions_and_artifacts_without_breaking_v1(tmp_path: Path) -> None:
+    from core.nodes.registry import _load_manifest, get_node_manifest_registry
+
+    package = tmp_path / 'classification' / 'svm-image-classifier'
+    package.mkdir(parents=True)
+    payload = {
+        'manifestVersion': 2,
+        'packageVersion': '1.0.0',
+        'id': 'svm-image-classifier',
+        'use': 'debug',
+        'executionTarget': 'local-cpu',
+        'capabilities': ['configure', 'train', 'evaluate', 'infer', 'export'],
+        'resourceHints': {'cpuCores': 1, 'memoryMegabytes': 512, 'gpuMemoryMegabytes': 0},
+        'actions': {
+            'train': {
+                'datasetInputs': ['training-dataset', 'test-dataset'],
+                'executionTargets': ['local-cpu'],
+                'cancellable': True,
+            },
+        },
+        'artifactContracts': {
+            'inputs': [],
+            'outputs': [
+                {'key': 'model', 'schema': 'aoi.sklearn-pipeline.v1'},
+                {'key': 'metrics', 'schema': 'aoi.classification-metrics.v1'},
+            ],
+        },
+        'parameterMigrationHooks': [],
+        'inspector': {'kind': 'custom', 'customKey': 'svm-image-classifier'},
+        'definition': {
+            'id': 'svm-image-classifier', 'name': 'SVM image classifier', 'description': 'Train SVM',
+            'category': 'Classification', 'documentation_group': 'Classical machine learning',
+            'inputs': [], 'outputs': [], 'parameters': [], 'availability': 'configuration-only',
+            'documentation_reference': None,
+        },
+        'catalogOrder': 1000,
+    }
+    manifest_path = package / 'manifest.json'
+    manifest_path.write_text(json.dumps(payload), encoding='utf-8')
+
+    manifest = _load_manifest(manifest_path)
+
+    assert manifest.manifest_version == 2
+    assert manifest.actions['train'].dataset_inputs == ('training-dataset', 'test-dataset')
+    assert manifest.actions['train'].cancellable is True
+    assert manifest.artifact_contracts['outputs'][0].schema == 'aoi.sklearn-pipeline.v1'
+    assert manifest.definition.actions == manifest.actions
+    assert manifest.definition.artifact_contracts == manifest.artifact_contracts
+    assert all(
+        not item.actions and not item.definition.actions
+        for item in get_node_manifest_registry().values()
+        if item.manifest_version == 1
+    )
+
+
+@pytest.mark.parametrize('patch', [
+    {'actions': {'execute-shell': {'datasetInputs': [], 'executionTargets': ['local-cpu'], 'cancellable': False}}},
+    {'actions': {'train': {'datasetInputs': ['../dataset'], 'executionTargets': ['local-cpu'], 'cancellable': True}}},
+    {'actions': {'train': {'datasetInputs': [], 'executionTargets': ['remote-worker'], 'cancellable': True}}},
+    {'artifactContracts': {'inputs': [], 'outputs': [{'key': 'model', 'schema': 'invalid schema'}]}},
+])
+def test_manifest_v2_rejects_unknown_actions_and_invalid_contracts(tmp_path: Path, patch: dict[str, object]) -> None:
+    from core.nodes.registry import InvalidNodeRuntime, _load_manifest
+
+    package = tmp_path / 'test' / 'invalid-v2-node'
+    package.mkdir(parents=True)
+    payload = {
+        'manifestVersion': 2, 'packageVersion': '1.0.0', 'id': 'invalid-v2-node', 'use': 'test',
+        'executionTarget': 'local-cpu', 'capabilities': ['configure'], 'resourceHints': {},
+        'actions': {}, 'artifactContracts': {'inputs': [], 'outputs': []}, 'parameterMigrationHooks': [],
+        'inspector': {'kind': 'none', 'customKey': None},
+        'definition': {
+            'id': 'invalid-v2-node', 'name': 'Invalid', 'description': 'Invalid', 'category': 'Test',
+            'documentation_group': 'Test', 'inputs': [], 'outputs': [], 'parameters': [],
+        },
+        'catalogOrder': 1001,
+        **patch,
+    }
+    manifest_path = package / 'manifest.json'
+    manifest_path.write_text(json.dumps(payload), encoding='utf-8')
+
+    with pytest.raises(InvalidNodeRuntime, match='invalid contract'):
+        _load_manifest(manifest_path)
 
 
 def test_manifest_and_runtime_contracts_cannot_drift() -> None:
@@ -87,6 +174,6 @@ def test_every_node_package_has_english_and_vietnamese_documentation() -> None:
     nodes_root = Path('core/nodes')
     package_directories = {path.parent for path in nodes_root.glob('*/*/manifest.json')}
 
-    assert len(package_directories) == 102
+    assert len(package_directories) == 105
     assert all((directory / 'README.md').is_file() for directory in package_directories)
     assert all((directory / 'README.md.vn').is_file() for directory in package_directories)

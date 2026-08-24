@@ -13,9 +13,11 @@ from app.database.session import SessionLocal
 from app.models.inspection_result import InspectionResult
 from app.models.inspection_run import InspectionReviewEvent, InspectionRun
 from app.models.recipe import Recipe
+from app.models.research import ModelAlias, ModelRegistryEntry, ModelVersion, ResearchArtifact, ResearchExperiment, ResearchRun
 from app.models.user import User
 from app.schemas.inspection_run import InspectionRunCreateRequest
 from app.services.inspection_runtime_service import (
+    _production_node_context,
     create_run,
     execute_run,
     get_preview_artifact,
@@ -28,6 +30,60 @@ from core.devices.camera import CaptureRequest, CaptureResult
 from core.devices.models import DeviceMode
 from core.devices.motion import CommandResult, HomeRequest, MotionState, MotionStateName, Position
 from core.nodes import NodeExecutionContext
+from app.schemas.workflow import WorkflowSchema
+from core.pipeline import create_default_workflow
+
+
+def test_production_context_pins_alias_and_exposes_verified_artifact(tmp_path: Path) -> None:
+    import hashlib
+    from dataclasses import replace
+    from app.services.research_service import ArtifactStore
+
+    operator_id, _ = _operator_and_recipe()
+    suffix = uuid4().hex
+    model_name = f'production-svm-{suffix}'
+    store = ArtifactStore(tmp_path / 'models')
+    first_content = b'first-model'
+    second_content = b'second-model'
+    first_record = store.put_bytes(first_content, media_type='application/vnd.aoi.sklearn-pipeline+zip')
+    second_record = store.put_bytes(second_content, media_type='application/vnd.aoi.sklearn-pipeline+zip')
+    with SessionLocal() as session:
+        experiment = ResearchExperiment(id=f'experiment-{suffix}', name=model_name, description='', created_by=operator_id)
+        run = ResearchRun(
+            id=f'run-{suffix}', experiment_id=experiment.id, status='completed', execution_target='local-cpu',
+            code_revision='test', node_versions={}, environment={}, random_seeds={}, resources={},
+            dataset_versions={}, parameters={}, metrics={}, output_artifacts={}, error=None, created_by=operator_id,
+        )
+        session.add_all([experiment, run]); session.flush()
+        artifacts = [
+            ResearchArtifact(run_id=run.id, name=name, sha256=record.sha256, media_type=record.media_type, byte_length=record.byte_length, storage_uri=record.storage_uri)
+            for name, record in (('model-1', first_record), ('model-2', second_record))
+        ]
+        session.add_all(artifacts); session.flush()
+        model = ModelRegistryEntry(name=model_name, description='', created_by=operator_id)
+        session.add(model); session.flush()
+        versions = [
+            ModelVersion(model_id=model.id, version=index, run_id=run.id, artifact_id=artifact.id, validation_evidence={'passed': True}, created_by=operator_id)
+            for index, artifact in enumerate(artifacts, 1)
+        ]
+        session.add_all(versions); session.flush()
+        alias = ModelAlias(model_id=model.id, alias='champion', model_version_id=versions[0].id)
+        session.add(alias); session.commit()
+
+        workflow = create_default_workflow()
+        first_node = workflow.nodes[0]
+        portable = replace(workflow, nodes=(replace(first_node, parameters={**first_node.parameters, 'model': {
+            'modelName': model_name, 'alias': 'champion',
+        }}), *workflow.nodes[1:]))
+        context = _production_node_context(
+            session, WorkflowSchema.from_core(portable), is_cancelled=lambda: False,
+        )
+        alias.model_version_id = versions[1].id
+        session.commit()
+
+        assert context.models[model_name].model_version == 1
+        assert context.models[model_name].artifact_sha256 == hashlib.sha256(first_content).hexdigest()
+        assert context.read_artifact(model_name) == first_content
 from simulator.camera.capture_service import create_test_pattern_png
 
 

@@ -11,6 +11,7 @@ from app.models.research import (
     ModelAlias, ModelPromotionEvent, ModelRegistryEntry, ModelVersion,
     ResearchArtifact, ResearchExperiment, ResearchRun,
 )
+from app.models.user import User
 from app.schemas.base import ApiSchema
 from app.services.research_service import ArtifactIntegrityError, ArtifactRecord, ArtifactStore, ResearchRunRecord, build_reproducibility_manifest
 from app.services.deep_learning_contract import validate_external_artifact_contract
@@ -63,6 +64,13 @@ class RollbackRequest(ApiSchema):
     reason: str = Field(min_length=1, max_length=2000)
 
 
+class ConfirmedRollbackRequest(RollbackRequest):
+    preview_event_id: int = Field(ge=1)
+
+
+SUPPORTED_MODEL_ALIASES = frozenset({'candidate', 'champion'})
+
+
 def _run_payload(run: ResearchRun) -> dict[str, Any]:
     return {
         'id': run.id, 'experimentId': run.experiment_id, 'status': run.status,
@@ -87,24 +95,11 @@ def create_experiment(request: ExperimentCreate, user: CurrentUser, session: Dat
 
 @router.post('/api/research/runs', status_code=status.HTTP_201_CREATED)
 def create_run(request: RunCreate, user: CurrentUser, session: DatabaseSession) -> dict[str, Any]:
-    if request.status not in {'queued', 'running', 'completed', 'failed', 'cancelled'}:
-        raise HTTPException(422, 'Run status is invalid.')
-    if request.execution_target not in {'local-cpu', 'local-gpu', 'remote-worker'}:
-        raise HTTPException(422, 'Execution target is invalid.')
-    if session.get(ResearchExperiment, request.experiment_id) is None:
-        raise HTTPException(404, 'Experiment does not exist.')
-    run = ResearchRun(
-        id=request.id, experiment_id=request.experiment_id, status=request.status,
-        execution_target=request.execution_target, code_revision=request.code_revision,
-        node_versions=request.node_versions, environment=request.environment,
-        random_seeds=request.random_seeds, resources=request.resources,
-        dataset_versions=request.dataset_versions, parameters=request.parameters,
-        metrics=request.metrics, output_artifacts=request.output_artifacts,
-        error=request.error, created_by=user.id,
+    del request, user, session
+    raise HTTPException(
+        status.HTTP_410_GONE,
+        'Client-authored research results are disabled. Use /api/v1/research/training-jobs.',
     )
-    session.add(run)
-    session.commit()
-    return _run_payload(run)
 
 
 @router.get('/api/research/runs')
@@ -112,7 +107,13 @@ def search_runs(_: CurrentUser, session: DatabaseSession, query: str = Query(def
     statement = select(ResearchRun).join(ResearchExperiment).order_by(ResearchRun.created_at.desc()).limit(200)
     if query.strip():
         term = f'%{query.strip()}%'
-        statement = statement.where(or_(ResearchRun.id.ilike(term), ResearchExperiment.name.ilike(term)))
+        statement = statement.where(or_(
+            ResearchRun.id.ilike(term),
+            ResearchRun.experiment_id.ilike(term),
+            ResearchExperiment.name.ilike(term),
+            ResearchRun.code_revision.ilike(term),
+            ResearchRun.execution_target.ilike(term),
+        ))
     return [_run_payload(run) for run in session.scalars(statement)]
 
 
@@ -148,6 +149,7 @@ async def create_artifact(run_id: str, _: CurrentUser, session: DatabaseSession,
 
 
 @router.post('/api/models', status_code=status.HTTP_201_CREATED)
+@router.post('/api/v1/models', status_code=status.HTTP_201_CREATED)
 def create_model(request: ModelCreate, user: CurrentUser, session: DatabaseSession) -> dict[str, Any]:
     if session.scalar(select(ModelRegistryEntry).where(ModelRegistryEntry.name == request.name)):
         raise HTTPException(409, 'Model already exists.')
@@ -194,9 +196,13 @@ def _compatibility(evidence: dict[str, Any]) -> dict[str, str]:
 
 def _model_payload(model: ModelRegistryEntry, session: DatabaseSession) -> dict[str, Any]:
     versions = list(session.scalars(select(ModelVersion).where(ModelVersion.model_id == model.id).order_by(ModelVersion.version.desc())))
+    assignments = list(session.scalars(select(ModelAlias).where(ModelAlias.model_id == model.id)))
+    unsupported_aliases = sorted({assignment.alias for assignment in assignments} - SUPPORTED_MODEL_ALIASES)
+    if unsupported_aliases:
+        raise HTTPException(422, f'Model contains unsupported persisted alias: {unsupported_aliases[0]}.')
     aliases = {
         assignment.alias: version.version
-        for assignment in session.scalars(select(ModelAlias).where(ModelAlias.model_id == model.id))
+        for assignment in assignments
         if (version := session.get(ModelVersion, assignment.model_version_id)) is not None
     }
     return {
@@ -211,28 +217,37 @@ def _model_payload(model: ModelRegistryEntry, session: DatabaseSession) -> dict[
             'validationEvidence': version.validation_evidence,
             'compatibility': _compatibility(version.validation_evidence),
             'deepLearningContract': version.validation_evidence.get('deepLearningContract'),
+            'createdAt': version.created_at,
         } for version in versions if (artifact := session.get(ResearchArtifact, version.artifact_id)) is not None],
     }
 
 
 @router.get('/api/models')
+@router.get('/api/v1/models')
 def list_models(_: CurrentUser, session: DatabaseSession) -> list[dict[str, Any]]:
     return [_model_payload(model, session) for model in session.scalars(select(ModelRegistryEntry).order_by(ModelRegistryEntry.name))]
 
 
 @router.get('/api/models/{model_name}')
+@router.get('/api/v1/models/{model_name}')
 def get_model(model_name: str, _: CurrentUser, session: DatabaseSession) -> dict[str, Any]:
     return _model_payload(_model(session, model_name), session)
 
 
 @router.post('/api/models/{model_name}/versions', status_code=status.HTTP_201_CREATED)
+@router.post('/api/v1/models/{model_name}/versions', status_code=status.HTTP_201_CREATED)
 def create_model_version(model_name: str, request: ModelVersionCreate, user: CurrentUser, session: DatabaseSession) -> dict[str, Any]:
     model = _model(session, model_name)
+    run = session.get(ResearchRun, request.run_id)
+    if run is None or run.status != 'completed':
+        raise HTTPException(422, 'Model version source run must be completed.')
     artifact = session.get(ResearchArtifact, request.artifact_id)
     if artifact is None or artifact.run_id != request.run_id:
         raise HTTPException(422, 'Model artifact lineage does not match research run.')
     _require_verified_artifact(artifact)
     validation_evidence = dict(request.validation_evidence)
+    if validation_evidence.get('passed') is not True:
+        raise HTTPException(422, 'Model version validation evidence must be passed.')
     if request.artifact_contract is not None:
         try:
             validation_evidence['deepLearningContract'] = validate_external_artifact_contract(request.artifact_contract)
@@ -249,16 +264,87 @@ def create_model_version(model_name: str, request: ModelVersionCreate, user: Cur
     return {'id': version.id, 'modelName': model.name, 'version': version.version, 'runId': version.run_id, 'artifactId': version.artifact_id, 'artifactSha256': artifact.sha256, 'validationEvidence': version.validation_evidence, 'deepLearningContract': version.validation_evidence.get('deepLearningContract')}
 
 
+@router.get('/api/v1/research/runs/{run_id}/artifacts')
+def list_run_artifacts(run_id: str, _: CurrentUser, session: DatabaseSession) -> list[dict[str, Any]]:
+    if session.get(ResearchRun, run_id) is None:
+        raise HTTPException(404, 'Research run does not exist.')
+    artifacts = session.scalars(select(ResearchArtifact).where(
+        ResearchArtifact.run_id == run_id,
+    ).order_by(ResearchArtifact.id))
+    return [{
+        'id': artifact.id,
+        'runId': artifact.run_id,
+        'name': artifact.name,
+        'sha256': artifact.sha256,
+        'mediaType': artifact.media_type,
+        'byteLength': artifact.byte_length,
+        'verified': _artifact_is_verified(artifact),
+    } for artifact in artifacts]
+
+
 def _event_payload(event: ModelPromotionEvent, session: DatabaseSession) -> dict[str, Any]:
     previous = session.get(ModelVersion, event.previous_version_id) if event.previous_version_id else None
     next_version = session.get(ModelVersion, event.next_version_id)
-    return {'id': event.id, 'action': event.action, 'alias': event.alias, 'previousVersion': previous.version if previous else None, 'nextVersion': next_version.version, 'reason': event.reason}
+    actor = session.get(User, event.actor_id)
+    return {
+        'id': event.id,
+        'action': event.action,
+        'alias': event.alias,
+        'previousVersion': previous.version if previous else None,
+        'nextVersion': next_version.version,
+        'reason': event.reason,
+        'actor': {'id': actor.id, 'email': actor.email, 'fullName': actor.full_name} if actor else None,
+        'createdAt': event.created_at,
+    }
+
+
+@router.get('/api/v1/models/{model_name}/events')
+def list_model_events(model_name: str, _: CurrentUser, session: DatabaseSession) -> list[dict[str, Any]]:
+    model = _model(session, model_name)
+    events = session.scalars(select(ModelPromotionEvent).where(
+        ModelPromotionEvent.model_id == model.id,
+    ).order_by(ModelPromotionEvent.id.desc()).limit(200))
+    return [_event_payload(event, session) for event in events]
+
+
+def _require_supported_alias(alias: str) -> None:
+    if alias not in SUPPORTED_MODEL_ALIASES:
+        raise HTTPException(422, 'Model alias is unsupported.')
+
+
+def _rollback_source_event(model_id: int, alias: str, session: DatabaseSession) -> ModelPromotionEvent:
+    event = session.scalar(select(ModelPromotionEvent).where(
+        ModelPromotionEvent.model_id == model_id,
+        ModelPromotionEvent.alias == alias,
+        ModelPromotionEvent.previous_version_id.is_not(None),
+    ).order_by(ModelPromotionEvent.id.desc()).limit(1))
+    if event is None or event.previous_version_id is None:
+        raise HTTPException(409, 'Model alias has no prior version to restore.')
+    return event
+
+
+def _rollback_preview_payload(model: ModelRegistryEntry, alias: str, session: DatabaseSession) -> dict[str, Any]:
+    _require_supported_alias(alias)
+    assignment = session.scalar(select(ModelAlias).where(ModelAlias.model_id == model.id, ModelAlias.alias == alias))
+    if assignment is None:
+        raise HTTPException(409, 'Model alias is not assigned.')
+    source_event = _rollback_source_event(model.id, alias, session)
+    current = session.get(ModelVersion, assignment.model_version_id)
+    target = session.get(ModelVersion, source_event.previous_version_id)
+    if current is None or target is None:
+        raise HTTPException(409, 'Model rollback history references a missing version.')
+    return {
+        'alias': alias,
+        'currentVersion': current.version,
+        'targetVersion': target.version,
+        'previewEventId': source_event.id,
+    }
 
 
 @router.post('/api/models/{model_name}/aliases/{alias}/promotions', status_code=status.HTTP_201_CREATED)
+@router.post('/api/v1/models/{model_name}/aliases/{alias}/promotions', status_code=status.HTTP_201_CREATED)
 def promote_model(model_name: str, alias: str, request: PromotionRequest, user: CurrentUser, session: DatabaseSession) -> dict[str, Any]:
-    if alias not in {'candidate', 'champion', 'rollback'}:
-        raise HTTPException(422, 'Model alias is unsupported.')
+    _require_supported_alias(alias)
     model = _model(session, model_name)
     version = session.scalar(select(ModelVersion).where(ModelVersion.model_id == model.id, ModelVersion.version == request.version))
     if version is None:
@@ -285,16 +371,57 @@ def promote_model(model_name: str, alias: str, request: PromotionRequest, user: 
 
 @router.post('/api/models/{model_name}/aliases/{alias}/rollback', status_code=status.HTTP_201_CREATED)
 def rollback_model(model_name: str, alias: str, request: RollbackRequest, user: CurrentUser, session: DatabaseSession) -> dict[str, Any]:
+    _require_supported_alias(alias)
     model = _model(session, model_name)
     assignment = session.scalar(select(ModelAlias).where(ModelAlias.model_id == model.id, ModelAlias.alias == alias).with_for_update())
     if assignment is None:
         raise HTTPException(409, 'Model alias is not assigned.')
-    last = session.scalar(select(ModelPromotionEvent).where(ModelPromotionEvent.model_id == model.id, ModelPromotionEvent.alias == alias, ModelPromotionEvent.previous_version_id.is_not(None)).order_by(ModelPromotionEvent.id.desc()).limit(1))
-    if last is None or last.previous_version_id is None:
-        raise HTTPException(409, 'Model alias has no prior version to restore.')
+    last = _rollback_source_event(model.id, alias, session)
     current_id = assignment.model_version_id
     assignment.model_version_id = last.previous_version_id
     event = ModelPromotionEvent(model_id=model.id, alias=alias, action='rollback', previous_version_id=current_id, next_version_id=last.previous_version_id, actor_id=user.id, reason=request.reason)
+    session.add(event)
+    session.commit()
+    session.refresh(event)
+    return _event_payload(event, session)
+
+
+@router.get('/api/v1/models/{model_name}/aliases/{alias}/rollback-preview')
+def preview_model_rollback(model_name: str, alias: str, _: CurrentUser, session: DatabaseSession) -> dict[str, Any]:
+    return _rollback_preview_payload(_model(session, model_name), alias, session)
+
+
+@router.post('/api/v1/models/{model_name}/aliases/{alias}/rollback', status_code=status.HTTP_201_CREATED)
+def rollback_model_from_preview(model_name: str, alias: str, request: ConfirmedRollbackRequest, user: CurrentUser, session: DatabaseSession) -> dict[str, Any]:
+    _require_supported_alias(alias)
+    model = _model(session, model_name)
+    assignment = session.scalar(select(ModelAlias).where(
+        ModelAlias.model_id == model.id,
+        ModelAlias.alias == alias,
+    ).with_for_update())
+    if assignment is None:
+        raise HTTPException(409, 'Model alias is not assigned.')
+    source_event = _rollback_source_event(model.id, alias, session)
+    if source_event.id != request.preview_event_id:
+        raise HTTPException(409, 'Model rollback preview is stale. Refresh the target before confirming.')
+    target_version = session.get(ModelVersion, source_event.previous_version_id)
+    if target_version is None:
+        raise HTTPException(409, 'Model rollback target version is missing.')
+    target_artifact = session.get(ResearchArtifact, target_version.artifact_id)
+    if target_artifact is None:
+        raise HTTPException(422, 'Model rollback target artifact is missing.')
+    _require_verified_artifact(target_artifact)
+    current_id = assignment.model_version_id
+    assignment.model_version_id = source_event.previous_version_id
+    event = ModelPromotionEvent(
+        model_id=model.id,
+        alias=alias,
+        action='rollback',
+        previous_version_id=current_id,
+        next_version_id=source_event.previous_version_id,
+        actor_id=user.id,
+        reason=request.reason,
+    )
     session.add(event)
     session.commit()
     session.refresh(event)

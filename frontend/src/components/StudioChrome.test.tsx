@@ -30,7 +30,7 @@ describe('StudioChrome', () => {
       </StudioChrome>,
     );
 
-    expect(markup).toContain('Inspection workspace');
+    expect(markup).not.toContain('Inspection workspace');
     expect(markup).toContain('Dashboard content');
     expect(markup).toContain('Run');
     expect(markup).toContain('Calibrate');

@@ -38,7 +38,6 @@ export function StudioChrome({
           <span className="studio-brand__mark" aria-hidden="true">A</span>
           <span>AOI Studio</span>
         </button>
-        <span className="studio-brand__context">Inspection workspace</span>
         <div className="studio-account">
           <StatusBadge status={isMachineReady ? 'success' : 'warning'} label={isMachineReady ? 'Ready' : 'Check I/O'} />
           <span className="studio-account__identity">

@@ -1,83 +1,114 @@
-import { useEffect, useState } from 'react';
-import { readRegisteredModels, searchResearchRuns } from '../services/research-service';
-import type { RegisteredModel, ResearchRun } from '../types/research';
+import { useEffect, useReducer, useState } from 'react';
+import { ReproducibilityManifestDialog } from '../components/research/ReproducibilityManifestDialog';
+import { searchResearchRuns } from '../services/research-service';
+import type { ResearchRun } from '../types/research';
 
 interface ResearchPageProps {
   accessToken: string;
   initialRuns?: ResearchRun[];
-  initialModels?: RegisteredModel[];
+  initialQuery?: string;
 }
 
-export function ResearchPage({ accessToken, initialRuns = [], initialModels = [] }: ResearchPageProps) {
+interface ResearchComparisonState {
+  selectedRunIds: string[];
+  isComparisonOpen: boolean;
+}
+
+type ResearchComparisonAction =
+  | { type: 'select'; runId: string; isSelected: boolean }
+  | { type: 'open' }
+  | { type: 'close' };
+
+const INITIAL_COMPARISON_STATE: ResearchComparisonState = {
+  selectedRunIds: [],
+  isComparisonOpen: false,
+};
+
+const PAGE_SIZE = 20;
+
+export function transitionResearchComparison(
+  state: ResearchComparisonState,
+  action: ResearchComparisonAction,
+): ResearchComparisonState {
+  if (action.type === 'open') {
+    return state.selectedRunIds.length >= 2 ? { ...state, isComparisonOpen: true } : state;
+  }
+  if (action.type === 'close') return { ...state, isComparisonOpen: false };
+
+  const selectedRunIds = action.isSelected
+    ? [...new Set([...state.selectedRunIds, action.runId])]
+    : state.selectedRunIds.filter((runId) => runId !== action.runId);
+  return {
+    selectedRunIds,
+    isComparisonOpen: state.isComparisonOpen && selectedRunIds.length >= 2,
+  };
+}
+
+export function ResearchPage({ accessToken, initialRuns = [], initialQuery = '' }: ResearchPageProps) {
   const [runs, setRuns] = useState(initialRuns);
-  const [models, setModels] = useState(initialModels);
-  const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<string[]>([]);
+  const [query, setQuery] = useState(initialQuery);
+  const [comparison, dispatchComparison] = useReducer(transitionResearchComparison, INITIAL_COMPARISON_STATE);
+  const [manifestRunId, setManifestRunId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (initialRuns.length > 0) return;
-    searchResearchRuns(accessToken).then(setRuns).catch((loadError: unknown) => {
+    searchResearchRuns(accessToken, initialQuery).then(setRuns).catch((loadError: unknown) => {
       setError(loadError instanceof Error ? loadError.message : 'Research runs could not be loaded.');
     });
-  }, [accessToken, initialRuns.length]);
-
-  useEffect(() => {
-    if (initialModels.length > 0) return;
-    readRegisteredModels(accessToken).then(setModels).catch((loadError: unknown) => {
-      setError(loadError instanceof Error ? loadError.message : 'Registered models could not be loaded.');
-    });
-  }, [accessToken, initialModels.length]);
+  }, [accessToken, initialQuery, initialRuns.length]);
 
   const search = async () => {
     setError('');
-    try { setRuns(await searchResearchRuns(accessToken, query)); }
+    try { setRuns(await searchResearchRuns(accessToken, query)); setVisibleCount(PAGE_SIZE); }
     catch (searchError) { setError(searchError instanceof Error ? searchError.message : 'Research search failed.'); }
   };
-  const selectedRuns = runs.filter((run) => selected.includes(run.id));
+  const selectedRuns = runs.filter((run) => comparison.selectedRunIds.includes(run.id));
+  const completedCount = runs.filter((run) => run.status === 'completed').length;
+  const failedCount = runs.filter((run) => run.status === 'failed').length;
+  const visibleRuns = runs.slice(0, visibleCount);
 
   return (
     <section className="research-page" aria-label="Research workspace">
       <header className="research-page__header">
-        <div><h1>Research runs</h1></div>
-        <div className="research-search">
+        <form className="research-search" onSubmit={(event) => { event.preventDefault(); void search(); }}>
           <label htmlFor="research-run-search">Search runs</label>
-          <input id="research-run-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Run, experiment, code revision" />
-          <button type="button" onClick={() => void search()}>Search</button>
-        </div>
+          <input id="research-run-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Run ID, experiment ID or name, code revision, execution target" />
+          <button type="submit">Search</button>
+        </form>
       </header>
+      <ol className="workspace-guide" aria-label="How to use Research">
+        <li><span>1</span><div><strong>Find the right run</strong><p>Search by run, experiment, revision, or execution target.</p></div></li>
+        <li><span>2</span><div><strong>Review the evidence</strong><p>Check status, metrics, lineage, artifacts, and failure details.</p></div></li>
+        <li><span>3</span><div><strong>Compare outcomes</strong><p>Select two or more runs, then compare their recorded metrics.</p></div></li>
+      </ol>
       {error && <div className="studio-message studio-message--error" role="alert">{error}</div>}
-      <div className="research-summary"><span><small>Runs</small><strong>{runs.length}</strong></span><span><small>Completed</small><strong>{runs.filter((run) => run.status === 'completed').length}</strong></span><span><small>Failed</small><strong>{runs.filter((run) => run.status === 'failed').length}</strong></span><button type="button" disabled={selected.length < 2}>Compare selected</button></div>
-      {selectedRuns.length >= 2 && <section className="research-comparison"><h2>Metric comparison</h2>{selectedRuns.map((run) => <article key={run.id}><strong>{run.id}</strong>{Object.entries(run.metrics).map(([key, value]) => <span key={key}>{key.toLocaleUpperCase()} {value}</span>)}</article>)}</section>}
-      <div className="research-run-list">{runs.map((run) => (
+      <div className="research-summary" aria-label="Research run summary">
+        <span className="summary-card"><small>All runs</small><strong>{runs.length}</strong><em>Tracked experiments</em></span>
+        <span className="summary-card summary-card--success"><small>Completed</small><strong>{completedCount}</strong><em>Ready to review</em></span>
+        <span className="summary-card summary-card--danger"><small>Failed</small><strong>{failedCount}</strong><em>Need attention</em></span>
+        <div className="research-summary__action"><span>{comparison.selectedRunIds.length} selected</span><button type="button" disabled={comparison.selectedRunIds.length < 2} onClick={() => dispatchComparison({ type: 'open' })}>Compare selected</button><small>Select at least 2 runs</small></div>
+      </div>
+      {comparison.isComparisonOpen && <section className="research-comparison" aria-label="Selected run comparison"><header><div><span className="section-kicker">Side-by-side review</span><h2>Metric comparison</h2></div><button type="button" className="secondary-button" onClick={() => dispatchComparison({ type: 'close' })}>Close comparison</button></header>{selectedRuns.map((run) => <article key={run.id}><strong>{run.id}</strong>{Object.entries(run.metrics).map(([key, value]) => <span key={key}>{key.toLocaleUpperCase()} {value}</span>)}</article>)}</section>}
+      <div className="section-heading"><div><span className="section-kicker">Run history</span><h2>Training runs</h2><p>Open a run only when you need its technical evidence.</p></div><span>{runs.length} results</span></div>
+      <div className="research-run-list">{visibleRuns.map((run) => (
         <article className={`research-run research-run--${run.status}`} key={run.id}>
-          <header><label><input type="checkbox" checked={selected.includes(run.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, run.id] : current.filter((id) => id !== run.id))} />Compare</label><strong>{run.id}</strong><span>{run.status}</span></header>
-          <div className="research-run__lineage"><span>Code <code>{run.codeRevision}</code></span><span>Target {run.executionTarget}</span><span>Seed {Object.values(run.randomSeeds)[0] ?? '—'}</span></div>
-          <div className="research-run__metrics">{Object.entries(run.metrics).map(([key, value]) => <span key={key}><small>{key.toLocaleUpperCase()}</small><strong>{value}</strong></span>)}</div>
-          <details><summary>Parameters and environment</summary><pre>{JSON.stringify({ nodeVersions: run.nodeVersions, environment: run.environment, resources: run.resources, parameters: run.parameters, datasets: run.datasetVersions }, null, 2)}</pre></details>
-          <details><summary>Artifacts</summary>{Object.keys(run.outputArtifacts).length === 0 ? <p>No output artifacts.</p> : <ul>{Object.entries(run.outputArtifacts).map(([name, hash]) => <li key={name}><strong>{name}</strong><code>{hash}</code></li>)}</ul>}</details>
+          <header className="research-run__header"><div className="research-run__identity"><strong>{run.id}</strong><span>{run.experimentId}</span></div><span className={`status-badge status-badge--${run.status}`}>Status: {run.status.charAt(0).toLocaleUpperCase() + run.status.slice(1)}</span></header>
+          <div className="research-run__toolbar"><label className="comparison-check"><input type="checkbox" checked={comparison.selectedRunIds.includes(run.id)} onChange={(event) => dispatchComparison({ type: 'select', runId: run.id, isSelected: event.target.checked })} />Select for comparison</label>{run.createdAt && <time dateTime={run.createdAt}>{new Date(run.createdAt).toLocaleString()}</time>}</div>
+          <dl className="research-run__lineage"><div><dt>Code revision</dt><dd><code>{run.codeRevision}</code></dd></div><div><dt>Execution target</dt><dd>{run.executionTarget}</dd></div><div><dt>Random seed</dt><dd>Seed {Object.values(run.randomSeeds)[0] ?? '—'}</dd></div></dl>
+          {Object.keys(run.metrics).length > 0 ? <div className="research-run__metrics">{Object.entries(run.metrics).map(([key, value]) => <span key={key}><small>{key.toLocaleUpperCase()}</small><strong>{value}</strong></span>)}</div> : <p className="research-run__no-metrics">No metrics were recorded for this run.</p>}
           {run.error && <div className="research-run__error" role="alert"><strong>Failure diagnostics</strong><p>{run.error}</p></div>}
+          <div className="research-run__details">
+            <details><summary>Parameters and environment</summary><pre>{JSON.stringify({ nodeVersions: run.nodeVersions, environment: run.environment, resources: run.resources, parameters: run.parameters, datasets: run.datasetVersions }, null, 2)}</pre></details>
+            <details><summary>Output artifacts</summary>{Object.keys(run.outputArtifacts).length === 0 ? <p>No output artifacts.</p> : <ul>{Object.entries(run.outputArtifacts).map(([name, hash]) => <li key={name}><strong>{name}</strong><code>{hash}</code></li>)}</ul>}</details>
+          </div>
+          <footer className="research-run__footer"><button type="button" className="secondary-button" onClick={() => setManifestRunId(run.id)}>View reproducibility manifest</button></footer>
         </article>
       ))}</div>
+      {runs.length > PAGE_SIZE && <div className="progressive-list"><span>Showing {visibleRuns.length} of {runs.length} runs</span>{visibleRuns.length < runs.length && <button type="button" className="secondary-button" onClick={() => setVisibleCount((current) => Math.min(current + PAGE_SIZE, runs.length))}>Show {Math.min(PAGE_SIZE, runs.length - visibleRuns.length)} more</button>}</div>}
       {runs.length === 0 && !error && <div className="workflow-empty"><strong>No research runs</strong><p>Create a node-context run from a trainable inspector.</p></div>}
-      <section className="research-models" aria-label="Registered models">
-        <header><h2>Model versions</h2></header>
-        {models.map((model) => (
-          <article className="research-run" key={model.name}>
-            <header><strong>{model.name}</strong><span>{Object.entries(model.aliases).map(([alias, version]) => `${alias} → v${version}`).join(' · ') || 'No promoted alias'}</span></header>
-            <p>{model.description || 'No model description.'}</p>
-            {model.versions.map((version) => (
-              <details key={version.version}>
-                <summary>v{version.version} · {version.artifactVerified ? 'artifact verified' : 'artifact unavailable'} · run {version.runId}</summary>
-                <p><code>{version.artifactSha256}</code></p>
-                <pre>{JSON.stringify({ metrics: version.validationEvidence, compatibility: version.compatibility }, null, 2)}</pre>
-                {version.deepLearningContract && <div><strong>External deep-learning artifact</strong><p>{version.deepLearningContract.format} · {version.deepLearningContract.runtime} {version.deepLearningContract.runtimeVersion}</p><p>{version.deepLearningContract.inputSchema.length} input tensor(s) → {version.deepLearningContract.outputSchema.length} output tensor(s)</p></div>}
-              </details>
-            ))}
-          </article>
-        ))}
-        {models.length === 0 && <div className="workflow-empty"><strong>No registered models</strong><p>Create a version from a completed research run and promote a validated candidate.</p></div>}
-      </section>
+      <ReproducibilityManifestDialog accessToken={accessToken} runId={manifestRunId} onClose={() => setManifestRunId(null)} />
     </section>
   );
 }

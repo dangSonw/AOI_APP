@@ -1,11 +1,13 @@
 import hashlib
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, TypeAlias
 
-from core.algorithms.models import AlgorithmDefinition, ParameterValue
+from core.algorithms.models import (
+    AlgorithmActionDefinition, AlgorithmDefinition, ArtifactContractDefinition, ParameterValue,
+)
 
 from .errors import NodeArtifactIntegrityError, NodeExecutionCancelled
 
@@ -142,11 +144,12 @@ class NodeManifest:
     execution_target: str
     capabilities: tuple[str, ...]
     resource_hints: Mapping[str, int]
-    artifact_contracts: Mapping[str, tuple[str, ...]]
+    artifact_contracts: Mapping[str, tuple[ArtifactContractDefinition, ...]]
     parameter_migration_hooks: tuple[str, ...]
     inspector_kind: str
     custom_inspector_key: str | None
     definition: AlgorithmDefinition
+    actions: Mapping[str, AlgorithmActionDefinition] = field(default_factory=lambda: MappingProxyType({}))
 
 
 @dataclass(frozen=True, slots=True)

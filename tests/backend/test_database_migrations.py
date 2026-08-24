@@ -21,7 +21,7 @@ def test_alembic_script_location_is_independent_of_process_working_directory(mon
     monkeypatch.chdir(PROJECT_ROOT / 'backend')
     scripts = ScriptDirectory.from_config(build_alembic_config('postgresql+psycopg://localhost/aoi_app'))
 
-    assert scripts.get_current_head() == '0006_add_workflow_runtime_events'
+    assert scripts.get_current_head() == '0007_add_research_training_jobs'
 
 
 def test_baseline_inventory_rejects_missing_columns() -> None:

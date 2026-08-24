@@ -1,0 +1,22 @@
+# Node đầu ra biểu đồ 2D
+
+## Mục đích và cách dùng nhanh
+`plot-2d-output` là cổng workflow rõ ràng cho viewer plot-series và confusion-matrix có cấu trúc.
+
+## Cấu trúc node
+```text
+structured payload -> [plot-2d-output] -> validated payload
+```
+
+## Cách nhập tham số
+Node không có tham số. Nối payload `aoi.plot-series.v1` hoặc `aoi.confusion-matrix.v1` hợp lệ.
+
+## Ví dụ sử dụng có thể làm theo ngay
+```json
+{"schema":"aoi.confusion-matrix.v1","labels":["OK","NG"],"matrix":[[9,1],[0,8]]}
+```
+
+## Lỗi thường gặp
+- Thêm explicit node khi viewer không xuất hiện.
+- Giữ dimension matrix khớp label.
+- Chỉ emit plot value hữu hạn và có giới hạn.

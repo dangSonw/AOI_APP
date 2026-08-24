@@ -45,7 +45,7 @@ from app.services.workflow_repository import WorkflowRepository
 from core.devices.camera import CaptureRequest
 from core.devices.models import DeviceMode
 from core.devices.motion import HomeRequest
-from core.nodes import ModelBinding, NodeExecutionCancelled, NodeExecutionContext, get_node_manifest_registry
+from core.nodes import ArtifactBinding, ModelBinding, NodeExecutionCancelled, NodeExecutionContext, get_node_manifest_registry
 from core.pipeline import WorkflowExecutionRecord, execute_workflow
 
 
@@ -421,6 +421,8 @@ def _production_node_context(
     is_cancelled: Callable[[], bool],
 ) -> NodeExecutionContext:
     bindings: dict[str, ModelBinding] = {}
+    artifact_bindings: dict[str, ArtifactBinding] = {}
+    artifact_contents: dict[str, bytes] = {}
     for node in workflow.nodes:
         for reference in _model_references(node.parameters):
             model_name = str(reference['modelName'])
@@ -459,7 +461,23 @@ def _production_node_context(
             if previous is not None and previous != binding:
                 raise InspectionRunError(f'Production model {model_name} has conflicting immutable bindings.')
             bindings[model_name] = binding
-    return NodeExecutionContext(models=bindings, is_cancelled=is_cancelled)
+            artifact_binding = ArtifactBinding(artifact.sha256, artifact.media_type, artifact.byte_length)
+            previous_artifact = artifact_bindings.get(model_name)
+            if previous_artifact is not None and previous_artifact != artifact_binding:
+                raise InspectionRunError(f'Production model {model_name} has conflicting immutable artifacts.')
+            artifact_bindings[model_name] = artifact_binding
+            artifact_contents[artifact.sha256] = artifact_content
+
+    def resolve_artifact(binding: ArtifactBinding) -> bytes:
+        try:
+            return artifact_contents[binding.sha256]
+        except KeyError as error:
+            raise InspectionRunError('Production model artifact is not part of the resolved execution snapshot.') from error
+
+    return NodeExecutionContext(
+        models=bindings, artifacts=artifact_bindings, resolve_artifact=resolve_artifact,
+        is_cancelled=is_cancelled,
+    )
 
 
 def execute_run(

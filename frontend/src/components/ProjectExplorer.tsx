@@ -36,7 +36,10 @@ const EXPLORER_GROUPS: Array<{
   },
   {
     label: 'System',
-    items: [{ label: 'Settings', icon: 'S', view: 'settings' }],
+    items: [
+      { label: 'Help', icon: '?', view: 'help' },
+      { label: 'Settings', icon: 'S', view: 'settings' },
+    ],
   },
 ];
 

@@ -1,0 +1,63 @@
+{
+  "manifestVersion": 2,
+  "packageVersion": "1.0.0",
+  "id": "svm-image-classifier",
+  "use": "release",
+  "executionTarget": "local-cpu",
+  "capabilities": ["configure", "train", "evaluate", "infer", "export"],
+  "resourceHints": {"cpuCores": 2, "memoryMegabytes": 1024, "gpuMemoryMegabytes": 0},
+  "actions": {
+    "train": {"datasetInputs": ["training-dataset", "test-dataset"], "executionTargets": ["local-cpu"], "cancellable": true},
+    "evaluate": {"datasetInputs": ["test-dataset"], "executionTargets": ["local-cpu"], "cancellable": true},
+    "infer": {"datasetInputs": ["test-dataset"], "executionTargets": ["local-cpu"], "cancellable": true},
+    "export": {"datasetInputs": [], "executionTargets": ["local-cpu"], "cancellable": true}
+  },
+  "artifactContracts": {
+    "inputs": [{"key": "model-input", "schema": "aoi.sklearn-pipeline.v1"}],
+    "outputs": [
+      {"key": "model", "schema": "aoi.sklearn-pipeline.v1"},
+      {"key": "metrics", "schema": "aoi.classification-metrics.v1"},
+      {"key": "report", "schema": "aoi.table.v1"},
+      {"key": "confusion-matrix", "schema": "aoi.confusion-matrix.v1"},
+      {"key": "failed-images", "schema": "aoi.failed-images.v1"}
+    ]
+  },
+  "parameterMigrationHooks": [],
+  "inspector": {"kind": "custom", "customKey": "svm-image-classifier"},
+  "definition": {
+    "id": "svm-image-classifier",
+    "name": "SVM image classifier",
+    "description": "Trains and evaluates a bounded HOG plus scikit-learn SVM image classifier from immutable datasets.",
+    "category": "Classification",
+    "documentation_group": "Classical machine learning",
+    "inputs": [],
+    "outputs": [],
+    "parameters": [
+      {"key": "imageWidth", "label": "Image width", "kind": "integer", "default_value": 128, "required": true, "minimum": 1, "maximum": 4096, "options": [], "description": "Resize width in pixels."},
+      {"key": "imageHeight", "label": "Image height", "kind": "integer", "default_value": 128, "required": true, "minimum": 1, "maximum": 4096, "options": [], "description": "Resize height in pixels."},
+      {"key": "hogWindowWidth", "label": "HOG window width", "kind": "integer", "default_value": 128, "required": true, "minimum": 1, "maximum": 4096, "options": [], "description": "Must equal image width."},
+      {"key": "hogWindowHeight", "label": "HOG window height", "kind": "integer", "default_value": 128, "required": true, "minimum": 1, "maximum": 4096, "options": [], "description": "Must equal image height."},
+      {"key": "hogBlockWidth", "label": "HOG block width", "kind": "integer", "default_value": 16, "required": true, "minimum": 2, "maximum": 1024, "options": [], "description": "Must be divisible by cell width."},
+      {"key": "hogBlockHeight", "label": "HOG block height", "kind": "integer", "default_value": 16, "required": true, "minimum": 2, "maximum": 1024, "options": [], "description": "Must be divisible by cell height."},
+      {"key": "hogBlockStrideX", "label": "HOG stride X", "kind": "integer", "default_value": 8, "required": true, "minimum": 1, "maximum": 1024, "options": [], "description": "Horizontal block stride."},
+      {"key": "hogBlockStrideY", "label": "HOG stride Y", "kind": "integer", "default_value": 8, "required": true, "minimum": 1, "maximum": 1024, "options": [], "description": "Vertical block stride."},
+      {"key": "hogCellWidth", "label": "HOG cell width", "kind": "integer", "default_value": 8, "required": true, "minimum": 1, "maximum": 512, "options": [], "description": "Cell width in pixels."},
+      {"key": "hogCellHeight", "label": "HOG cell height", "kind": "integer", "default_value": 8, "required": true, "minimum": 1, "maximum": 512, "options": [], "description": "Cell height in pixels."},
+      {"key": "hogBins", "label": "HOG bins", "kind": "integer", "default_value": 9, "required": true, "minimum": 1, "maximum": 64, "options": [], "description": "Orientation histogram bins."},
+      {"key": "useScaler", "label": "Use StandardScaler", "kind": "boolean", "default_value": true, "required": true, "minimum": null, "maximum": null, "options": [], "description": "Scale HOG features before SVC."},
+      {"key": "kernel", "label": "Kernel", "kind": "select", "default_value": "rbf", "required": true, "minimum": null, "maximum": null, "options": ["linear", "rbf", "poly", "sigmoid"], "description": "SVC kernel."},
+      {"key": "c", "label": "C", "kind": "number", "default_value": 10.0, "required": true, "minimum": 0.000001, "maximum": 1000000, "options": [], "description": "Positive SVC regularization value."},
+      {"key": "gamma", "label": "Gamma", "kind": "json", "default_value": "scale", "required": true, "minimum": null, "maximum": null, "options": [], "description": "scale, auto, or a positive number."},
+      {"key": "degree", "label": "Polynomial degree", "kind": "integer", "default_value": 3, "required": true, "minimum": 1, "maximum": 10, "options": [], "description": "Used only by the poly kernel."},
+      {"key": "classWeight", "label": "Class weight", "kind": "select", "default_value": "none", "required": true, "minimum": null, "maximum": null, "options": ["none", "balanced"], "description": "Optional balanced class weighting."},
+      {"key": "probability", "label": "Probability estimates", "kind": "boolean", "default_value": false, "required": true, "minimum": null, "maximum": null, "options": [], "description": "Enable SVC probability estimates."},
+      {"key": "invalidImagePolicy", "label": "Invalid image policy", "kind": "select", "default_value": "fail", "required": true, "minimum": null, "maximum": null, "options": ["fail", "skip"], "description": "Fail closed or report and skip invalid images."},
+      {"key": "maxSamples", "label": "Maximum samples", "kind": "integer", "default_value": 10000, "required": true, "minimum": 2, "maximum": 100000, "options": [], "description": "Bound loaded samples."},
+      {"key": "maxImagePixels", "label": "Maximum image pixels", "kind": "integer", "default_value": 16777216, "required": true, "minimum": 1, "maximum": 100000000, "options": [], "description": "Bound decoded source dimensions."},
+      {"key": "randomSeed", "label": "Random seed", "kind": "integer", "default_value": 42, "required": true, "minimum": 0, "maximum": 2147483647, "options": [], "description": "Deterministic training seed."}
+    ],
+    "availability": "configuration-only",
+    "documentation_reference": "OpenCV HOGDescriptor and scikit-learn SVC"
+  },
+  "catalogOrder": 95
+}

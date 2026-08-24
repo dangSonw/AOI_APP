@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { createDefaultPreferences } from '../utils/workstation-preferences';
 import type { InspectionRun } from '../types/inspection';
-import type { Workflow } from '../types/workflow';
+import type { AlgorithmDefinition, Workflow } from '../types/workflow';
 import { DashboardPage } from './DashboardPage';
 
 const workflow: Workflow = {
@@ -82,5 +82,55 @@ describe('Project inspection flow runtime state', () => {
     expect(markup).toContain('Popup message 3');
     expect(markup).toContain('Popup message 4');
     expect(markup).not.toContain('Popup message 1');
+  });
+
+  it('renders independently sized structured viewers only for explicit output capabilities', () => {
+    const definition = (id: string, capability: string): AlgorithmDefinition => ({
+      id, name: id, description: '', category: 'Visualization', documentationGroup: 'Output viewers',
+      availability: 'configuration-only', use: 'release', inputs: [], outputs: [], parameters: [],
+      documentationReference: null, manifestVersion: 2, packageVersion: '1.0.0', executionTarget: 'local-cpu',
+      inspectorKind: 'none', customInspectorKey: null, capabilities: capability ? [capability] : [], actions: {}, artifactContracts: {},
+    });
+    const structuredWorkflow: Workflow = {
+      ...workflow,
+      nodes: [
+        { ...workflow.nodes[0], id: 'plot-1', algorithmId: 'plot-2d-output', displayName: 'Confusion matrix' },
+        { ...workflow.nodes[0], id: 'table-1', algorithmId: 'table-output', displayName: 'Classification report' },
+        { ...workflow.nodes[0], id: 'pin-1', algorithmId: 'output-pin', displayName: 'Generic output' },
+      ],
+      executionOrder: ['plot-1', 'table-1', 'pin-1'],
+    };
+    const runState = run('completed');
+    runState.nodeRuns = structuredWorkflow.nodes.map((node, index) => ({
+      sequence: index + 1, nodeId: node.id, algorithmId: node.algorithmId, visitIndex: 1, nodeVersion: '1',
+      executionTarget: 'local-cpu', status: 'completed', parameters: {}, inputs: {}, resources: {}, evidenceSha256: null,
+      errorCode: null, errorMessage: null, startedAt: '', completedAt: '', durationMs: 1, logEvent: null,
+      outputs: { viewerDescriptor: {
+        nodeInstanceId: node.id, title: node.displayName, kind: node.id === 'table-1' ? 'table' : 'plot-2d',
+        schema: node.id === 'table-1' ? 'aoi.table.v1' : 'aoi.confusion-matrix.v1',
+        artifactEndpoint: `/api/v1/research/artifacts/${index + 1}`, width: null, height: null,
+        xLabel: '', yLabel: '', xUnit: '', yUnit: '', interactions: [], fallbackMediaType: null,
+      } },
+    }));
+    const preferences = createDefaultPreferences(1, 'station-01').dashboard;
+    preferences.panels.outputViewers = {
+      'plot-1': { isCollapsed: false, widthUnits: 4, heightUnits: 5 },
+      'table-1': { isCollapsed: false, widthUnits: 8, heightUnits: 7 },
+    };
+
+    const markup = renderToStaticMarkup(<DashboardPage
+      accessToken="token" inputs={null} outputs={null} isLoading={false} error="" isRunning={false}
+      inspectionRun={runState} runError="" onOutputToggle={vi.fn()} workflow={structuredWorkflow} workflowError=""
+      onConfigureWorkflow={vi.fn()} preferences={preferences} onPreferencesChange={vi.fn()}
+      algorithmCatalog={[
+        definition('plot-2d-output', 'plot-2d-preview'), definition('table-output', 'table-preview'), definition('output-pin', ''),
+      ]}
+    />);
+
+    expect(markup).toContain('2D optical view · Confusion matrix');
+    expect(markup).toContain('Table · Classification report');
+    expect(markup).not.toContain('2D optical view · Generic output');
+    expect(markup).toContain('--viewer-width:4;--viewer-height:5');
+    expect(markup).toContain('--viewer-width:8;--viewer-height:7');
   });
 });
